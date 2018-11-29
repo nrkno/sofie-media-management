@@ -52,7 +52,7 @@ export class CoreHandler {
 		this._deviceOptions = deviceOptions
 	}
 
-	init (config: CoreConfig): Promise<void> {
+	async init (config: CoreConfig): Promise<void> {
 		// this.logger.info('========')
 		this._statusInitialized = false
 		this._coreConfig = config
@@ -73,65 +73,46 @@ export class CoreHandler {
 			this.logger.error('Core Error: ' + (err.message || err.toString() || err))
 		})
 
-		return this.core.init(config)
-		.then(() => {
-			this.logger.info('Core id: ' + this.core.deviceId)
-			return this.setupObserversAndSubscriptions()
-		})
-		.then(() => {
-			this._statusInitialized = true
-			return this.updateCoreStatus()
-		})
-		.then(() => {
-			return
-		})
+		await this.core.init(config)
+		this.logger.info('Core id: ' + this.core.deviceId)
+		await this.setupObserversAndSubscriptions()
+		this._statusInitialized = true
+		await this.updateCoreStatus()
+		return
 	}
-	setupObserversAndSubscriptions () {
+	async setupObserversAndSubscriptions () {
 		this.logger.info('Core: Setting up subscriptions..')
 		this.logger.info('DeviceId: ' + this.core.deviceId)
-		return Promise.all([
-			this.core.autoSubscribe('timeline', {
-				deviceId: this.core.deviceId
-			}),
+		await Promise.all([
 			this.core.autoSubscribe('peripheralDevices', {
 				_id: this.core.deviceId
 			}),
 			this.core.autoSubscribe('studioInstallationOfDevice', this.core.deviceId),
 			this.core.autoSubscribe('peripheralDeviceCommands', this.core.deviceId)
 		])
-		.then(() => {
-			this.logger.info('Core: Subscriptions are set up!')
-
-			if (this._observers.length) {
-				this.logger.info('CoreMos: Clearing observers..')
-				this._observers.forEach((obs) => {
-					obs.stop()
-				})
-				this._observers = []
-			}
-			// setup observers
-			let observer = this.core.observe('peripheralDevices')
-			observer.added = (id: string) => {
-				this.onDeviceChanged(id)
-			}
-			observer.changed = (id: string) => {
-				this.onDeviceChanged(id)
-			}
-
-			this.setupObserverForPeripheralDeviceCommands(this)
-
-			return
-		})
+		this.logger.info('Core: Subscriptions are set up!')
+		if (this._observers.length) {
+			this.logger.info('CoreMos: Clearing observers..')
+			this._observers.forEach((obs) => {
+				obs.stop()
+			})
+			this._observers = []
+		}
+		// setup observers
+		let observer = this.core.observe('peripheralDevices')
+		observer.added = (id: string) => {
+			this.onDeviceChanged(id)
+		}
+		observer.changed = (id1: string) => {
+			this.onDeviceChanged(id1)
+		}
+		this.setupObserverForPeripheralDeviceCommands(this)
+		return
 	}
-	destroy (): Promise<void> {
+	async destroy (): Promise<void> {
 		this._statusDestroyed = true
-		return this.updateCoreStatus()
-		.then(() => {
-			return this.core.destroy()
-		})
-		.then(() => {
-			// nothing
-		})
+		await this.updateCoreStatus()
+		await this.core.destroy()
 	}
 	getCoreConnectionOptions (name: string, subDeviceId: string, parentProcess: boolean): CoreOptions {
 		let credentials
@@ -151,7 +132,7 @@ export class CoreHandler {
 			credentials = CoreConnection.getCredentials(subDeviceId)
 		}
 		let options: CoreOptions = _.extend(credentials, {
-			deviceType: (parentProcess ? P.DeviceType.PLAYOUT : P.DeviceType.OTHER),
+			deviceType: P.DeviceType.OTHER,
 			deviceName: name,
 			watchDog: (this._coreConfig ? this._coreConfig.watchdog : true)
 		})
@@ -281,14 +262,14 @@ export class CoreHandler {
 		}
 		return 0
 	}
-	devicesMakeReady (okToDestroyStuff?: boolean): Promise<any> {
+	/* devicesMakeReady (okToDestroyStuff?: boolean): Promise<any> {
 		// TODO: perhaps do something here?
 		return Promise.resolve()
 	}
 	devicesStandDown (okToDestroyStuff?: boolean): Promise<any> {
 		// TODO: perhaps do something here?
 		return Promise.resolve()
-	}
+	} */
 	pingResponse (message: string) {
 		this.core.setPingResponse(message)
 		return true
@@ -337,7 +318,7 @@ export class CoreHandler {
 
 		let dirNames: Array<string> = [
 			// TODO: add any relevant sub-libraries here, to report to Core
-			// 'tv-automation-server-core-integration',
+			'tv-automation-server-core-integration',
 			// 'timeline-state-resolver',
 		]
 		try {

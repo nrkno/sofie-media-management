@@ -1,11 +1,10 @@
 {
   "name": "tv-automation-media-management",
   "version": "0.0.0",
-  "description": "Connect to Core, play stuff",
+  "description": "Connect to Core, synchronize media",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "module": "dist/module/index.js",
-  "browser": "dist/browser/index.js",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -106,9 +105,12 @@
   ],
   "dependencies": {
     "axios": "^0.18.0",
+    "chokidar": "^2.0.4",
+    "pouchdb-node": "^7.0.0",
     "tslib": "^1.9.2",
     "tv-automation-server-core-integration": "0.6.2",
     "underscore": "^1.9.1",
+    "windows-network-drive": "^2.1.1",
     "winston": "^2.4.2"
   }
 }

@@ -19,45 +19,37 @@ export class MediaManager {
 		this._logger = logger
 	}
 
-	init (config: Config): Promise<void> {
+	async init (config: Config): Promise<void> {
 		this._config = config
 
-		return Promise.resolve()
-		.then(() => {
+		try {
+			// await Promise.resolve();
 			this._logger.info('Initializing Core...')
-			return this.initCore()
-		})
-		.then(() => {
+			await this.initCore()
 			this._logger.info('Core initialized')
 			this._logger.info('Initializing MediaManager...')
-			return this.initMediaManager()
-		})
-		.then(() => {
+			await this.initMediaManager()
 			this._logger.info('MediaManager initialized')
 			this._logger.info('Initialization done')
 			return
-		})
-		.catch((e) => {
+		} catch (e) {
 			this._logger.error('Error during initialization:')
 			this._logger.error(e)
 			this._logger.error(e.stack)
-
 			try {
 				if (this.coreHandler) {
 					this.coreHandler.destroy()
-					.catch(this._logger.error)
+						.catch(this._logger.error)
 				}
-			} catch (e) {
-				this._logger.error(e)
+			} catch (e1) {
+				this._logger.error(e1)
 			}
-
 			this._logger.info('Shutting down in 10 seconds!')
 			setTimeout(() => {
 				process.exit(0)
 			}, 10 * 1000)
-
 			return
-		})
+		}
 	}
 	initCore () {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
