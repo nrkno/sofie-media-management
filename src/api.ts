@@ -76,9 +76,9 @@ export interface LocalFolderStorage extends StorageSettings {
 export interface FileShareStorage extends StorageSettings {
 	type: StorageType.FILE_SHARE
 	options: {
-		/** URI to the network share, eg "smb://somehting/share" */
+		/** URI to the network share, eg "\\somehting\share" */
 		basePath: string
-		/** A virtual local drive letter, "E:", the basePath should be mounted to */
+		/** A virtual local drive letter, "E", the basePath should be mounted to */
 		mappedNetworkedDriveTarget: string
 		username?: string // wip?
 		password?: string // wip?
