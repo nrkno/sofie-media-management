@@ -1,10 +1,11 @@
 import { EventEmitter } from 'events'
-import { StorageHandler, File, FileProperties } from './storageHandler'
+import { StorageHandler, File, FileProperties, StorageEventType } from './storageHandler'
 import { LocalFolderStorage, StorageType } from '../api'
 import * as stream from 'stream'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as _ from 'underscore'
+import * as chokidar from 'chokidar'
 
 export class LocalFolderFile implements File {
 	source = StorageType.LOCAL_FOLDER
@@ -37,11 +38,49 @@ interface NestedFiles extends Array<Promise<File | NestedFiles | null>> {}
 
 export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _basePath: string
+	private _watcher: chokidar.FSWatcher
+	private _initialized: boolean = false
 
 	constructor (settings: LocalFolderStorage) {
 		super()
 
 		this._basePath = settings.options.basePath
+	}
+
+	async init (): Promise<void> {
+		this._watcher = chokidar.watch('.', {
+			cwd: this._basePath,
+			ignoreInitial: true,
+			awaitWriteFinish: {
+				stabilityThreshold: 2000,
+				pollInterval: 1000
+			},
+			atomic: true
+		})
+		.on('error', this.onError)
+		.on('add', this.onAdd)
+		.on('change', this.onChange)
+		.on('unlink', this.onUnlink)
+
+		return new Promise<void>((resolve) => {
+			this._watcher.on('ready', () => {
+				this._initialized = true
+				resolve()
+			})
+		})
+	}
+
+	async destroy (): Promise<void> {
+		return new Promise<void>((resolve, reject) => {
+			setTimeout(() => {
+				if (this._initialized) {
+					this._watcher.close()
+					resolve()
+					return
+				}
+				reject()
+			})
+		})
 	}
 
 	async getAllFiles (): Promise<File[]> {
@@ -103,7 +142,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		}
 	}
 
-	dropFile (file: File): Promise<void> {
+	deleteFile (file: File): Promise<void> {
 		return new Promise((resolve, reject) => {
 			fs.unlink(file.url, (err) => {
 				if (err) {
@@ -131,6 +170,33 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 				})
 			})
 		})
+	}
+
+	private onUnlink = (filePath: string) => {
+		this.emit(StorageEventType.delete, {
+			type: StorageEventType.delete,
+			path: filePath
+		})
+	}
+
+	private onChange = (filePath: string) => {
+		this.emit(StorageEventType.change, {
+			type: StorageEventType.change,
+			path: filePath,
+			file: new LocalFolderFile(path.join(this._basePath, filePath))
+		})
+	}
+
+	private onAdd = (filePath: string) => {
+		this.emit(StorageEventType.add, {
+			type: StorageEventType.add,
+			path: filePath,
+			file: new LocalFolderFile(path.join(this._basePath, filePath))
+		})
+	}
+
+	private onError = (e: any) => {
+		process.stderr.write(e)
 	}
 
 	private createFile (sourceFile: File): LocalFolderFile {

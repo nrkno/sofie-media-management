@@ -17,12 +17,27 @@ export interface FileProperties {
 	modified: Time
 }
 
+export enum StorageEventType {
+	add = 'add',
+	change = 'change',
+	delete = 'delete'
+}
+
+export interface StorageEvent {
+	type: StorageEventType,
+	path: string
+	file?: File
+}
+
 export interface StorageHandler extends EventEmitter {
 	getAllFiles (): Promise<Array<File>>
 
 	getFile (name: string): Promise<File>
 	putFile (file: File): Promise<File>
-	dropFile (file: File): Promise<void>
+	deleteFile (file: File): Promise<void>
 
 	getFileProperties (file: File): Promise<FileProperties>
+
+	init (): Promise<void>
+	destroy (): Promise<void>
 }
