@@ -2,7 +2,7 @@ import { EventEmitter } from 'events'
 import { StorageHandler, File, FileProperties, StorageEventType } from './storageHandler'
 import { LocalFolderStorage, StorageType } from '../api'
 import * as stream from 'stream'
-import * as fs from 'fs'
+import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
@@ -110,13 +110,20 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			// Use fast copy if possible
 			return new Promise((resolve, reject) => {
 				const localFile = this.createFile(file)
-				fs.copyFile(file.url, localFile.url, (err) => {
+				fs.ensureDir(path.dirname(localFile.url), (err) => {
 					if (err) {
 						reject(err)
 						return
 					}
 
-					resolve()
+					fs.copyFile(file.url, localFile.url, (err) => {
+						if (err) {
+							reject(err)
+							return
+						}
+
+						resolve()
+					})
 				})
 			})
 		} else {
@@ -124,16 +131,23 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			return new Promise((resolve, reject) => {
 				file.getReadableStream().then((rStream) => {
 					const localFile = this.createFile(file)
-					localFile.getWritableStream().then((wStream) => {
-						rStream.on('end', () => {
-							resolve(localFile)
-						})
-						rStream.on('error', reject)
-						wStream.on('error', reject)
+					fs.ensureDir(path.dirname(localFile.url), (err) => {
+						if (err) {
+							reject(err)
+							return
+						}
 
-						rStream.pipe(wStream)
-					}, (reason) => {
-						reject(reason)
+						localFile.getWritableStream().then((wStream) => {
+							rStream.on('end', () => {
+								resolve(localFile)
+							})
+							rStream.on('error', reject)
+							wStream.on('error', reject)
+
+							rStream.pipe(wStream)
+						}, (reason) => {
+							reject(reason)
+						})
 					})
 				}, (reason) => {
 					reject(reason)

@@ -105,6 +105,7 @@
   ],
   "dependencies": {
     "@types/chokidar": "^1.7.5",
+    "@types/pouchdb-node": "^6.1.2",
     "axios": "^0.18.0",
     "chokidar": "^2.0.4",
     "chokidar-cli": "^1.2.1",
