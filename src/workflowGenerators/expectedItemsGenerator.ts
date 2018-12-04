@@ -1,18 +1,22 @@
-import * as PouchDB from 'pouchdb-node'
+import * as Winston from 'winston'
 import { BaseWorkFlowGenerator } from './baseWorkFlowGenerator'
 export * from './baseWorkFlowGenerator'
 
 import { CoreHandler } from '../coreHandler'
 import { ExpectedMediaItem } from '../api'
+import { TrackedMediaItems } from '../mediaItemTracker'
+import { StorageObject } from '../storageHandlers/storageHandler'
 
 export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _coreHandler: CoreHandler
-	private _db: PouchDB.Database
+	private _tracked: TrackedMediaItems
+	logger: Winston.LoggerInstance
 
-	constructor (coreHandler: CoreHandler, database: PouchDB.Database) {
+	constructor (logger: Winston.LoggerInstance, availableStorage: StorageObject[], coreHandler: CoreHandler, tracked: TrackedMediaItems) {
 		super()
 		this._coreHandler = coreHandler
-		this._db = database
+		this._tracked = tracked
+		this.logger = logger
 	}
 
 	async getCoreExpectedMediaItems (): Promise<Array<ExpectedMediaItem>> {

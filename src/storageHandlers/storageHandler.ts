@@ -1,6 +1,10 @@
-import { StorageType, Time } from '../api'
+import { StorageType, Time, StorageSettings } from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
+
+export interface StorageObject extends StorageSettings {
+	handler: StorageHandler
+}
 
 export interface File {
 	name: string

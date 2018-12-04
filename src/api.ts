@@ -43,14 +43,6 @@ interface MediaFlow {
 	destinationId: string
 }
 
-export interface TrackedMediaItem {
-	_id: string
-	expectedMediaItemId: string
-	storageId: string
-	lastSeen: Time
-	lingerTime: Duration
-}
-
 export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
 	FILE_SHARE = 'file_share'
@@ -99,7 +91,7 @@ export interface WorkFlow {
 	finished: boolean
 }
 
-enum WorkFlowSource {
+export enum WorkFlowSource {
 	EXPECTED_MEDIA_ITEM = 'expected_media_item',
 	SOURCE_STORAGE_REMOVE = 'source_storage_remove',
 	LOCAL_MEDIA_ITEM = 'local_media_item',
@@ -117,14 +109,14 @@ export interface WorkStep {
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 }
-enum WorkStepStatus {
+export enum WorkStepStatus {
 	IDLE = 'idle',
 	WORKING = 'working',
 	DONE = 'done',
 	ERROR = 'error',
 	CANCELED = 'canceled'
 }
-enum WorkStepAction {
+export enum WorkStepAction {
 	COPY = 'copy',
 	DELETE = 'delete',
 	GENERATE_THUMBNAIL = 'generate_thumbnail',
