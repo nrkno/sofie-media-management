@@ -104,14 +104,17 @@
     "production"
   ],
   "dependencies": {
+    "@types/asap": "^2.0.0",
     "@types/chokidar": "^1.7.5",
     "@types/pouchdb-node": "^6.1.2",
+    "asap": "^2.0.6",
     "axios": "^0.18.0",
     "chokidar": "^2.0.4",
-    "chokidar-cli": "^1.2.1",
+    "class-transformer": "^0.2.0",
     "fs-extra": "^7.0.1",
     "pouchdb-find": "^7.0.0",
     "pouchdb-node": "^7.0.0",
+    "reflect-metadata": "^0.1.12",
     "tslib": "^1.9.2",
     "tv-automation-server-core-integration": "0.6.2",
     "underscore": "^1.9.1",

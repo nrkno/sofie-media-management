@@ -1,15 +1,16 @@
 import * as Winston from 'winston'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 import { File, StorageEvent, StorageObject, StorageEventType } from '../storageHandlers/storageHandler'
-import { TrackedMediaItems, TrackedMediaItem, TrackedMediaItemBase } from '../mediaItemTracker'
+import { TrackedMediaItems, TrackedMediaItemBase } from '../mediaItemTracker'
 export * from './baseWorkFlowGenerator'
-import { getCurrentTime, literal } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepStatus, WorkStep } from '../api'
-import { CopyWorkStep, GenMetadataWorkStep, GenThumbnailWorkStep } from '../work/workStep'
+import { getCurrentTime, literal, randomId } from '../lib/lib'
+import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepBase } from '../api'
+import { FileWorkStep } from '../work/workStep'
+import { LocalFolderFile } from '../storageHandlers/localFolderHandler';
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
-	private _availableStorage: StorageObject[]
-	private _tracked: TrackedMediaItems
+	protected _availableStorage: StorageObject[]
+	protected _tracked: TrackedMediaItems
 	logger: Winston.LoggerInstance
 
 	private LOCAL_LINGER_TIME = 7 * 24 * 60 * 60 * 1000
@@ -22,6 +23,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	}
 
 	async init (): Promise<void> {
+		this.logger.debug(`Initializing WorkFlow generator ${this.constructor.name}`)
 		return Promise.resolve().then(() => {
 			this._availableStorage.forEach((item) => {
 				if (item.manualIngest) this.registerStorage(item)
@@ -34,34 +36,35 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	}
 
 	protected registerStorage (st: StorageObject) {
+		this.logger.debug(`Registering storage: "${st.id}" in ${this.constructor.name}`)
 		st.handler.on(StorageEventType.add, (e: StorageEvent) => this.onAdd(st, e))
 		st.handler.on(StorageEventType.change, (e: StorageEvent) => this.onChange(st, e))
 		st.handler.on(StorageEventType.delete, (e: StorageEvent) => this.onDelete(st, e))
 
 		this.initialCheck(st).then(() => {
-			this.logger.info(`Initial localStorageGenerator scan for "${st.id}" complete.`)
+			this.logger.info(`Initial ${this.constructor.name} scan for "${st.id}" complete.`)
 		}, (e) => {
-			this.logger.info(`Initial localStorageGenerator scan for "${st.id}" failed: ${e}.`)
+			this.logger.info(`Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
 		})
 	}
 
-	protected generateChangedFileWorkSteps (file: File): WorkStep[] {
-		return this.generateNewFileWorkSteps(file)
+	protected generateChangedFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+		return this.generateNewFileWorkSteps(file, st)
 	}
 
-	protected generateNewFileWorkSteps (file: File): WorkStep[] {
+	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
 		return [
-			literal<GenMetadataWorkStep>({
+			new FileWorkStep({
 				action: WorkStepAction.GENERATE_METADATA,
 				file: file,
-				priority: 1,
-				status: WorkStepStatus.IDLE
+				target: st,
+				priority: 1
 			}),
-			literal<GenThumbnailWorkStep>({
+			new FileWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
 				file: file,
-				priority: 1,
-				status: WorkStepStatus.IDLE
+				target: st,
+				priority: 0.5
 			})
 		]
 	}
@@ -84,14 +87,14 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 			this.logger.debug(`File "${e.path}" is already tracked, "${st.id}" ignoring.`)
 		}, () => {
 			this.registerFile(localFile, st).then(() => {
-				this.logger.debug(`File "${e.path}" has started to be tracked by localStorageGenerator for "${st.id}".`)
-				const workflowId = e.path + '_' + getCurrentTime()
+				this.logger.debug(`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
+				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
-					id: workflowId,
+					_id: workflowId,
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
-					steps: this.generateNewFileWorkSteps(localFile)
+					steps: this.generateNewFileWorkSteps(localFile, st)
 				}))
 				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
 			}).catch((e) => {
@@ -105,13 +108,13 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		const localFile = e.file
 		this._tracked.getById(e.path).then((tmi) => {
 			if (tmi.sourceStorageId === st.id) {
-				const workflowId = e.path + '_' + getCurrentTime()
+				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
-					id: workflowId,
+					_id: workflowId,
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
-					steps: this.generateNewFileWorkSteps(localFile)
+					steps: this.generateNewFileWorkSteps(localFile, st)
 				}))
 				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
 			}
@@ -125,6 +128,8 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 			if (tmi.sourceStorageId === st.id) {
 				this._tracked.remove(tmi).then(() => {
 					this.logger.debug(`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
+				}, (e) => {
+					this.logger.error(`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
 				})
 			}
 			// TODO: generate a pull from sourceStorage?
@@ -142,12 +147,17 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					const trackedFile = await this._tracked.getById(file.name)
 					if (trackedFile.sourceStorageId === st.id) {
 						trackedFile.lastSeen = initialScanTime
-						this._tracked.put(trackedFile)
+						try {
+							await this._tracked.put(trackedFile)
+						} catch (e1) {
+							this.logger.error(`Could not update "${trackedFile.name}" last seen: ${e1}`)
+						}
 					}
 				} catch (e) {
 					this.onAdd(st,{
 						type: StorageEventType.add,
-						path: file.name
+						path: file.name,
+						file: file
 					})
 				}
 			}))

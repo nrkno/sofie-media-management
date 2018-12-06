@@ -1,5 +1,13 @@
 import * as Winston from 'winston'
+import * as _ from 'underscore'
+import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
+import { StorageSettings, StorageType } from './api'
+import { StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
+import { TrackedMediaItems } from './mediaItemTracker'
+import { Dispatcher } from './work/dispatcher'
+import { BaseWorkFlowGenerator } from './workflowGenerators/baseWorkFlowGenerator'
+import { WatchFolderGenerator } from './workflowGenerators/watchFolderGenerator'
 
 export interface Config {
 	device: DeviceConfig
@@ -15,6 +23,11 @@ export class MediaManager {
 	private _config: Config
 	private _logger: Winston.LoggerInstance
 
+	private _availableStorage: StorageObject[]
+	private _trackedMedia: TrackedMediaItems
+	private _dispatcher: Dispatcher
+	private _workFlowGenerators: BaseWorkFlowGenerator[]
+
 	constructor (logger: Winston.LoggerInstance) {
 		this._logger = logger
 	}
@@ -25,7 +38,8 @@ export class MediaManager {
 		try {
 			// await Promise.resolve();
 			this._logger.info('Initializing Core...')
-			await this.initCore()
+			// await this.initCore()
+			this._logger.info('Skipping core initialization, just for now')
 			this._logger.info('Core initialized')
 			this._logger.info('Initializing MediaManager...')
 			await this.initMediaManager()
@@ -57,7 +71,56 @@ export class MediaManager {
 	}
 	initMediaManager (): Promise<void> {
 		// TODO: Initialize Media Manager
-		return Promise.resolve()
+		const storage: StorageSettings[] = [
+			{
+				id: 'local0',
+				type: StorageType.LOCAL_FOLDER,
+				support: {
+					read: true,
+					write: false
+				},
+				options: {
+					basePath: './source'
+				},
+				watchFolder: true,
+				watchFolderTargetId: 'local1'
+			},
+			{
+				id: 'local1',
+				type: StorageType.LOCAL_FOLDER,
+				support: {
+					read: true,
+					write: true
+				},
+				options: {
+					basePath: './target'
+				}
+			}
+		]
 
+		this._availableStorage = _.map(storage, (item) => {
+			return extendMandadory<StorageSettings, StorageObject>(item, {
+				handler: buildStorageHandler(item)
+			})
+		})
+
+		this._trackedMedia = new TrackedMediaItems(this._logger)
+
+		this._workFlowGenerators = []
+		this._workFlowGenerators.push(
+			new WatchFolderGenerator(this._logger, this._availableStorage, this._trackedMedia)
+		)
+
+
+		this._dispatcher = new Dispatcher(
+			this._logger,
+			this._workFlowGenerators,
+			this._availableStorage,
+			3)
+
+		return Promise.resolve()
+			.then(() => Promise.all(this._availableStorage.map((st) => st.handler.init())))
+			.then(() => this._dispatcher.init())
+			.then(() => { return })
 	}
 }

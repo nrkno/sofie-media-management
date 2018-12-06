@@ -7,6 +7,18 @@ import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
 
+function getLocalFileProperties (fileUrl: string): Promise<FileProperties> {
+	return new Promise((resolve, reject) => {
+		fs.stat(fileUrl).then((stats) => {
+			resolve({
+				created: stats.ctimeMs,
+				modified: stats.mtimeMs,
+				size: stats.size
+			})
+		}, err => reject(err))
+	})
+}
+
 export class LocalFolderFile implements File {
 	source = StorageType.LOCAL_FOLDER
 	private _name: string
@@ -14,11 +26,15 @@ export class LocalFolderFile implements File {
 	private _read: boolean
 	private _write: boolean
 
-	constructor (url: string, read: boolean, write: boolean, name?: string) {
-		this._url = url
-		this._name = name || path.basename(url)
-		this._read = !!read
-		this._write = !!write
+	constructor ()
+	constructor (url: string, read: boolean, write: boolean, name?: string)
+	constructor (url?: string, read?: boolean, write?: boolean, name?: string) {
+		if (url) {
+			this._url = url
+			this._name = name || path.basename(url)
+			this._read = !!read
+			this._write = !!write
+		}
 	}
 
 	get name (): string {
@@ -37,6 +53,10 @@ export class LocalFolderFile implements File {
 	async getReadableStream (): Promise<stream.Readable> {
 		if (!this._read) throw Error(`File "${this._name}" is not readable.`)
 		return fs.createReadStream(this._url)
+	}
+
+	async getProperties (): Promise<FileProperties> {
+		return getLocalFileProperties(this._url)
 	}
 }
 
@@ -112,27 +132,45 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
-	putFile (file: File): Promise<File> {
+	putFile (file: File, progressCallback?: (progress: number) => void): Promise<File> {
+		function progressMonitorFunc (localFile: File, sourceProperties: FileProperties): (() => void) {
+			return (() => {
+				localFile.getProperties().then((targetProperties) => {
+					if (typeof progressCallback === 'function') {
+						progressCallback(targetProperties.size / sourceProperties.size)
+					}
+				}, () => {
+					// this is just to report progress on the file
+				})
+			})
+		}
+
 		if (!this._writable) throw Error('This storage is not writable.')
 		if ((file.source === StorageType.LOCAL_FOLDER) || (file.source === StorageType.FILE_SHARE)) {
 			// Use fast copy if possible
 			return new Promise((resolve, reject) => {
 				const localFile = this.createFile(file)
-				fs.ensureDir(path.dirname(localFile.url)).then(() => {
-					fs.exists(file.url, async (exists) => {
-						if (exists) {
-							await fs.unlink(file.url)
-						}
-
-						fs.copyFile(file.url, localFile.url, (err) => {
-							if (err) {
-								reject(err)
-								return
+				file.getProperties().then((sourceProperties) => {
+					fs.ensureDir(path.dirname(localFile.url)).then(() => {
+						fs.access(file.url, async (exists) => {
+							if (exists) {
+								await fs.unlink(file.url)
 							}
 
-							resolve()
+							const progressMonitor = setInterval(progressMonitorFunc(localFile, sourceProperties), 500)
+
+							fs.copyFile(file.url, localFile.url, (err) => {
+								clearInterval(progressMonitor)
+
+								if (err) {
+									reject(err)
+									return
+								}
+
+								resolve()
+							})
 						})
-					})
+					}, (err) => reject(err))
 				}, (err) => reject(err))
 			})
 		} else {
@@ -140,19 +178,31 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			return new Promise((resolve, reject) => {
 				file.getReadableStream().then((rStream) => {
 					const localFile = this.createFile(file)
-					fs.ensureDir(path.dirname(localFile.url)).then(() => {
-						localFile.getWritableStream().then((wStream) => {
-							rStream.on('end', () => {
-								resolve(localFile)
-							})
-							rStream.on('error', reject)
-							wStream.on('error', reject)
+					file.getProperties().then((sourceProperties) => {
+						fs.ensureDir(path.dirname(localFile.url)).then(() => {
+							localFile.getWritableStream().then((wStream) => {
+								const progressMonitor = setInterval(progressMonitorFunc(localFile, sourceProperties), 500)
 
-							rStream.pipe(wStream)
-						}, (reason) => {
-							reject(reason)
-						})
-					}, err => reject(err))
+								function handleError (e) {
+									clearInterval(progressMonitor)
+									reject(e)
+								}
+
+								rStream.on('end', () => {
+									clearInterval(progressMonitor)
+									resolve(localFile)
+								})
+								rStream.on('error', handleError)
+								wStream.on('error', handleError)
+
+								rStream.pipe(wStream)
+							}, (reason) => {
+								reject(reason)
+							})
+						}, err => reject(err))
+					}, (e) => {
+						throw new Error(`Could not get file properties for file: "${file.name}": ${e}`)
+					})
 				}, reason => reject(reason))
 			})
 		}
@@ -166,15 +216,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	}
 
 	getFileProperties (file: File): Promise<FileProperties> {
-		return new Promise((resolve, reject) => {
-			fs.stat(file.url).then((stats) => {
-				resolve({
-					created: stats.ctimeMs,
-					modified: stats.mtimeMs,
-					size: stats.size
-				})
-			}, err => reject(err))
-		})
+		return getLocalFileProperties(file.url)
 	}
 
 	private onUnlink = (filePath: string) => {

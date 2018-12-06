@@ -4,6 +4,7 @@ export * from './api/mediaObject'
 export interface DeviceSettings {
 	storages: Array<Storage>
 	mediaFlows: Array<MediaFlow>
+	workers: number
 }
 
 /**
@@ -55,9 +56,12 @@ export interface StorageSettings {
 		read: boolean
 		write: boolean
 	}
-	manualIngest?: boolean
 	type: StorageType
 	options: any
+
+	manualIngest?: boolean
+	watchFolder?: boolean
+	watchFolderTargetId?: string
 }
 export interface LocalFolderStorage extends StorageSettings {
 	type: StorageType.LOCAL_FOLDER
@@ -78,17 +82,21 @@ export interface FileShareStorage extends StorageSettings {
 }
 
 export interface WorkFlow {
-	id: string
+	_id: string
 
 	source: WorkFlowSource
 	/** Id of the expectedMedia Item */
 	expectedMediaItemId?: string
 	mediaObjectId?: string
-	steps: Array<WorkStep>
+	steps: Array<WorkStepBase>
 
 	priority: number
 
 	finished: boolean
+}
+
+export interface WorkFlowDB extends WorkFlow {
+	steps: never
 }
 
 export enum WorkFlowSource {
@@ -98,7 +106,7 @@ export enum WorkFlowSource {
 	TARGET_STORAGE_REMOVE = 'local_storage_remove'
 }
 
-export interface WorkStep {
+export abstract class WorkStepBase {
 	action: WorkStepAction
 	status: WorkStepStatus
 	messages?: Array<string>
@@ -108,14 +116,21 @@ export interface WorkStep {
 	progress?: number
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
+
+	constructor (init?: Partial<WorkStepBase>) {
+		Object.assign(this, init)
+	}
 }
+
 export enum WorkStepStatus {
 	IDLE = 'idle',
 	WORKING = 'working',
 	DONE = 'done',
 	ERROR = 'error',
-	CANCELED = 'canceled'
+	CANCELED = 'canceled',
+	BLOCKED = 'blocked'
 }
+
 export enum WorkStepAction {
 	COPY = 'copy',
 	DELETE = 'delete',

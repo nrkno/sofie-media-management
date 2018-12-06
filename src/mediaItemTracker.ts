@@ -1,7 +1,8 @@
-import { Time, Duration } from './api'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
+import * as Winston from 'winston'
+import { Time, Duration } from './api'
 
 export interface TrackedMediaItemBase {
 	_id: string
@@ -22,17 +23,29 @@ export interface TrackedMediaItem extends TrackedMediaItemBase {
 
 export class TrackedMediaItems {
 	private _db: PouchDB.Database
+	logger: Winston.LoggerInstance
 
-	constructor () {
+	constructor (logger: Winston.LoggerInstance) {
+		this.logger = logger
+
 		PouchDB.plugin(PouchDBFind)
 
-		this._db = new PouchDB('trackedMediaItems')
+		const PrefixedPouchDB = PouchDB.defaults({
+			prefix: './db/'
+		} as any)
+
+		this._db = new PrefixedPouchDB('trackedMediaItems')
 		this._db.compact()
-		this._db.createIndex({ index: {
-			fields: ['sourceStorageId']
-		}}).then(() => {
+		.then(() => {
+			return this._db.createIndex({
+				index: {
+					fields: ['sourceStorageId']
+				}
+			})
+		})
+		.then(() => {
 			// Index created
-		}, () => console.log('Index could not be created.'))
+		}, () => this.logger.error('trackedMediaItems: Index "sourceStorageId" could not be created.'))
 	}
 
 	async put (tmi: TrackedMediaItemBase): Promise<string> {

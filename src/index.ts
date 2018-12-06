@@ -1,6 +1,8 @@
+import 'reflect-metadata'
 import { MediaManager } from './mediaManager'
 import { config, logPath, disableWatchdog } from './config'
 import * as Winston from 'winston'
+import * as PouchDB from 'pouchdb-node'
 
 let manager: MediaManager
 // Setup logging --------------------------------------
@@ -36,6 +38,7 @@ if (logPath) {
 	logger.add(Winston.transports.Console,{
 		handleExceptions: true,
 		json: true,
+		level: 'debug',
 		stringify: (obj) => {
 			obj.localTimestamp = getCurrentTime()
 			obj.randomId = Math.round(Math.random() * 10000)
