@@ -2,6 +2,7 @@ import * as _ from 'underscore'
 import * as Winston from 'winston'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
+import * as fs from 'fs-extra'
 import { EventEmitter } from 'events'
 
 import { extendMandadory, randomId } from '../lib/lib'
@@ -19,8 +20,8 @@ export class Dispatcher extends EventEmitter {
 
 	private _workers: Worker[] = []
 
-	private _workFlows: PouchDB.Database
-	private _workSteps: PouchDB.Database
+	private _workFlows: PouchDB.Database<WorkFlowDB>
+	private _workSteps: PouchDB.Database<WorkStep>
 	private _availableStorage: StorageObject[]
 	private _tmi: TrackedMediaItems
 
@@ -31,6 +32,7 @@ export class Dispatcher extends EventEmitter {
 		this.generators = generators
 		this._tmi = tmi
 
+		fs.ensureDirSync('./db')
 		PouchDB.plugin(PouchDBFind)
 		const PrefixedPouchDB = PouchDB.defaults({
 			prefix: './db/'
@@ -39,7 +41,9 @@ export class Dispatcher extends EventEmitter {
 		this._workFlows = new PrefixedPouchDB('workFlows')
 		this._workFlows.createIndex({ index: {
 			fields: ['priority']
-		}}).then(() => {
+		}}).then(() => this._workFlows.createIndex({ index: {
+			fields: ['finished']
+		}})).then(() => {
 			this.logger.debug(`DB "workFlows" index "priority" succesfully created.`)
 		}).catch((e) => {
 			throw new Error(`Could not initialize "workFlows" database: ${e}`)
@@ -47,11 +51,9 @@ export class Dispatcher extends EventEmitter {
 		this._workSteps = new PrefixedPouchDB('workSteps')
 		this._workSteps.createIndex({ index: {
 			fields: ['workFlowId']
-		}}).then(() => {
-			return this._workSteps.createIndex({ index: {
-				fields: ['status']
-			}})
-		}).then(() => {
+		}}).then(() => this._workSteps.createIndex({ index: {
+			fields: ['status']
+		}})).then(() => {
 			this.logger.debug(`DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
 		}).catch((e) => {
 			throw new Error(`Could not initialize "workSteps" database: ${e}`)
@@ -81,7 +83,7 @@ export class Dispatcher extends EventEmitter {
 		})
 	}
 
-	onNewWorkFlow = (wf: WorkFlow) => {
+	private onNewWorkFlow = (wf: WorkFlow) => {
 		const workFlowDb: WorkFlowDB = _.omit(wf, 'steps')
 		this.logger.debug(`Dispatcher caught new workFlow: "${wf._id}"`)
 		this._workFlows.put(workFlowDb).then(() => {
@@ -91,7 +93,7 @@ export class Dispatcher extends EventEmitter {
 					_id: workFlowDb._id + '_' + randomId(),
 					workFlowId: workFlowDb._id
 				})
-				return this._workSteps.put(workStepToPlain(stepDb))
+				return this._workSteps.put(workStepToPlain(stepDb) as WorkStep)
 			}))
 		}, (e) => {
 			this.logger.error(`New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
@@ -118,15 +120,14 @@ export class Dispatcher extends EventEmitter {
 				workFlowId: workFlowId
 			}
 		}).then((result) => {
-			const otherJobs = result.docs as WorkStep[]
-			return Promise.all(otherJobs.map(item => {
+			return Promise.all(result.docs.map(item => {
 				if (item.status === WorkStepStatus.IDLE) {
 					item.status = WorkStepStatus.BLOCKED
-					return this._workSteps.put(item).then(() => { return })
+					return this._workSteps.put(item).then(() => { })
 				}
 				return Promise.resolve()
 			}))
-		}).then(() => { return })
+		}).then(() => { })
 	}
 
 	private async processResult (job: WorkStep, result: WorkResult): Promise<void> {
@@ -141,12 +142,60 @@ export class Dispatcher extends EventEmitter {
 			break
 		}
 			
-		const workStep = await this._workSteps.get(job._id) as WorkStep
+		const workStep = await this._workSteps.get(job._id)
 		workStep.status = result.status
 		workStep.messages = (workStep.messages || []).concat(result.messages || [])
 
-		this.logger.debug(`Setting WorkStep "${job._id}" result to "${result.status}"`)
-		return this._workSteps.put(workStep).then(() => { return })
+		this.logger.debug(`Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ': ' : '') + (result.messages || []).join(', '))
+		return this._workSteps.put(workStep).then(() => { })
+	}
+
+	private async updateWorkFlowStatus (): Promise<void> {
+		// Get all unfinished workFlows
+		return this._workFlows.find({ selector: {
+			finished: false
+		}}).then((result) => {
+			return Promise.all(result.docs.map(async (wf: WorkFlowDB) => {
+				return this._workSteps.find({ selector: {
+					workFlowId: wf._id
+				}}).then((result) => {
+					// Check if all WorkSteps are finished (not WORKING or IDLE)
+					const isFinished = result.docs.reduce<boolean>((pV, item) => {
+						return pV && (
+							(item.status !== WorkStepStatus.WORKING) &&
+							(item.status !== WorkStepStatus.IDLE)
+						)
+					}, true)
+
+					if (isFinished) {
+						// if they are finished, check if all are DONE (not CANCELLED, ERROR or BLOCKED)
+						const isSuccessful = result.docs.reduce<boolean>((pV, item) => {
+							return pV && (
+								(item.status === WorkStepStatus.DONE)
+							)
+						}, true)
+
+						// update WorkFlow in DB
+						return this._workFlows.get(wf._id)
+						.then((obj) => {
+							const wf = obj as object as WorkFlowDB
+							wf.finished = isFinished
+							wf.success = isSuccessful 
+							this._workFlows.put(wf)
+						})
+						.then(() => this.logger.info(`WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfuly' : 'unsuccesfuly'}`))
+						.catch((e) => {
+							this.logger.error(`Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}: ${e}`)
+						})
+					}
+
+					// if WorkFlow has unfinished WorkSteps, skip it
+					return Promise.resolve()
+				})
+			})).then(() => {})
+		}).catch((e) => {
+			this.logger.error(`Failed to update WorkFlows' status: ${e}`)
+		})
 	}
 
 	private dispatchWork () {
@@ -160,6 +209,7 @@ export class Dispatcher extends EventEmitter {
 					if (!nextJob) return // No work is left to be assigned at this moment
 					this._workers[i].doWork(nextJob)
 					.then((result) => this.processResult(nextJob, result))
+					.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done
 					.catch(e => {
 						this.logger.error(`There was an unhandled error when handling job "${nextJob._id}": ${e}`)

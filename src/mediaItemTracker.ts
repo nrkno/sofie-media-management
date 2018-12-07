@@ -2,6 +2,7 @@ import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
 import * as Winston from 'winston'
+import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
 
 export interface TrackedMediaItemBase {
@@ -22,7 +23,7 @@ export interface TrackedMediaItem extends TrackedMediaItemBase {
 }
 
 export class TrackedMediaItems {
-	private _db: PouchDB.Database
+	private _db: PouchDB.Database<TrackedMediaItemBase>
 	logger: Winston.LoggerInstance
 
 	constructor (logger: Winston.LoggerInstance) {
@@ -30,6 +31,7 @@ export class TrackedMediaItems {
 
 		PouchDB.plugin(PouchDBFind)
 
+		fs.ensureDirSync('./db')
 		const PrefixedPouchDB = PouchDB.defaults({
 			prefix: './db/'
 		} as any)
