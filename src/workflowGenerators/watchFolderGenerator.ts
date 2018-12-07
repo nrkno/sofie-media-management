@@ -142,7 +142,12 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					$lt: initialScanTime
 				}
 			})
-			await Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile)))
+			staleFiles.map((sFile) => {
+				this.onDelete(st, {
+					type: StorageEventType.delete,
+					path: sFile.name
+				})
+			})
 		})
 	}
 }
