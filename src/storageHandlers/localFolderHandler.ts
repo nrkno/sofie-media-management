@@ -83,10 +83,12 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			cwd: this._basePath,
 			ignoreInitial: true,
 			awaitWriteFinish: {
-				stabilityThreshold: 2000,
-				pollInterval: 1000
+				stabilityThreshold: 3000,
+				pollInterval: 100
 			},
-			atomic: true
+			atomic: true,
+			disableGlobbing: true,
+			alwaysStat: true
 		})
 		.on('error', this.onError)
 		.on('add', this.onAdd)

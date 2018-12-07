@@ -10,6 +10,7 @@ import { WorkStep, workStepToPlain, plainToWorkStep } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
 import { StorageObject } from '../storageHandlers/storageHandler'
 import { Worker, WorkResult } from './worker'
+import { TrackedMediaItems } from '../mediaItemTracker'
 
 export class Dispatcher extends EventEmitter {
 	logger: Winston.LoggerInstance
@@ -21,12 +22,14 @@ export class Dispatcher extends EventEmitter {
 	private _workFlows: PouchDB.Database
 	private _workSteps: PouchDB.Database
 	private _availableStorage: StorageObject[]
+	private _tmi: TrackedMediaItems
 
-	constructor (logger: Winston.LoggerInstance, generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], workersCount: number) {
+	constructor (logger: Winston.LoggerInstance, generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, workersCount: number) {
 		super()
 
 		this.logger = logger
 		this.generators = generators
+		this._tmi = tmi
 
 		PouchDB.plugin(PouchDBFind)
 		const PrefixedPouchDB = PouchDB.defaults({
@@ -57,7 +60,7 @@ export class Dispatcher extends EventEmitter {
 		this._availableStorage = availableStorage
 
 		for (let i = 0; i < workersCount; i++) {
-			const newWorker = new Worker(this.logger, this._workSteps)
+			const newWorker = new Worker(this.logger, this._workSteps, this._tmi)
 			this._workers.push(newWorker)
 		}
 	}
@@ -127,37 +130,40 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private async processResult (job: WorkStep, result: WorkResult): Promise<void> {
+		switch (result.status) {
+			case WorkStepStatus.CANCELED:
+			case WorkStepStatus.ERROR:
+			try {
+				await this.blockStepsInWorkFlow(job.workFlowId)
+			} catch (e) {
+				this.logger.error(`Could not block outstanding work steps: ${e}`)
+			}
+			break
+		}
+			
 		const workStep = await this._workSteps.get(job._id) as WorkStep
 		workStep.status = result.status
 		workStep.messages = (workStep.messages || []).concat(result.messages || [])
 
-		switch (result.status) {
-			case WorkStepStatus.CANCELED:
-			case WorkStepStatus.ERROR:
-				try {
-					await this.blockStepsInWorkFlow(job.workFlowId)
-				} catch (e) {
-					this.logger.error(`Could not block outstanding work steps: ${e}`)
-				}
-				break
-		}
-
+		this.logger.debug(`Setting WorkStep "${job._id}" result to "${result.status}"`)
 		return this._workSteps.put(workStep).then(() => { return })
 	}
 
 	private dispatchWork () {
 		this.getOutstandingWork().then((jobs) => {
+			this.logger.debug(`Got ${jobs.length} outstanding jobs`)
 			if (jobs.length === 0) return
 
 			for (let i = 0; i < this._workers.length; i++) {
 				if (!this._workers[i].busy) {
 					const nextJob = jobs.shift()
 					if (!nextJob) return // No work is left to be assigned at this moment
-					this._workers[i].doWork(nextJob).then((result) => this.processResult(nextJob, result)).then(() => {
-						setImmediate(() => {
-							this.dispatchWork() // dispatch more work once this job is done
-						})
-					}).catch(e => this.logger.error(`There was an unhandled error when handling job "${nextJob}": ${e}`))
+					this._workers[i].doWork(nextJob)
+					.then((result) => this.processResult(nextJob, result))
+					.then(() => this.dispatchWork()) // dispatch more work once this job is done
+					.catch(e => {
+						this.logger.error(`There was an unhandled error when handling job "${nextJob._id}": ${e}`)
+					})
 				}
 			}
 		}, (e) => {

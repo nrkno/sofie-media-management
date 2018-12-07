@@ -42,9 +42,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		st.handler.on(StorageEventType.delete, (e: StorageEvent) => this.onDelete(st, e))
 
 		this.initialCheck(st).then(() => {
-			this.logger.info(`Initial ${this.constructor.name} scan for "${st.id}" complete.`)
-		}, (e) => {
-			this.logger.info(`Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
+			this.logger.debug(`Initial ${this.constructor.name} scan for "${st.id}" complete.`)
+		}).catch((e) => {
+			this.logger.debug(`Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
 		})
 	}
 
@@ -123,7 +123,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	private onDelete (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
+	protected onDelete (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
 		this._tracked.getById(e.path).then((tmi) => {
 			if (tmi.sourceStorageId === st.id) {
 				this._tracked.remove(tmi).then(() => {
@@ -138,7 +138,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	private async initialCheck (st: StorageObject): Promise<void> {
+	protected async initialCheck (st: StorageObject): Promise<void> {
 		const initialScanTime = getCurrentTime()
 
 		return st.handler.getAllFiles().then((allFiles) => {
@@ -167,7 +167,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					$lt: initialScanTime
 				}
 			})
-			await Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile)))
+			return Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile))).then(() => { return })
 		})
 	}
 }

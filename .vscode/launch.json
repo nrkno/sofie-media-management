@@ -12,7 +12,10 @@
 			"outFiles": [
 				"${workspaceFolder}/**/*.js"
 			],
-			"preLaunchTask": "build"
+			"preLaunchTask": "build",
+			"showAsyncStacks": true,
+			"smartStep": true,
+			"console": "integratedTerminal"
 		}
 	]
 }

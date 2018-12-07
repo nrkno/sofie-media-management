@@ -3,7 +3,7 @@ import { literal } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction } from '../api'
 import { FileWorkStep, WorkStep } from './workStep'
-import { classToPlain } from 'class-transformer'
+import { TrackedMediaItems } from '../mediaItemTracker'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -13,10 +13,12 @@ export interface WorkResult {
 export class Worker {
 	private _busy: boolean = false
 	private _db: PouchDB.Database
+	private _trackedMediaItems: TrackedMediaItems
 	logger: Winston.LoggerInstance
 
-	constructor (logger: Winston.LoggerInstance, db: PouchDB.Database) {
+	constructor (logger: Winston.LoggerInstance, db: PouchDB.Database, tmi: TrackedMediaItems) {
 		this._db = db
+		this._trackedMediaItems = tmi
 		this.logger = logger
 	}
 
@@ -39,57 +41,76 @@ export class Worker {
 						this._busy = false
 						return result
 					})
+					.catch((e) => this.failStep(e))
 			case WorkStepAction.DELETE:
 				return this.doDelete(step as any as FileWorkStep)
 					.then((result: WorkResult) => {
 						this._busy = false
 						return result
 					})
+					.catch((e) => this.failStep(e))
 			default:
 				return Promise.resolve().then(() => {
-					return literal<WorkResult>({
-						status: WorkStepStatus.ERROR,
-						messages: [
-							`Worker could not recognize action: ${step.action}`
-						]
-					})
+					return this.failStep(`Worker could not recognize action: ${step.action}`)
 				})
 		}
 	}
 
+	private async failStep (reason: string): Promise<WorkResult> {
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR,
+			messages: [
+				reason
+			]
+		})
+	}
+
 	private async reportProgress (step: WorkStep, progress: number): Promise<void> {
-		step.progress = progress
 		this.logger.debug(`${step._id}: Progress ${Math.round(progress * 100)}%`)
-		return this._db.put(classToPlain(step)).then(() => { return })
+		return this._db.get(step._id).then((obj) => {
+			(obj as WorkStep).progress = progress
+			return this._db.put(obj).then(() => { return })
+		})
 	}
 
 	private async doCopy (step: FileWorkStep, reportProgress?: (progress: number) => void): Promise<WorkResult> {
-		return step.target.handler.putFile(step.file, reportProgress).then(() => {
-			return literal<WorkResult>({
-				status: WorkStepStatus.DONE
+		return step.target.handler.putFile(step.file, reportProgress).then(async () => {
+			return this._trackedMediaItems.getById(step.file.name).then((tmi) => {
+				if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
+					tmi.targetStorageIds.push(step.target.id)
+				}
+				return this._trackedMediaItems.put(tmi)
+			}).then(() => {
+				return literal<WorkResult>({
+					status: WorkStepStatus.DONE
+				})
+			}).catch((e) => {
+				return this.failStep(e)
 			})
 		}, (e) => {
-			return literal<WorkResult>({
-				status: WorkStepStatus.ERROR,
-				messages: [
-					e
-				]
-			})
+			return this.failStep(e)
 		})
 	}
 
 	private async doDelete (step: FileWorkStep): Promise<WorkResult> {
 		return step.target.handler.deleteFile(step.file).then(() => {
-			return literal<WorkResult>({
-				status: WorkStepStatus.DONE
+			return this._trackedMediaItems.getById(step.file.name).then((tmi) => {
+				const idx = tmi.targetStorageIds.indexOf(step.target.id)
+				if (idx >= 0) {
+					tmi.targetStorageIds.splice(idx, 1)
+				} else {
+					this.logger.warn(`Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
+				}
+				return this._trackedMediaItems.put(tmi)
+			}).then(() => {
+				return literal<WorkResult>({
+					status: WorkStepStatus.DONE
+				})
+			}).catch((e) => {
+				return this.failStep(e)
 			})
 		}, (e) => {
-			return literal<WorkResult>({
-				status: WorkStepStatus.ERROR,
-				messages: [
-					e
-				]
-			})
+			return this.failStep(e)
 		})
 	}
 }

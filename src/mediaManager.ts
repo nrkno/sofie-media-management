@@ -116,6 +116,7 @@ export class MediaManager {
 			this._logger,
 			this._workFlowGenerators,
 			this._availableStorage,
+			this._trackedMedia,
 			3)
 
 		return Promise.resolve()

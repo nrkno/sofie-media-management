@@ -9,6 +9,7 @@
     "semicolon": [
       true,
       "never"
-    ]
+    ],
+    "triple-equals": true
   }
 }
