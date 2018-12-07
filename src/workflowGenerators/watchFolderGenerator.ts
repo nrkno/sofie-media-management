@@ -31,6 +31,17 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		]
 	}
 
+	protected generateDeleteFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+		return [
+			new FileWorkStep({
+				action: WorkStepAction.DELETE,
+				file: file,
+				target: st,
+				priority: 1
+			})
+		]
+	}
+
 	private onFileUpdated (st: StorageObject, e: StorageEvent) {
 		if (!e.file) throw new Error(`Invalid event type or arguments.`)
 		const localFile = e.file
@@ -42,7 +53,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 			return Promise.resolve()
 		}, () => {
 			return this.registerFile(localFile, st).then(() => {
-				this.logger.debug(`File "${e.path}" has started to be tracked by localStorageGenerator for "${st.id}".`)
+				this.logger.debug(`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
 			}).catch((e) => {
 				this.logger.error(`Tracked file registration failed: ${e}`)
 			})
@@ -54,7 +65,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
-					steps: this.generateNewFileWorkSteps(localFile, targetStorage)
+					steps: this.generateNewFileWorkSteps(localFile, targetStorage),
+					created: getCurrentTime(),
+					success: false
 				}))
 				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
 			}
@@ -88,11 +101,21 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					const storageObject = this._availableStorage.find((as) => as.id === sId)
 					if (storageObject) {
 						storageObject.handler.getFile(tmi.name).then((file) => {
-							return storageObject.handler.deleteFile(file)
+							const workflowId = e.path + '_' + randomId()
+							this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
+								_id: workflowId,
+								finished: false,
+								priority: 1,
+								source: WorkFlowSource.LOCAL_MEDIA_ITEM,
+								steps: this.generateDeleteFileWorkSteps(file, storageObject),
+								created: getCurrentTime(),
+								success: false
+							}))
+							// return storageObject.handler.deleteFile(file)
 						}).then(() => {
-							this.logger.debug(`Sucessfully deleted file "${tmi.name}" from target storage "${storageObject.id}"`)
+							this.logger.debug(`New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`)
 						}).catch((e) => {
-							this.logger.warn(`Could not delete file from target storage: "${storageObject.id}"`)
+							this.logger.warn(`Could not find file in target storage: "${storageObject.id}"`)
 						})
 					}
 				})
