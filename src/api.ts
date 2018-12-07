@@ -89,10 +89,12 @@ export interface WorkFlow {
 	expectedMediaItemId?: string
 	mediaObjectId?: string
 	steps: Array<WorkStepBase>
+	created: Time
 
 	priority: number
 
 	finished: boolean
+	success: boolean
 }
 
 export interface WorkFlowDB extends WorkFlow {

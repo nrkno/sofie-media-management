@@ -12,11 +12,11 @@ export interface WorkResult {
 
 export class Worker {
 	private _busy: boolean = false
-	private _db: PouchDB.Database
+	private _db: PouchDB.Database<WorkStep>
 	private _trackedMediaItems: TrackedMediaItems
 	logger: Winston.LoggerInstance
 
-	constructor (logger: Winston.LoggerInstance, db: PouchDB.Database, tmi: TrackedMediaItems) {
+	constructor (logger: Winston.LoggerInstance, db: PouchDB.Database<WorkStep>, tmi: TrackedMediaItems) {
 		this._db = db
 		this._trackedMediaItems = tmi
 		this.logger = logger
@@ -69,7 +69,7 @@ export class Worker {
 		this.logger.debug(`${step._id}: Progress ${Math.round(progress * 100)}%`)
 		return this._db.get(step._id).then((obj) => {
 			(obj as WorkStep).progress = progress
-			return this._db.put(obj).then(() => { return })
+			return this._db.put(obj).then(() => { })
 		})
 	}
 
@@ -102,6 +102,15 @@ export class Worker {
 					this.logger.warn(`Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
 				}
 				return this._trackedMediaItems.put(tmi)
+			}, (e) => {
+				if (e.status === 404) {
+					this.logger.info(`File "${step.file.name}" to be deleted was already removed from tracking database`)
+					return literal<WorkResult>({
+						status: WorkStepStatus.DONE
+					})
+				} else {
+					throw e
+				}
 			}).then(() => {
 				return literal<WorkResult>({
 					status: WorkStepStatus.DONE

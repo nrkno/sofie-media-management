@@ -6,7 +6,6 @@ export * from './baseWorkFlowGenerator'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
 import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepBase } from '../api'
 import { FileWorkStep } from '../work/workStep'
-import { LocalFolderFile } from '../storageHandlers/localFolderHandler';
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	protected _availableStorage: StorageObject[]
@@ -77,7 +76,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 			lingerTime: this.LOCAL_LINGER_TIME,
 			targetStorageIds: [],
 			name: file.name
-		})).then(() => { return })
+		})).then(() => { })
 	}
 
 	protected onAdd (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
@@ -94,7 +93,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
-					steps: this.generateNewFileWorkSteps(localFile, st)
+					steps: this.generateNewFileWorkSteps(localFile, st),
+					created: getCurrentTime(),
+					success: false
 				}))
 				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
 			}).catch((e) => {
@@ -114,7 +115,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
-					steps: this.generateNewFileWorkSteps(localFile, st)
+					steps: this.generateNewFileWorkSteps(localFile, st),
+					created: getCurrentTime(),
+					success: false
 				}))
 				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
 			}
@@ -167,7 +170,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					$lt: initialScanTime
 				}
 			})
-			return Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile))).then(() => { return })
+			return Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile))).then(() => { })
 		})
 	}
 }

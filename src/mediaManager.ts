@@ -122,6 +122,6 @@ export class MediaManager {
 		return Promise.resolve()
 			.then(() => Promise.all(this._availableStorage.map((st) => st.handler.init())))
 			.then(() => this._dispatcher.init())
-			.then(() => { return })
+			.then(() => { })
 	}
 }
