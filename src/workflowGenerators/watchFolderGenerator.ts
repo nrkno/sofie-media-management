@@ -1,5 +1,3 @@
-import * as Winston from 'winston'
-
 import { getCurrentTime, literal, randomId } from '../lib/lib'
 import { WorkFlow, WorkFlowSource, WorkStepBase, WorkStepAction } from '../api'
 import { LocalStorageGenerator, WorkFlowGeneratorEventType } from './localStorageGenerator'
@@ -115,7 +113,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 						}).then(() => {
 							this.emit('debug', `New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`)
 						}).catch((e) => {
-							this.emit('warn', `Could not find file in target storage: "${storageObject.id}"`)
+							this.emit('warn', `Could not find file in target storage: "${storageObject.id}": ${e}`)
 						})
 					}
 				})

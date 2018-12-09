@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events'
-import * as Winston from 'winston'
 import { literal } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction } from '../api'

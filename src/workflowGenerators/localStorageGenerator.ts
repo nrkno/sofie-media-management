@@ -1,4 +1,3 @@
-import * as Winston from 'winston'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 import { File, StorageEvent, StorageObject, StorageEventType } from '../storageHandlers/storageHandler'
 import { TrackedMediaItems, TrackedMediaItemBase } from '../mediaItemTracker'

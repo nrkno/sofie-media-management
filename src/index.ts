@@ -2,7 +2,6 @@ import 'reflect-metadata'
 import { MediaManager } from './mediaManager'
 import { config, logPath, disableWatchdog } from './config'
 import * as Winston from 'winston'
-import * as PouchDB from 'pouchdb-node'
 
 let manager: MediaManager
 // Setup logging --------------------------------------

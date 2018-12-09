@@ -1,5 +1,4 @@
 import * as _ from 'underscore'
-import * as Winston from 'winston'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
