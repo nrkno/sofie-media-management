@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import * as Winston from 'winston'
 import { literal } from '../lib/lib'
 
@@ -10,16 +11,15 @@ export interface WorkResult {
 	messages?: string[]
 }
 
-export class Worker {
+export class Worker extends EventEmitter {
 	private _busy: boolean = false
 	private _db: PouchDB.Database<WorkStep>
 	private _trackedMediaItems: TrackedMediaItems
-	logger: Winston.LoggerInstance
 
-	constructor (logger: Winston.LoggerInstance, db: PouchDB.Database<WorkStep>, tmi: TrackedMediaItems) {
+	constructor (db: PouchDB.Database<WorkStep>, tmi: TrackedMediaItems) {
+		super()
 		this._db = db
 		this._trackedMediaItems = tmi
-		this.logger = logger
 	}
 
 	get busy (): boolean {
@@ -28,7 +28,7 @@ export class Worker {
 
 	async doWork (step: WorkStep): Promise<WorkResult> {
 		const progressReportFailed = (e) => {
-			this.logger.warn(`Worker could not report progress: ${e}`)
+			this.emit('warn', `Worker could not report progress: ${e}`)
 		}
 
 		if (this._busy) throw new Error(`Busy worker was assigned to do "${step._id}"`)
@@ -66,7 +66,7 @@ export class Worker {
 	}
 
 	private async reportProgress (step: WorkStep, progress: number): Promise<void> {
-		this.logger.debug(`${step._id}: Progress ${Math.round(progress * 100)}%`)
+		this.emit('debug', `${step._id}: Progress ${Math.round(progress * 100)}%`)
 		return this._db.get(step._id).then((obj) => {
 			(obj as WorkStep).progress = progress
 			return this._db.put(obj).then(() => { })
@@ -99,12 +99,12 @@ export class Worker {
 				if (idx >= 0) {
 					tmi.targetStorageIds.splice(idx, 1)
 				} else {
-					this.logger.warn(`Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
+					this.emit('warn', `Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
 				}
 				return this._trackedMediaItems.put(tmi)
 			}, (e) => {
 				if (e.status === 404) {
-					this.logger.info(`File "${step.file.name}" to be deleted was already removed from tracking database`)
+					this.emit('info', `File "${step.file.name}" to be deleted was already removed from tracking database`)
 					return literal<WorkResult>({
 						status: WorkStepStatus.DONE
 					})

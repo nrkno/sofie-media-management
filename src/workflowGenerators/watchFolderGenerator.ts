@@ -8,8 +8,8 @@ import { TrackedMediaItems } from '../mediaItemTracker'
 import { FileWorkStep } from '../work/workStep'
 
 export class WatchFolderGenerator extends LocalStorageGenerator {
-	constructor (logger: Winston.LoggerInstance, availableStorage: StorageObject[], tracked: TrackedMediaItems) {
-		super(logger, availableStorage, tracked)
+	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems) {
+		super(availableStorage, tracked)
 	}
 
 	async init (): Promise<void> {
@@ -48,14 +48,14 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		const targetStorage = this._availableStorage.find((i) => i.id === st.watchFolderTargetId)
 		if (!targetStorage) throw new Error(`Could not find target storage "${st.watchFolderTargetId}"`)
 		this._tracked.getById(e.path).then(() => {
-			this.logger.debug(`File "${e.path}" is already tracked, "${st.id}" ignoring.`)
+			this.emit('debug', `File "${e.path}" is already tracked, "${st.id}" ignoring.`)
 
 			return Promise.resolve()
 		}, () => {
 			return this.registerFile(localFile, st).then(() => {
-				this.logger.debug(`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
+				this.emit('debug', `File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
 			}).catch((e) => {
-				this.logger.error(`Tracked file registration failed: ${e}`)
+				this.emit('error', `Tracked file registration failed: ${e}`)
 			})
 		}).then(() => {
 			const emitCopy = () => {
@@ -69,7 +69,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					created: getCurrentTime(),
 					success: false
 				}))
-				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
+				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}
 
 			return targetStorage.handler.getFile(localFile.name).then((file) => {
@@ -113,21 +113,21 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 							}))
 							// return storageObject.handler.deleteFile(file)
 						}).then(() => {
-							this.logger.debug(`New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`)
+							this.emit('debug', `New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`)
 						}).catch((e) => {
-							this.logger.warn(`Could not find file in target storage: "${storageObject.id}"`)
+							this.emit('warn', `Could not find file in target storage: "${storageObject.id}"`)
 						})
 					}
 				})
 				this._tracked.remove(tmi).then(() => {
-					this.logger.debug(`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
+					this.emit('debug', `Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
 				}, (e) => {
-					this.logger.error(`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
+					this.emit('error', `Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
 				})
 			}
 			// TODO: generate a pull from sourceStorage?
 		}, (e) => {
-			this.logger.debug(`Untracked file "${e.path}" deleted from storage "${st.id}".`)
+			this.emit('debug', `Untracked file "${e.path}" deleted from storage "${st.id}".`)
 		})
 	}
 
@@ -145,7 +145,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 						try {
 							await this._tracked.put(trackedFile)
 						} catch (e1) {
-							this.logger.error(`Could not update "${trackedFile.name}" last seen: ${e1}`)
+							this.emit('error', `Could not update "${trackedFile.name}" last seen: ${e1}`)
 						}
 
 						await targetStorage.handler.getFile(trackedFile.name)
@@ -157,7 +157,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 						file: file
 					})
 				}
-				this.logger.debug(`Finished handling file: ${file.name}`)
+				this.emit('debug', `Finished handling file: ${file.name}`)
 			}))
 		}).then(async () => {
 			const staleFiles = await this._tracked.getAllFromStorage(st.id, {

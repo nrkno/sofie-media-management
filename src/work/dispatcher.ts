@@ -14,8 +14,6 @@ import { Worker, WorkResult } from './worker'
 import { TrackedMediaItems } from '../mediaItemTracker'
 
 export class Dispatcher extends EventEmitter {
-	logger: Winston.LoggerInstance
-
 	generators: BaseWorkFlowGenerator[]
 
 	private _workers: Worker[] = []
@@ -25,10 +23,9 @@ export class Dispatcher extends EventEmitter {
 	private _availableStorage: StorageObject[]
 	private _tmi: TrackedMediaItems
 
-	constructor (logger: Winston.LoggerInstance, generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, workersCount: number) {
+	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, workersCount: number) {
 		super()
 
-		this.logger = logger
 		this.generators = generators
 		this._tmi = tmi
 
@@ -44,7 +41,7 @@ export class Dispatcher extends EventEmitter {
 		}}).then(() => this._workFlows.createIndex({ index: {
 			fields: ['finished']
 		}})).then(() => {
-			this.logger.debug(`DB "workFlows" index "priority" succesfully created.`)
+			this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
 		}).catch((e) => {
 			throw new Error(`Could not initialize "workFlows" database: ${e}`)
 		})
@@ -54,7 +51,7 @@ export class Dispatcher extends EventEmitter {
 		}}).then(() => this._workSteps.createIndex({ index: {
 			fields: ['status']
 		}})).then(() => {
-			this.logger.debug(`DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
+			this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
 		}).catch((e) => {
 			throw new Error(`Could not initialize "workSteps" database: ${e}`)
 		})
@@ -62,32 +59,40 @@ export class Dispatcher extends EventEmitter {
 		this._availableStorage = availableStorage
 
 		for (let i = 0; i < workersCount; i++) {
-			const newWorker = new Worker(this.logger, this._workSteps, this._tmi)
+			const newWorker = new Worker(this._workSteps, this._tmi)
+			newWorker.on('error', (e) => this.emit('error', e))
+			.on('warn', (e) => this.emit('warn', e))
+			.on('info', (e) => this.emit('info', e))
+			.on('debug', (e) => this.emit('debug', e))
 			this._workers.push(newWorker)
 		}
 	}
 
 	async init (): Promise<void> {
 		return Promise.all(this.generators.map(gen => gen.init())).then(() => {
-			this.logger.debug(`Dispatcher initialized.`)
+			this.emit('debug', `Dispatcher initialized.`)
 		}).then(() => {
 			this.generators.forEach((gen) => {
 				gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
+				.on('error', (e) => this.emit('error', e))
+				.on('warn', (e) => this.emit('warn', e))
+				.on('info', (e) => this.emit('info', e))
+				.on('debug', (e) => this.emit('debug', e))
 			})
 		})
 	}
 
 	async destroy (): Promise<void> {
 		return Promise.all(this.generators.map(gen => gen.destroy())).then(() => {
-			this.logger.debug(`Dispatcher destroyed.`)
+			this.emit('debug', `Dispatcher destroyed.`)
 		})
 	}
 
 	private onNewWorkFlow = (wf: WorkFlow) => {
 		const workFlowDb: WorkFlowDB = _.omit(wf, 'steps')
-		this.logger.debug(`Dispatcher caught new workFlow: "${wf._id}"`)
+		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}"`)
 		this._workFlows.put(workFlowDb).then(() => {
-			this.logger.debug(`New WorkFlow successfully added to queue: "${wf._id}"`)
+			this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
 			return Promise.all(wf.steps.map(step => {
 				const stepDb = extendMandadory<WorkStepBase, WorkStep>(step, {
 					_id: workFlowDb._id + '_' + randomId(),
@@ -96,11 +101,11 @@ export class Dispatcher extends EventEmitter {
 				return this._workSteps.put(workStepToPlain(stepDb) as WorkStep)
 			}))
 		}, (e) => {
-			this.logger.error(`New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
+			this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
 		}).then(() => {
 			this.dispatchWork()
 		}).catch((e) => {
-			this.logger.error(`Adding new WorkFlow to queue failed: ${e}`)
+			this.emit('error', `Adding new WorkFlow to queue failed: ${e}`)
 		})
 	}
 
@@ -137,7 +142,7 @@ export class Dispatcher extends EventEmitter {
 			try {
 				await this.blockStepsInWorkFlow(job.workFlowId)
 			} catch (e) {
-				this.logger.error(`Could not block outstanding work steps: ${e}`)
+				this.emit('error', `Could not block outstanding work steps: ${e}`)
 			}
 			break
 		}
@@ -146,7 +151,7 @@ export class Dispatcher extends EventEmitter {
 		workStep.status = result.status
 		workStep.messages = (workStep.messages || []).concat(result.messages || [])
 
-		this.logger.debug(`Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ': ' : '') + (result.messages || []).join(', '))
+		this.emit('debug', `Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ': ' : '') + (result.messages || []).join(', '))
 		return this._workSteps.put(workStep).then(() => { })
 	}
 
@@ -183,9 +188,9 @@ export class Dispatcher extends EventEmitter {
 							wf.success = isSuccessful 
 							this._workFlows.put(wf)
 						})
-						.then(() => this.logger.info(`WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfuly' : 'unsuccesfuly'}`))
+						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfuly' : 'unsuccesfuly'}`))
 						.catch((e) => {
-							this.logger.error(`Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}: ${e}`)
+							this.emit('error', `Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}: ${e}`)
 						})
 					}
 
@@ -194,13 +199,13 @@ export class Dispatcher extends EventEmitter {
 				})
 			})).then(() => {})
 		}).catch((e) => {
-			this.logger.error(`Failed to update WorkFlows' status: ${e}`)
+			this.emit('error', `Failed to update WorkFlows' status: ${e}`)
 		})
 	}
 
 	private dispatchWork () {
 		this.getOutstandingWork().then((jobs) => {
-			this.logger.debug(`Got ${jobs.length} outstanding jobs`)
+			this.emit('debug', `Got ${jobs.length} outstanding jobs`)
 			if (jobs.length === 0) return
 
 			for (let i = 0; i < this._workers.length; i++) {
@@ -212,7 +217,7 @@ export class Dispatcher extends EventEmitter {
 					.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done
 					.catch(e => {
-						this.logger.error(`There was an unhandled error when handling job "${nextJob._id}": ${e}`)
+						this.emit('error', `There was an unhandled error when handling job "${nextJob._id}": ${e}`)
 					})
 				}
 			}

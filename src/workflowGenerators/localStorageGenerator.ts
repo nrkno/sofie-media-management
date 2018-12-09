@@ -10,19 +10,17 @@ import { FileWorkStep } from '../work/workStep'
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	protected _availableStorage: StorageObject[]
 	protected _tracked: TrackedMediaItems
-	logger: Winston.LoggerInstance
 
 	private LOCAL_LINGER_TIME = 7 * 24 * 60 * 60 * 1000
 
-	constructor (logger: Winston.LoggerInstance, availableStorage: StorageObject[], tracked: TrackedMediaItems) {
+	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems) {
 		super()
 		this._availableStorage = availableStorage
 		this._tracked = tracked
-		this.logger = logger
 	}
 
 	async init (): Promise<void> {
-		this.logger.debug(`Initializing WorkFlow generator ${this.constructor.name}`)
+		this.emit('debug', `Initializing WorkFlow generator ${this.constructor.name}`)
 		return Promise.resolve().then(() => {
 			this._availableStorage.forEach((item) => {
 				if (item.manualIngest) this.registerStorage(item)
@@ -35,15 +33,15 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	}
 
 	protected registerStorage (st: StorageObject) {
-		this.logger.debug(`Registering storage: "${st.id}" in ${this.constructor.name}`)
+		this.emit('debug', `Registering storage: "${st.id}" in ${this.constructor.name}`)
 		st.handler.on(StorageEventType.add, (e: StorageEvent) => this.onAdd(st, e))
 		st.handler.on(StorageEventType.change, (e: StorageEvent) => this.onChange(st, e))
 		st.handler.on(StorageEventType.delete, (e: StorageEvent) => this.onDelete(st, e))
 
 		this.initialCheck(st).then(() => {
-			this.logger.debug(`Initial ${this.constructor.name} scan for "${st.id}" complete.`)
+			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" complete.`)
 		}).catch((e) => {
-			this.logger.debug(`Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
+			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
 		})
 	}
 
@@ -83,10 +81,10 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		if (e.type !== StorageEventType.add || !e.file) throw new Error(`Invalid event type or arguments.`)
 		const localFile = e.file
 		this._tracked.getById(e.path).then(() => {
-			this.logger.debug(`File "${e.path}" is already tracked, "${st.id}" ignoring.`)
+			this.emit('debug', `File "${e.path}" is already tracked, "${st.id}" ignoring.`)
 		}, () => {
 			this.registerFile(localFile, st).then(() => {
-				this.logger.debug(`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
+				this.emit('debug', `File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
 				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 					_id: workflowId,
@@ -97,9 +95,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					created: getCurrentTime(),
 					success: false
 				}))
-				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
+				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}).catch((e) => {
-				this.logger.error(`Tracked file registration failed: ${e}`)
+				this.emit('error', `Tracked file registration failed: ${e}`)
 			})
 		})
 	}
@@ -119,10 +117,10 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					created: getCurrentTime(),
 					success: false
 				}))
-				this.logger.debug(`New forkflow started for "${e.path}": "${workflowId}".`)
+				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}
 		}).catch((e) => {
-			this.logger.error(`Unregistered file "${e.path}" changed!`)
+			this.emit('error', `Unregistered file "${e.path}" changed!`)
 		})
 	}
 
@@ -130,14 +128,14 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		this._tracked.getById(e.path).then((tmi) => {
 			if (tmi.sourceStorageId === st.id) {
 				this._tracked.remove(tmi).then(() => {
-					this.logger.debug(`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
+					this.emit('debug', `Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
 				}, (e) => {
-					this.logger.error(`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
+					this.emit('error', `Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
 				})
 			}
 			// TODO: generate a pull from sourceStorage?
 		}, (e) => {
-			this.logger.debug(`Untracked file "${e.path}" deleted from storage "${st.id}".`)
+			this.emit('debug', `Untracked file "${e.path}" deleted from storage "${st.id}".`)
 		})
 	}
 
@@ -153,7 +151,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 						try {
 							await this._tracked.put(trackedFile)
 						} catch (e1) {
-							this.logger.error(`Could not update "${trackedFile.name}" last seen: ${e1}`)
+							this.emit('error', `Could not update "${trackedFile.name}" last seen: ${e1}`)
 						}
 					}
 				} catch (e) {

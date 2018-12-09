@@ -108,16 +108,20 @@ export class MediaManager {
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
-			new WatchFolderGenerator(this._logger, this._availableStorage, this._trackedMedia)
+			new WatchFolderGenerator(this._availableStorage, this._trackedMedia)
 		)
 
 
 		this._dispatcher = new Dispatcher(
-			this._logger,
 			this._workFlowGenerators,
 			this._availableStorage,
 			this._trackedMedia,
 			3)
+
+		this._dispatcher.on('error', this._logger.error)
+		.on('warn', this._logger.warn)
+		.on('info', this._logger.info)
+		.on('debug', this._logger.debug)
 
 		return Promise.resolve()
 			.then(() => Promise.all(this._availableStorage.map((st) => st.handler.init())))
