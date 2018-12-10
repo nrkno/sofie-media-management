@@ -1,7 +1,15 @@
 import { Dispatcher } from '../dispatcher'
+import { LocalStorageGenerator } from '../__mocks__/localStorageGenerator'
+import { LocalFolderHandler } from '../__mocks__/localFolderHandler'
 
 describe('Dispatcher', () => {
-	const disp = new Dispatcher ()
+	const localGen = new LocalStorageGenerator()
+	const localFolder = new LocalFolderHandler()
+	const disp = new Dispatcher ([
+		localGen
+	], [
+		localFolder
+	], )
 
 	beforeAll(() => {
 

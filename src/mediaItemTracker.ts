@@ -26,17 +26,19 @@ export class TrackedMediaItems {
 	private _db: PouchDB.Database<TrackedMediaItemBase>
 	logger: Winston.LoggerInstance
 
-	constructor (logger: Winston.LoggerInstance) {
+	constructor (logger: Winston.LoggerInstance, dbAdapter?: string, dbPrefix?: string) {
 		this.logger = logger
 
 		PouchDB.plugin(PouchDBFind)
 
-		fs.ensureDirSync('./db')
+		fs.ensureDirSync(dbPrefix || './db')
 		const PrefixedPouchDB = PouchDB.defaults({
-			prefix: './db/'
+			prefix: dbPrefix || './db/'
 		} as any)
 
-		this._db = new PrefixedPouchDB('trackedMediaItems')
+		this._db = new PrefixedPouchDB('trackedMediaItems', {
+			adapter: dbAdapter
+		})
 		this._db.compact()
 		.then(() => {
 			return this._db.createIndex({
