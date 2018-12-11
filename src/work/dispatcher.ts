@@ -27,6 +27,7 @@ export class Dispatcher extends EventEmitter {
 
 		this.generators = generators
 		this._tmi = tmi
+		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
 		fs.ensureDirSync('./db')
 		PouchDB.plugin(PouchDBFind)
@@ -59,10 +60,7 @@ export class Dispatcher extends EventEmitter {
 
 		for (let i = 0; i < workersCount; i++) {
 			const newWorker = new Worker(this._workSteps, this._tmi)
-			newWorker.on('error', (e) => this.emit('error', e))
-			.on('warn', (e) => this.emit('warn', e))
-			.on('info', (e) => this.emit('info', e))
-			.on('debug', (e) => this.emit('debug', e))
+			this.attachLogEvents(`Worker ${i}`, newWorker)
 			this._workers.push(newWorker)
 		}
 	}
@@ -73,10 +71,7 @@ export class Dispatcher extends EventEmitter {
 		}).then(() => {
 			this.generators.forEach((gen) => {
 				gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
-				.on('error', (e) => this.emit('error', e))
-				.on('warn', (e) => this.emit('warn', e))
-				.on('info', (e) => this.emit('info', e))
-				.on('debug', (e) => this.emit('debug', e))
+				this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
 			})
 		})
 	}
@@ -85,6 +80,13 @@ export class Dispatcher extends EventEmitter {
 		return Promise.all(this.generators.map(gen => gen.destroy())).then(() => {
 			this.emit('debug', `Dispatcher destroyed.`)
 		})
+	}
+
+	private attachLogEvents = (prefix: string, ee: EventEmitter) => {
+		ee.on('error', (e) => this.emit('error', prefix + ': ' + e))
+		.on('warn', (e) => this.emit('warn', prefix + ': ' + e))
+		.on('info', (e) => this.emit('info', prefix + ': ' + e))
+		.on('debug', (e) => this.emit('debug', prefix + ': ' + e))
 	}
 
 	private onNewWorkFlow = (wf: WorkFlow) => {
@@ -138,14 +140,14 @@ export class Dispatcher extends EventEmitter {
 		switch (result.status) {
 			case WorkStepStatus.CANCELED:
 			case WorkStepStatus.ERROR:
-			try {
-				await this.blockStepsInWorkFlow(job.workFlowId)
-			} catch (e) {
-				this.emit('error', `Could not block outstanding work steps: ${e}`)
-			}
-			break
+				try {
+					await this.blockStepsInWorkFlow(job.workFlowId)
+				} catch (e) {
+					this.emit('error', `Could not block outstanding work steps: ${e}`)
+				}
+				break
 		}
-			
+
 		const workStep = await this._workSteps.get(job._id)
 		workStep.status = result.status
 		workStep.messages = (workStep.messages || []).concat(result.messages || [])
@@ -184,8 +186,8 @@ export class Dispatcher extends EventEmitter {
 						.then((obj) => {
 							const wf = obj as object as WorkFlowDB
 							wf.finished = isFinished
-							wf.success = isSuccessful 
-							this._workFlows.put(wf)
+							wf.success = isSuccessful
+							return this._workFlows.put(wf)
 						})
 						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfuly' : 'unsuccesfuly'}`))
 						.catch((e) => {

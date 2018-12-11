@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
@@ -22,12 +23,11 @@ export interface TrackedMediaItem extends TrackedMediaItemBase {
 	_rev: string
 }
 
-export class TrackedMediaItems {
+export class TrackedMediaItems extends EventEmitter {
 	private _db: PouchDB.Database<TrackedMediaItemBase>
-	logger: Winston.LoggerInstance
 
-	constructor (logger: Winston.LoggerInstance, dbAdapter?: string, dbPrefix?: string) {
-		this.logger = logger
+	constructor (dbAdapter?: string, dbPrefix?: string) {
+		super()
 
 		PouchDB.plugin(PouchDBFind)
 
@@ -49,7 +49,7 @@ export class TrackedMediaItems {
 		})
 		.then(() => {
 			// Index created
-		}, () => this.logger.error('trackedMediaItems: Index "sourceStorageId" could not be created.'))
+		}, () => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.'))
 	}
 
 	async put (tmi: TrackedMediaItemBase): Promise<string> {

@@ -54,7 +54,7 @@ export function plainToWorkStep (obj: object, availableStorage: StorageObject[])
 			} catch (e) {
 				throw new Error(`Error when deserializing WorkStep: ${e}`)
 			}
-			
+
 		default:
 			throw new Error(`Could not deserialize work step: unknown action: "${action}"`)
 	}

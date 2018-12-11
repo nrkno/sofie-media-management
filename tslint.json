@@ -10,6 +10,7 @@
       true,
       "never"
     ],
-    "triple-equals": true
+    "triple-equals": true,
+    "no-empty": false
   }
 }

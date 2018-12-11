@@ -7,5 +7,10 @@
     "node_modules/**",
     "src/**/*spec.ts",
     "src/**/__mocks__/*"
+  ],
+  "types": [
+    "node",
+    "reflect-metadata",
+    "jest"
   ]
 }

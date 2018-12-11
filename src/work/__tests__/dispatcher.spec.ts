@@ -1,22 +1,58 @@
+import 'reflect-metadata'
+import * as _ from 'underscore'
 import { Dispatcher } from '../dispatcher'
 import { LocalStorageGenerator } from '../__mocks__/localStorageGenerator'
-import { LocalFolderHandler } from '../__mocks__/localFolderHandler'
+import { StorageType, StorageSettings } from '../../api'
+import { TrackedMediaItems } from '../__mocks__/mediaItemTracker'
+import { extendMandadory } from '../../lib/lib'
+import { buildStorageHandler, StorageObject } from '../../storageHandlers/storageHandler'
+// jest.mock('../../storageHandlers/localFolderHandler')
 
 describe('Dispatcher', () => {
 	const localGen = new LocalStorageGenerator()
-	const localFolder = new LocalFolderHandler()
-	const disp = new Dispatcher ([
+	const storage: StorageSettings[] = [
+		{
+			id: 'local0',
+			type: StorageType.LOCAL_FOLDER,
+			support: {
+				read: true,
+				write: false
+			},
+			options: {
+				basePath: './source'
+			},
+			watchFolder: true,
+			watchFolderTargetId: 'local1'
+		},
+		{
+			id: 'local1',
+			type: StorageType.LOCAL_FOLDER,
+			support: {
+				read: true,
+				write: true
+			},
+			options: {
+				basePath: './target'
+			}
+		}
+	]
+
+	const _availableStorage = _.map(storage, (item) => {
+		return extendMandadory<StorageSettings, StorageObject>(item, {
+			handler: buildStorageHandler(item)
+		})
+	})
+
+	const disp = new Dispatcher([
 		localGen
-	], [
-		localFolder
-	], )
+	], _availableStorage, new TrackedMediaItems(), 3)
 
 	beforeAll(() => {
 
 	})
 
 	it('initializes it\'s workflow generators', () => {
-		
+
 	})
 
 	it('receives new WorkFlows and starts processing', () => {

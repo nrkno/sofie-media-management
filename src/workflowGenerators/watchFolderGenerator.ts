@@ -81,7 +81,8 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 			}, () => {
 				emitCopy()
 			})
-		})
+		}).then(() => { })
+		.catch((e) => this.emit('error', `An error was thrown when handling an updated file: ${e}`))
 	}
 
 	protected onAdd (st: StorageObject, e: StorageEvent, initialScan?: boolean) {

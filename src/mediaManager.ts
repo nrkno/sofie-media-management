@@ -104,13 +104,12 @@ export class MediaManager {
 			})
 		})
 
-		this._trackedMedia = new TrackedMediaItems(this._logger)
+		this._trackedMedia = new TrackedMediaItems()
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
 			new WatchFolderGenerator(this._availableStorage, this._trackedMedia)
 		)
-
 
 		this._dispatcher = new Dispatcher(
 			this._workFlowGenerators,

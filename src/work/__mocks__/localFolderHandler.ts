@@ -17,7 +17,6 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return Promise.resolve()
 	})
 
-
 	getAllFiles = jest.fn((): Promise<File[]> => {
 		return Promise.resolve().then(() => this._files)
 	})
