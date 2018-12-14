@@ -1,21 +1,36 @@
+import * as _ from 'underscore'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStepBase, WorkStepAction } from '../api'
+import { WorkFlow, WorkFlowSource, WorkStepBase, WorkStepAction, MediaFlow, MediaFlowType } from '../api'
 import { LocalStorageGenerator, WorkFlowGeneratorEventType } from './localStorageGenerator'
 import { File, StorageObject, StorageEvent, StorageEventType } from '../storageHandlers/storageHandler'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import { FileWorkStep } from '../work/workStep'
 
 export class WatchFolderGenerator extends LocalStorageGenerator {
-	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems) {
-		super(availableStorage, tracked)
+	private _storageMapping: _.Dictionary<string> = {}
+
+	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[]) {
+		super(availableStorage, tracked, flows)
 	}
 
 	async init (): Promise<void> {
 		return Promise.resolve().then(() => {
-			this._availableStorage.forEach((item) => {
-				if (item.watchFolder && item.watchFolderTargetId) this.registerStorage(item)
+			this._flows.forEach((item) => {
+				if (item.mediaFlowType === MediaFlowType.WATCH_FOLDER) {
+					const srcStorage = this._availableStorage.find(i => i.id === item.sourceId)
+					const dstStorage = this._availableStorage.find(i => i.id === item.destinationId)
+
+					if (srcStorage && dstStorage) {
+						this.registerStoragePair(srcStorage, dstStorage)
+					}
+				}
 			})
 		})
+	}
+
+	protected registerStoragePair (srcStorage: StorageObject, dstStorage: StorageObject) {
+		this._storageMapping[srcStorage.id] = dstStorage.id
+		super.registerStorage(srcStorage)
 	}
 
 	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
@@ -43,8 +58,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 	private onFileUpdated (st: StorageObject, e: StorageEvent) {
 		if (!e.file) throw new Error(`Invalid event type or arguments.`)
 		const localFile = e.file
-		const targetStorage = this._availableStorage.find((i) => i.id === st.watchFolderTargetId)
-		if (!targetStorage) throw new Error(`Could not find target storage "${st.watchFolderTargetId}"`)
+		const dstStorageId = this._storageMapping[st.id]
+		const targetStorage = this._availableStorage.find((i) => i.id === dstStorageId)
+		if (!targetStorage) throw new Error(`Could not find target storage "${dstStorageId}"`)
 		this._tracked.getById(e.path).then(() => {
 			this.emit('debug', `File "${e.path}" is already tracked, "${st.id}" ignoring.`)
 
@@ -132,8 +148,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 
 	protected async initialCheck (st: StorageObject): Promise<void> {
 		const initialScanTime = getCurrentTime()
-		const targetStorage = this._availableStorage.find((i) => i.id === st.watchFolderTargetId)
-		if (!targetStorage) throw new Error(`Target storage "${st.watchFolderTargetId}" not found!`)
+		const dstStorageId = this._storageMapping[st.id]
+		const targetStorage = this._availableStorage.find((i) => i.id === dstStorageId)
+		if (!targetStorage) throw new Error(`Target storage "${dstStorageId}" not found!`)
 
 		return st.handler.getAllFiles().then((allFiles) => {
 			return Promise.all(allFiles.map(async (file): Promise<void> => {

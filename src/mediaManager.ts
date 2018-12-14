@@ -2,7 +2,7 @@ import * as Winston from 'winston'
 import * as _ from 'underscore'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
-import { StorageSettings, StorageType } from './api'
+import { StorageSettings, StorageType, DeviceSettings, MediaFlowType } from './api'
 import { StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
 import { TrackedMediaItems } from './mediaItemTracker'
 import { Dispatcher } from './work/dispatcher'
@@ -70,35 +70,45 @@ export class MediaManager {
 		return this.coreHandler.init(this._config.core)
 	}
 	initMediaManager (): Promise<void> {
-		// TODO: Initialize Media Manager
-		const storage: StorageSettings[] = [
-			{
-				id: 'local0',
-				type: StorageType.LOCAL_FOLDER,
-				support: {
-					read: true,
-					write: false
-				},
-				options: {
-					basePath: './source'
-				},
-				watchFolder: true,
-				watchFolderTargetId: 'local1'
-			},
-			{
-				id: 'local1',
-				type: StorageType.LOCAL_FOLDER,
-				support: {
-					read: true,
-					write: true
-				},
-				options: {
-					basePath: './target'
+		const settings: DeviceSettings = {
+			mediaFlows: [
+				{
+					id: 'flow0',
+					sourceId: 'local0',
+					destinationId: 'local1',
+					mediaFlowType: MediaFlowType.WATCH_FOLDER
 				}
-			}
-		]
+			],
+			storages: [
+				{
+					id: 'local0',
+					type: StorageType.LOCAL_FOLDER,
+					support: {
+						read: true,
+						write: false
+					},
+					options: {
+						basePath: './source'
+					}
+				},
+				{
+					id: 'local1',
+					type: StorageType.LOCAL_FOLDER,
+					support: {
+						read: true,
+						write: true
+					},
+					options: {
+						basePath: './target'
+					}
+				}
+			],
+			workers: 3
+		}
 
-		this._availableStorage = _.map(storage, (item) => {
+		// TODO: Initialize Media Manager
+
+		this._availableStorage = _.map(settings.storages, (item) => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
 				handler: buildStorageHandler(item)
 			})
@@ -108,7 +118,7 @@ export class MediaManager {
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
-			new WatchFolderGenerator(this._availableStorage, this._trackedMedia)
+			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows)
 		)
 
 		this._dispatcher = new Dispatcher(

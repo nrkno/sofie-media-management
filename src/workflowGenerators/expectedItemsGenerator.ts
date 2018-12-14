@@ -3,7 +3,7 @@ import { BaseWorkFlowGenerator } from './baseWorkFlowGenerator'
 export * from './baseWorkFlowGenerator'
 
 import { CoreHandler } from '../coreHandler'
-import { ExpectedMediaItem } from '../api'
+import { ExpectedMediaItem, MediaFlow } from '../api'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import { StorageObject } from '../storageHandlers/storageHandler'
 
@@ -12,11 +12,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _tracked: TrackedMediaItems
 	logger: Winston.LoggerInstance
 
-	constructor (logger: Winston.LoggerInstance, availableStorage: StorageObject[], coreHandler: CoreHandler, tracked: TrackedMediaItems) {
+	constructor(availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[], coreHandler: CoreHandler) {
 		super()
 		this._coreHandler = coreHandler
 		this._tracked = tracked
-		this.logger = logger
 	}
 
 	async getCoreExpectedMediaItems (): Promise<Array<ExpectedMediaItem>> {

@@ -3,26 +3,34 @@ import { File, StorageEvent, StorageObject, StorageEventType } from '../storageH
 import { TrackedMediaItems, TrackedMediaItemBase } from '../mediaItemTracker'
 export * from './baseWorkFlowGenerator'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepBase } from '../api'
+import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepBase, MediaFlow, MediaFlowType } from '../api'
 import { FileWorkStep } from '../work/workStep'
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	protected _availableStorage: StorageObject[]
 	protected _tracked: TrackedMediaItems
+	protected _flows: MediaFlow[]
 
 	private LOCAL_LINGER_TIME = 7 * 24 * 60 * 60 * 1000
 
-	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems) {
+	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[]) {
 		super()
 		this._availableStorage = availableStorage
 		this._tracked = tracked
+		this._flows = flows
 	}
 
 	async init (): Promise<void> {
 		this.emit('debug', `Initializing WorkFlow generator ${this.constructor.name}`)
 		return Promise.resolve().then(() => {
-			this._availableStorage.forEach((item) => {
-				if (item.manualIngest) this.registerStorage(item)
+			this._flows.forEach((item) => {
+				if (item.mediaFlowType === MediaFlowType.LOCAL_INGEST) {
+					const srcStorage = this._availableStorage.find(i => i.id === item.sourceId)
+
+					if (srcStorage) {
+						this.registerStorage(srcStorage)
+					}
+				}
 			})
 		})
 	}

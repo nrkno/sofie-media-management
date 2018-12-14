@@ -2,7 +2,7 @@ export * from './api/mediaObject'
 
 /** The settings in Core (that's gonna be in the UI) */
 export interface DeviceSettings {
-	storages: Array<Storage>
+	storages: Array<StorageSettings>
 	mediaFlows: Array<MediaFlow>
 	workers: number
 }
@@ -35,13 +35,21 @@ export interface ExpectedMediaItem {
 	lingerTime: Duration
 }
 
-interface MediaFlow {
+export enum MediaFlowType {
+	WATCH_FOLDER = 'watch_folder',
+	LOCAL_INGEST = 'local_ingest',
+	EXPECTED_ITEMS = 'expected_items'
+}
+
+export interface MediaFlow {
 	/** Id of the mediaFlow */
 	id: string
 	/** Id of a Storage */
 	sourceId: string
 	/** Id of a Storage */
-	destinationId: string
+	destinationId?: string
+	/** Workflow generator type */
+	mediaFlowType: MediaFlowType
 }
 
 export enum StorageType {
@@ -58,10 +66,6 @@ export interface StorageSettings {
 	}
 	type: StorageType
 	options: any
-
-	manualIngest?: boolean
-	watchFolder?: boolean
-	watchFolderTargetId?: string
 }
 export interface LocalFolderStorage extends StorageSettings {
 	type: StorageType.LOCAL_FOLDER
