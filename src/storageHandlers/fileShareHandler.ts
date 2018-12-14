@@ -2,6 +2,9 @@ import { LocalFolderHandler } from './localFolderHandler'
 import { FileShareStorage, LocalFolderStorage, StorageType } from '../api'
 import * as networkDrive from 'windows-network-drive'
 
+/**
+ * File Share handles a file share mapped as a network drive. If the drive is not mapped, the drive will be mapped automatically.
+ */
 export class FileShareHandler extends LocalFolderHandler {
 	private _driveLetter: string
 	private _uncPath: string
@@ -13,7 +16,6 @@ export class FileShareHandler extends LocalFolderHandler {
 		if (!targetBasePath.match(/[a-zA-Z]/)) throw Error('mappedNetworkedDriveTarget needs to be a drive letter')
 		const settingsObj: LocalFolderStorage = {
 			id: settings.id,
-			manualIngest: false,
 			support: settings.support,
 			type: StorageType.LOCAL_FOLDER,
 			options: {

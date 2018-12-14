@@ -7,6 +7,11 @@ import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
 
+/**
+ * A shared method to get the file properties from the underlying file system.
+ * @param  {string} fileUrl 
+ * @return Promise<FileProperties> 
+ */
 function getLocalFileProperties (fileUrl: string): Promise<FileProperties> {
 	return new Promise((resolve, reject) => {
 		fs.stat(fileUrl).then((stats) => {
@@ -221,6 +226,11 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return getLocalFileProperties(file.url)
 	}
 
+	/**
+	 * Handles delete events from the File System watcher
+	 * @private
+	 * @memberof LocalFolderHandler
+	 */
 	private onUnlink = (filePath: string) => {
 		this.emit(StorageEventType.delete, {
 			type: StorageEventType.delete,
@@ -228,6 +238,11 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
+	/**
+	 * Handles change events from the File System watcher
+	 * @private
+	 * @memberof LocalFolderHandler
+	 */
 	private onChange = (filePath: string) => {
 		this.emit(StorageEventType.change, {
 			type: StorageEventType.change,
@@ -236,6 +251,11 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
+	/**
+	 * Handles add events from the File System watcher
+	 * @private
+	 * @memberof LocalFolderHandler
+	 */
 	private onAdd = (filePath: string) => {
 		this.emit(StorageEventType.add, {
 			type: StorageEventType.add,
@@ -244,15 +264,35 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
+	/**
+	 * Handles errors from the file system watcher
+	 * @private
+	 * @memberof LocalFolderHandler
+	 */
 	private onError = (e: any) => {
 		process.stderr.write(e)
 	}
 
+	/**
+	 * Creates a file in the storage, based on an existing file from another storage
+	 * @private
+	 * @param  {File} sourceFile 
+	 * @return LocalFolderFile 
+	 * @memberof LocalFolderHandler
+	 */
 	private createFile (sourceFile: File): LocalFolderFile {
 		const newFile = new LocalFolderFile(path.join(this._basePath, sourceFile.name), this._readable, this._writable, sourceFile.name)
 		return newFile
 	}
 
+	/**
+	 * Gathers all the file in a folder recursively
+	 * @private
+	 * @param  {string} folder 
+	 * @param  {string} [accumulatedPath] 
+	 * @return Promise<NestedFiles> 
+	 * @memberof LocalFolderHandler
+	 */
 	private traverseFolder (folder: string, accumulatedPath?: string): Promise<NestedFiles> {
 		return new Promise((resolve, reject) => {
 			fs.readdir(folder).then((files) => {

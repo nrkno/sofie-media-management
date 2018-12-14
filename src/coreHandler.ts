@@ -132,7 +132,7 @@ export class CoreHandler {
 			credentials = CoreConnection.getCredentials(subDeviceId)
 		}
 		let options: CoreOptions = _.extend(credentials, {
-			deviceType: P.DeviceType.OTHER,
+			deviceType: P.DeviceType.MEDIA_MANAGER,
 			deviceName: name,
 			watchDog: (this._coreConfig ? this._coreConfig.watchdog : true)
 		})
