@@ -2,9 +2,17 @@ export * from './api/mediaObject'
 
 /** The settings in Core (that's gonna be in the UI) */
 export interface DeviceSettings {
+	/** A list of available storage locations */
 	storages: Array<StorageSettings>
+	
+	/** A specification of source -> target mappings with workflow generators to be attached to them */
 	mediaFlows: Array<MediaFlow>
+	
+	/** The amount of workers to be available for file system operations */
 	workers: number
+
+	/** How long to wait before removing a file - used by some workflow generators */
+	lingerTime: number
 }
 
 /**
@@ -32,7 +40,7 @@ export interface ExpectedMediaItem {
 	lastSeen: Time
 
 	/** Time to wait before removing file */
-	lingerTime: Duration
+	lingerTime?: Duration
 }
 
 export enum MediaFlowType {

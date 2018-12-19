@@ -73,13 +73,13 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		]
 	}
 
-	protected registerFile (file: File, st: StorageObject): Promise<void> {
+	protected registerFile (file: File, st: StorageObject, targetStorages?: StorageObject[]): Promise<void> {
 		return this._tracked.put(literal<TrackedMediaItemBase>({
 			_id: file.name,
 			sourceStorageId: st.id,
 			lastSeen: getCurrentTime(),
 			lingerTime: this.LOCAL_LINGER_TIME,
-			targetStorageIds: [],
+			targetStorageIds: targetStorages ? targetStorages.map(i => i.id) : [],
 			name: file.name
 		})).then(() => { })
 	}

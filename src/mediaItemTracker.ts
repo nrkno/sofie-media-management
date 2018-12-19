@@ -45,6 +45,12 @@ export class TrackedMediaItems extends EventEmitter {
 				index: {
 					fields: ['sourceStorageId']
 				}
+			}).then(() => {
+				this._db.createIndex({
+					index: {
+						fields: ['mediaFlowId']
+					}
+				})
 			})
 		})
 		.then(() => {
@@ -73,4 +79,11 @@ export class TrackedMediaItems extends EventEmitter {
 	async remove (tmi: TrackedMediaItem): Promise<boolean> {
 		return this._db.remove(tmi._id, tmi._rev).then((value) => value.ok)
 	}
+
+	async bulkChange (tmis: TrackedMediaItemBase[]): Promise<void> {
+		return this._db.bulkDocs(tmis).then((res) => {
+			
+		})
+	}
+
 }

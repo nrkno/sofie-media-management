@@ -1,18 +1,33 @@
+import * as _ from 'underscore'
 import * as Winston from 'winston'
-import { BaseWorkFlowGenerator } from './baseWorkFlowGenerator'
+import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 export * from './baseWorkFlowGenerator'
 
 import { CoreHandler } from '../coreHandler'
-import { ExpectedMediaItem, MediaFlow } from '../api'
-import { TrackedMediaItems } from '../mediaItemTracker'
-import { StorageObject } from '../storageHandlers/storageHandler'
+import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAction, WorkStepBase, WorkFlow } from '../api'
+import { TrackedMediaItems, TrackedMediaItem, TrackedMediaItemBase } from '../mediaItemTracker'
+import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
+import { Collection } from 'tv-automation-server-core-integration'
+import { randomId, literal, getCurrentTime } from '../lib/lib';
+import { FileWorkStep } from '../work/workStep';
 
 export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _coreHandler: CoreHandler
 	private _tracked: TrackedMediaItems
 	private _availableStorage: StorageObject[]
+	private _storage: StorageObject[] = []
 	private _flows: MediaFlow[]
+	private _handledFlows: MediaFlow[]
 	logger: Winston.LoggerInstance
+
+	private expectedMediaItems: Collection
+	private observer: any
+
+	private _cronJob: NodeJS.Timer
+
+	private CRON_JOB_INTERVAL = 10 * 60 * 1000
+
+	private LINGER_TIME = 3 * 24 * 60 * 60 * 1000
 
 	constructor(availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[], coreHandler: CoreHandler) {
 		super()
@@ -22,21 +37,243 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this._flows = flows
 	}
 
-	async getCoreExpectedMediaItems (): Promise<Array<ExpectedMediaItem>> {
-		return await this._coreHandler.core.callMethodLowPrio('getExpectedMediaItems') as Array<ExpectedMediaItem>
-	}
-
-	async ingestExpectedItems (items: Array<ExpectedMediaItem>): Promise<void> {
-		// TODO: process expected items
-	}
-
 	async init (): Promise<void> {
 		return Promise.resolve().then(() => {
-			this._coreHandler.core.getCollection('expectedMediaItems')
+			this._flows.forEach((item) => {
+				if (item.mediaFlowType === MediaFlowType.EXPECTED_ITEMS) {
+					const storage = this._availableStorage.find(i => i.id === item.sourceId)
+					if (!storage) {
+						this.emit('debug', `Storage "${item.sourceId}" could not be found among available storage.`)
+						return
+					}
+
+					this._handledFlows.push(item)
+
+					this.registerStorage(storage)
+				}
+			})
+
+			this.expectedMediaItems = this._coreHandler.core.getCollection('expectedMediaItems')
+			const observer = this._coreHandler.core.observe('expectedMediaItems')
+			observer.added = this.onExpectedAdded
+			observer.changed = this.onExpectedChanged
+			observer.removed = this.onExpectedRemoved
+
+			this.observer = observer
+
+			this._cronJob = setInterval(this.cronJob, this.CRON_JOB_INTERVAL)
+
+			return this.initialExpectedCheck()
 		})
 	}
 
 	async destroy (): Promise<void> {
-		return Promise.resolve()
+		return Promise.resolve().then(() => {
+			clearInterval(this._cronJob)
+			this.observer.stop()
+		})
 	}
+
+	private onExpectedAdded = (id: string) => {
+		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem	
+		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
+
+		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
+		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
+
+		const baseObj = {
+			_id: item.path,
+			name: item.path,
+			expectedMediaItemId: item._id,
+			lastSeen: item.lastSeen,
+			lingerTime: item.lingerTime || this.LINGER_TIME,
+			sourceStorageId: flow.sourceId,
+			targetStorageIds: [flow.destinationId]
+		}
+		this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj))
+	}
+	
+	private onExpectedChanged = (id: string, oldFields: any, clearedFields: any, newFields: any) => {
+		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
+
+		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
+		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
+
+		const baseObj = {
+			_id: item.path,
+			name: item.path,
+			expectedMediaItemId: item._id,
+			lastSeen: item.lastSeen,
+			lingerTime: item.lingerTime || this.LINGER_TIME,
+			sourceStorageId: flow.sourceId,
+			targetStorageIds: [flow.destinationId]
+		}
+
+		this._tracked.getById(item.path).then((tracked) => {
+			if (tracked.sourceStorageId === flow.sourceId) {
+				const update = _.extend(tracked, baseObj)
+				this._tracked.put(update).then(() => this.checkAndEmitCopyWorkflow(update))
+			} else {
+				this.emit('warn', `File "${item.path}" is already tracked from a different source storage than "${flow.sourceId}".`)
+			}
+		}, () => {
+			this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj))
+		})
+	}
+
+	private onExpectedRemoved = (id: string, oldValue: any) => {
+		this.emit('debug', `${id} was removed from Core expectedMediaItems collection`)
+	}
+
+	private getFile (fileName: string, sourceStorageId: string): Promise<File | undefined> {
+		const sourceStorage = this._storage.find(i => i.id === sourceStorageId)
+		if (!sourceStorage) throw new Error(`Source storage "${sourceStorageId}" could not be found.`)
+
+		return new Promise<File | undefined>((resolve, reject) => {
+			sourceStorage.handler.getFile(fileName).then((file) => {
+				resolve(file)
+			}, (reason) => {
+				resolve(undefined)
+			})
+		})
+	}
+
+	private onFileAdd = (st: StorageObject, e: StorageEvent) => {
+		if (!e.file) throw new Error(`Event for file "${e.path}" has no file argument`)
+		this._tracked.getById(e.path).then((tracked) => {
+			if (tracked.sourceStorageId !== st.id) throw new Error(`File "${e.path}" is already sourced from a different storage.`)
+
+			this._availableStorage.filter(i => tracked.targetStorageIds.indexOf(i.id) >= 0)
+			.forEach(target => this.emitCopyWorkflow(e.file as File, target))
+		})
+	}
+
+	private onFileChange = this.onFileAdd
+
+	private onFileDelete = (st: StorageObject, e: StorageEvent) => {
+		this._tracked.getById(e.path).then((tracked) => {
+			if (tracked.sourceStorageId === st.id) {
+				this.emit('warn', `File "${e.path}" has been deleted from source storage "${st.id}".`)
+			}
+		})
+	}
+
+	protected cronJob () {
+		this.emit('debug', `Starting cron job for ${this.constructor.name}`)
+		this.emit('debug', `Doing expected items storage check`)
+		this._storage.forEach((i) => this.expectedStorageCheck(i))
+	}
+
+	protected registerStorage (st: StorageObject) {
+		this.emit('debug', `Registering storage: "${st.id}" in ${this.constructor.name}`)
+		st.handler.on(StorageEventType.add, (e: StorageEvent) => this.onFileAdd(st, e))
+		st.handler.on(StorageEventType.change, (e: StorageEvent) => this.onFileChange(st, e))
+		st.handler.on(StorageEventType.delete, (e: StorageEvent) => this.onFileDelete(st, e))
+
+		this._storage.push(st)
+
+		this.initialStorageCheck(st).then(() => {
+			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" complete.`)
+		}).catch((e) => {
+			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
+		})
+	}
+
+	protected async initialStorageCheck (st: StorageObject): Promise<void> {
+		return await this.expectedStorageCheck(st)
+	}
+
+	protected async expectedStorageCheck (st: StorageObject): Promise<void> {
+		const tmis = await this._tracked.getAllFromStorage(st.id)
+		tmis.forEach((item) => this.checkAndEmitCopyWorkflow(item))
+	}
+
+	protected async initialExpectedCheck (): Promise<void> {
+		const currentExpectedContents = this.expectedMediaItems.find({
+			mediaFlowId: {
+				$in: this._handledFlows.map(i => i.id)
+			}
+		}) as ExpectedMediaItem[]
+		const expectedItems: TrackedMediaItemBase[] = []
+		currentExpectedContents.forEach((i) => {
+			const flow = this._handledFlows.find((j) => j.id === i.mediaFlowId)
+			if (!flow) return
+			if (!flow.destinationId) {
+				this.emit('error', `Media flow "${flow.id}" does not have a destinationId`)
+				return
+			}
+			const expectedItem = literal<TrackedMediaItemBase>({
+				_id: i.path,
+				name: i.path,
+				lastSeen: i.lastSeen,
+				lingerTime: i.lingerTime || this.LINGER_TIME,
+				expectedMediaItemId: i._id,
+				sourceStorageId: flow.sourceId,
+				targetStorageIds: [ flow.destinationId ]
+			})
+			expectedItems.push(expectedItem)
+		})
+	}
+
+	protected generateNewFileWorkSteps(file: File, st: StorageObject): WorkStepBase[] {
+		return [
+			new FileWorkStep({
+				action: WorkStepAction.COPY,
+				file: file,
+				target: st,
+				priority: 1
+			})
+		]
+	}
+
+	protected emitCopyWorkflow (file: File, targetStorage: StorageObject) {
+		const workflowId = file.name + '_' + randomId()
+		this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
+			_id: workflowId,
+			finished: false,
+			priority: 1,
+			source: WorkFlowSource.LOCAL_MEDIA_ITEM,
+			steps: this.generateNewFileWorkSteps(file, targetStorage),
+			created: getCurrentTime(),
+			success: false
+		}))
+		this.emit('debug', `New forkflow started for "${file.name}": "${workflowId}".`)
+	}
+
+	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItemBase) {
+		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
+		const storage = this._storage.find(i => i.id === tmi.sourceStorageId)
+		if (!storage) throw new Error(`Could not find storage "${tmi.sourceStorageId}"`)
+		// get file from source storage
+		this.getFile(tmi.name, tmi.sourceStorageId).then((file) => {
+			if (file && storage) {
+				file.getProperties().then((sFileProps) => {
+					this._availableStorage.filter(i => tmi.targetStorageIds.indexOf(i.id) >= 1)
+					.forEach((i) => {
+						// check if the file exists on the target storage
+						i.handler.getFile(tmi.name).then((rFile) => {
+							// the file exists on target storage
+							rFile.getProperties().then((rFileProps) => {
+								if (rFileProps.size !== sFileProps.size) {
+									// File size doesn't match
+									this.emitCopyWorkflow(file, i)
+								}
+							}, (e) => {
+								// Properties could not be fetched
+								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked: ${e}. Attempting to write over.`)
+								this.emitCopyWorkflow(file, i)
+							})
+						}, () => {
+							// the file not found
+							this.emitCopyWorkflow(file, i)
+						})
+					})
+				})
+			} else {
+				this.emit('debug', `File "${tmi.name}" not found in source storage "${tmi.sourceStorageId}".`)
+			}
+		})
+	}
+
 }

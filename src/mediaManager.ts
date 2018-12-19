@@ -103,6 +103,7 @@ export class MediaManager {
 					}
 				}
 			],
+			lingerTime: 3 * 24 * 60 * 60 * 1000,
 			workers: 3
 		}
 

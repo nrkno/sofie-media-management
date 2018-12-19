@@ -11,6 +11,7 @@
       "never"
     ],
     "triple-equals": true,
-    "no-empty": false
+    "no-empty": false,
+    "quotemark": [true, "single"]
   }
 }

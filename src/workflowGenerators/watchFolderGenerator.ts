@@ -66,7 +66,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 
 			return Promise.resolve()
 		}, () => {
-			return this.registerFile(localFile, st).then(() => {
+			return this.registerFile(localFile, st, [ targetStorage ]).then(() => {
 				this.emit('debug', `File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
 			}).catch((e) => {
 				this.emit('error', `Tracked file registration failed: ${e}`)
