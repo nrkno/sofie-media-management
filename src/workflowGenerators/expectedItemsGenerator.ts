@@ -90,9 +90,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			sourceStorageId: flow.sourceId,
 			targetStorageIds: [flow.destinationId]
 		}
-		this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj))
+		this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
+			this.emit(`An error happened when trying to create a copy workflow: ${e}`)
+		})
 	}
-	
+
 	private onExpectedChanged = (id: string, oldFields: any, clearedFields: any, newFields: any) => {
 		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
@@ -118,7 +120,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				this.emit('warn', `File "${item.path}" is already tracked from a different source storage than "${flow.sourceId}".`)
 			}
 		}, () => {
-			this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj))
+			this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
+				this.emit(`An error happened when trying to create a copy workflow: ${e}`)
+			})
 		})
 	}
 
@@ -146,6 +150,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 			this._availableStorage.filter(i => tracked.targetStorageIds.indexOf(i.id) >= 0)
 			.forEach(target => this.emitCopyWorkflow(e.file as File, target))
+		}).catch((e) => {
+			this.emit('debug', `File "${e.path}" has been added to a monitored filesystem, but is not expected yet.`)
 		})
 	}
 
@@ -156,13 +162,18 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			if (tracked.sourceStorageId === st.id) {
 				this.emit('warn', `File "${e.path}" has been deleted from source storage "${st.id}".`)
 			}
-		})
+		}).catch((e) => { })
 	}
 
 	protected cronJob () {
 		this.emit('debug', `Starting cron job for ${this.constructor.name}`)
-		this.emit('debug', `Doing expected items storage check`)
-		this._storage.forEach((i) => this.expectedStorageCheck(i))
+		this.emit('debug', `Purging old expected items`)
+		this.purgeOldExpectedItems().then(() => {
+			this.emit('debug', `Doing expected items storage check`)
+			this._storage.forEach((i) => this.expectedStorageCheck(i))
+		}).catch((e) => {
+			this.emit('error', `There was an error running the cron job: ${e}`)
+		})
 	}
 
 	protected registerStorage (st: StorageObject) {
@@ -181,7 +192,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	protected async initialStorageCheck (st: StorageObject): Promise<void> {
-		return await this.expectedStorageCheck(st)
+		return this.expectedStorageCheck(st)
 	}
 
 	protected async expectedStorageCheck (st: StorageObject): Promise<void> {
@@ -213,6 +224,37 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				targetStorageIds: [ flow.destinationId ]
 			})
 			expectedItems.push(expectedItem)
+		})
+		Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
+		.then((result) => {
+			const allTrackedFiles = _.flatten(result)
+			const newItems = _.compact(expectedItems.map((i) => {
+				return allTrackedFiles.find(j => j._id === i._id) ? null : i
+			}))
+			this._tracked.bulkChange(newItems).catch((e) => {
+				this.emit('error', `There has been an error writing to tracked items database: ${e}`)
+			})
+		}).catch((e) => {
+			this.emit('error')
+		})
+	}
+
+	protected purgeOldExpectedItems(): Promise<void> {
+		return Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
+		.then((result) => {
+			const allTrackedFiles = _.flatten(result) as TrackedMediaItem[]
+			const toBeDeleted = allTrackedFiles.filter(i => ((i.lastSeen + i.lingerTime) < getCurrentTime())).map((i) => {
+				return _.extend(i, {
+					_deleted: true
+				})
+			})
+			return Promise.all(toBeDeleted.map((i: TrackedMediaItem) => {
+				return Promise.all(this._availableStorage
+				// get only storages that contain the file as a target storage
+				.filter(j => (i.targetStorageIds.indexOf(j.id) >= 0))
+				// remove the file from all the storages that contain it as a target
+				.map((j) => j.handler.getFile(i.name).then((f) => j.handler.deleteFile(f))))
+			})).then(() => { })
 		})
 	}
 
@@ -269,10 +311,14 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							this.emitCopyWorkflow(file, i)
 						})
 					})
+				}).catch((e) => {
+					this.emit('error', `Could not fetch file "${tmi.name}" properties from storage: ${e}`)
 				})
 			} else {
 				this.emit('debug', `File "${tmi.name}" not found in source storage "${tmi.sourceStorageId}".`)
 			}
+		}).catch((e) => {
+			this.emit('error', `File "${tmi.name}" failed to be checked in source storage "${tmi.sourceStorageId}": ${e}`)
 		})
 	}
 

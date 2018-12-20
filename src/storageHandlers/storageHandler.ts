@@ -79,7 +79,7 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @returns An array of file handles in the storage
 	 */
 	abstract getAllFiles (): Promise<Array<File>>
-	
+
 	/**
 	 * Get a file handle
 	 * @abstract
@@ -132,8 +132,8 @@ export abstract class StorageHandler extends EventEmitter {
 /**
  * A factory for storage handlers, based on the StorageSettings object
  * @export
- * @param  {StorageSettings} storage 
- * @return StorageHandler 
+ * @param  {StorageSettings} storage
+ * @return StorageHandler
  */
 export function buildStorageHandler (storage: StorageSettings): StorageHandler {
 	switch (storage.type) {
