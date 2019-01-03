@@ -288,6 +288,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		.then((result) => {
 			const allTrackedFiles = _.flatten(result) as TrackedMediaItem[]
 			const toBeDeleted = allTrackedFiles.filter(i => ((i.lastSeen + i.lingerTime) < getCurrentTime())).map((i) => {
+				this.emit('debug', `Marking file "${i.name}" coming from "${i.sourceStorageId}" to be deleted because it was last seen ${new Date(i.lastSeen)} & linger time is ${i.lingerTime / (60 * 60 * 1000)} hours`)
 				return _.extend(i, {
 					_deleted: true
 				})
@@ -298,6 +299,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				.filter(j => (i.targetStorageIds.indexOf(j.id) >= 0))
 				// remove the file from all the storages that contain it as a target
 				.map((j) => j.handler.getFile(i.name).then((f) => j.handler.deleteFile(f))))
+				.then(() => this._tracked.remove(i))
+				.then(() => this.emit('debug', `Stopped tracking file "${i.name}".`))
 			})).then(() => { })
 		})
 	}
@@ -352,7 +355,6 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							})
 						}, (err) => {
 							// the file not found
-							this.emit('error', err)
 							this.emitCopyWorkflow(file, i)
 						})
 					})

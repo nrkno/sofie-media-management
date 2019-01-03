@@ -13,3 +13,5 @@ wallaby.conf.js
 .DS_Store
 
 local/
+source/
+target/
