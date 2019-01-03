@@ -27,16 +27,19 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	private _expectedMediaItemsSub: string
 
-	private CRON_JOB_INTERVAL = 1 * 20 * 1000
+	private CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000
 
 	private LINGER_TIME = 3 * 24 * 60 * 60 * 1000
 
-	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[], coreHandler: CoreHandler) {
+	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[], coreHandler: CoreHandler, lingerTime?: number, cronJobTime?: number) {
 		super()
 		this._availableStorage = availableStorage
 		this._coreHandler = coreHandler
 		this._tracked = tracked
 		this._flows = flows
+
+		this.LINGER_TIME = lingerTime || this.LINGER_TIME
+		this.CRON_JOB_INTERVAL = cronJobTime || this.CRON_JOB_INTERVAL
 	}
 
 	async init (): Promise<void> {

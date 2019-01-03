@@ -2,7 +2,7 @@ import * as Winston from 'winston'
 import * as _ from 'underscore'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
-import { StorageSettings, StorageType, DeviceSettings, MediaFlowType } from './api'
+import { StorageSettings, DeviceSettings } from './api'
 import { StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
 import { TrackedMediaItems } from './mediaItemTracker'
 import { Dispatcher } from './work/dispatcher'
@@ -43,10 +43,10 @@ export class MediaManager {
 			this._logger.info('Skipping core initialization, just for now')
 			this._logger.info('Core initialized')
 			this._logger.info('Initializing MediaManager...')
-			// const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
-			// await this.initMediaManager(peripheralDevice.settings)
-			await this.coreHandler.core.getPeripheralDevice()
-			const settings = {
+			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
+			await this.initMediaManager(peripheralDevice.settings)
+			// await this.coreHandler.core.getPeripheralDevice()
+			/* const settings = {
 				mediaFlows: [
 					{
 						id: 'flow0',
@@ -82,7 +82,7 @@ export class MediaManager {
 				lingerTime: 3 * 24 * 60 * 60 * 1000,
 				workers: 3
 			}
-			await this.initMediaManager(settings)
+			await this.initMediaManager(settings) */
 
 			this._logger.info('MediaManager initialized')
 			this._logger.info('Initialization done')
@@ -128,7 +128,7 @@ export class MediaManager {
 		this._workFlowGenerators.push(
 			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows),
 			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows),
-			new ExpectedItemsGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows, this.coreHandler),
+			new ExpectedItemsGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows, this.coreHandler, settings.lingerTime, settings.cronJobTime),
 		)
 
 		this._dispatcher = new Dispatcher(

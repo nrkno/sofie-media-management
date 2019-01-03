@@ -13,12 +13,10 @@ export interface DeviceSettings {
 
 	/** How long to wait before removing a file - used by some workflow generators */
 	lingerTime: number
-}
 
-/**
- * Get the expected clips from Core
- */
-export type CoreCallGetExpectedMediaItems = (deviceId: string, token: string) => Array<ExpectedMediaItem>
+	/** Cron job time - how often to check the file system for consistency - do a poll of the filesystem to check that the files are where they are supposed to be, clean out expired files */
+	cronJobTime?: number
+}
 
 export type Time = number // Timestamp, unix time in ms
 export type Duration = number // Duration, in ms
