@@ -4,10 +4,10 @@ export * from './api/mediaObject'
 export interface DeviceSettings {
 	/** A list of available storage locations */
 	storages: Array<StorageSettings>
-	
+
 	/** A specification of source -> target mappings with workflow generators to be attached to them */
 	mediaFlows: Array<MediaFlow>
-	
+
 	/** The amount of workers to be available for file system operations */
 	workers: number
 

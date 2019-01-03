@@ -8,8 +8,8 @@ import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAc
 import { TrackedMediaItems, TrackedMediaItem, TrackedMediaItemBase } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection } from 'tv-automation-server-core-integration'
-import { randomId, literal, getCurrentTime } from '../lib/lib';
-import { FileWorkStep } from '../work/workStep';
+import { randomId, literal, getCurrentTime } from '../lib/lib'
+import { FileWorkStep } from '../work/workStep'
 
 export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _coreHandler: CoreHandler
@@ -31,7 +31,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	private LINGER_TIME = 3 * 24 * 60 * 60 * 1000
 
-	constructor(availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[], coreHandler: CoreHandler) {
+	constructor (availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[], coreHandler: CoreHandler) {
 		super()
 		this._availableStorage = availableStorage
 		this._coreHandler = coreHandler
@@ -102,7 +102,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	private onExpectedAdded = (id: string) => {
-		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem	
+		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
@@ -301,7 +301,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				.map((j) => j.handler.getFile(i.name).then((f) => j.handler.deleteFile(f))))
 				.then(() => this._tracked.remove(i))
 				.then(() => this.emit('debug', `Stopped tracking file "${i.name}".`))
-			})).then(() => { })
+			})).then((results) => {
+				this.emit('info', `Removed ${results.length} expired expected items.`)
+			})
 		})
 	}
 
@@ -353,7 +355,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked: ${e}. Attempting to write over.`)
 								this.emitCopyWorkflow(file, i)
 							})
-						}, (err) => {
+						}, (_err) => {
 							// the file not found
 							this.emitCopyWorkflow(file, i)
 						})

@@ -9,8 +9,8 @@ import * as chokidar from 'chokidar'
 
 /**
  * A shared method to get the file properties from the underlying file system.
- * @param  {string} fileUrl 
- * @return Promise<FileProperties> 
+ * @param  {string} fileUrl
+ * @return Promise<FileProperties>
  */
 function getLocalFileProperties (fileUrl: string): Promise<FileProperties> {
 	return new Promise((resolve, reject) => {
@@ -276,8 +276,8 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	/**
 	 * Creates a file in the storage, based on an existing file from another storage
 	 * @private
-	 * @param  {File} sourceFile 
-	 * @return LocalFolderFile 
+	 * @param  {File} sourceFile
+	 * @return LocalFolderFile
 	 * @memberof LocalFolderHandler
 	 */
 	private createFile (sourceFile: File): LocalFolderFile {
@@ -288,9 +288,9 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	/**
 	 * Gathers all the file in a folder recursively
 	 * @private
-	 * @param  {string} folder 
-	 * @param  {string} [accumulatedPath] 
-	 * @return Promise<NestedFiles> 
+	 * @param  {string} folder
+	 * @param  {string} [accumulatedPath]
+	 * @return Promise<NestedFiles>
 	 * @memberof LocalFolderHandler
 	 */
 	private traverseFolder (folder: string, accumulatedPath?: string): Promise<NestedFiles> {
