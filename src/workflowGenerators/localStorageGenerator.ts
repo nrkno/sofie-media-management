@@ -84,7 +84,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		})).then(() => { })
 	}
 
-	protected onAdd (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
+	protected onAdd (st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
 		if (e.type !== StorageEventType.add || !e.file) throw new Error(`Invalid event type or arguments.`)
 		const localFile = e.file
 		this._tracked.getById(e.path).then(() => {
@@ -131,7 +131,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	protected onDelete (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
+	protected onDelete (st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
 		this._tracked.getById(e.path).then((tmi) => {
 			if (tmi.sourceStorageId === st.id) {
 				this._tracked.remove(tmi).then(() => {

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { literal } from '../lib/lib'
+import { literal, LogEvents } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction } from '../api'
 import { FileWorkStep, WorkStep } from './workStep'
@@ -19,6 +19,10 @@ export class Worker extends EventEmitter {
 		super()
 		this._db = db
 		this._trackedMediaItems = tmi
+	}
+
+	on (type: LogEvents, listener: (e: string) => void): this {
+		return super.on(type, listener)
 	}
 
 	get busy (): boolean {

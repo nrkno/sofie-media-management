@@ -2,14 +2,13 @@ import { EventEmitter } from 'events'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
-import * as Winston from 'winston'
 import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
 
 export interface TrackedMediaItemBase {
 	_id: string
 
-	expectedMediaItemId?: string
+	expectedMediaItemId?: string[]
 
 	sourceStorageId?: string
 	targetStorageIds: string[]
@@ -40,19 +39,15 @@ export class TrackedMediaItems extends EventEmitter {
 			adapter: dbAdapter
 		})
 		this._db.compact()
-		.then(() => {
-			return this._db.createIndex({
-				index: {
-					fields: ['sourceStorageId']
-				}
-			}).then(() => {
-				return this._db.createIndex({
-					index: {
-						fields: ['mediaFlowId']
-					}
-				})
-			})
-		})
+		.then(() => this._db.createIndex({
+			index: {
+				fields: ['sourceStorageId']
+			}
+		})).then(() => this._db.createIndex({
+			index: {
+				fields: ['mediaFlowId']
+			}
+		}))
 		.then(() => {
 			// Index created
 		}, () => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.'))
@@ -81,7 +76,7 @@ export class TrackedMediaItems extends EventEmitter {
 	}
 
 	async bulkChange (tmis: TrackedMediaItemBase[]): Promise<void> {
-		return this._db.bulkDocs(tmis).then((res) => { })
+		return this._db.bulkDocs(tmis).then(({}) => { })
 	}
 
 }

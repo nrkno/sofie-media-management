@@ -101,7 +101,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		.catch((e) => this.emit('error', `An error was thrown when handling an updated file: ${e}`))
 	}
 
-	protected onAdd (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
+	protected onAdd (st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
 		return this.onFileUpdated(st, e)
 	}
 
@@ -109,7 +109,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		return this.onAdd(st, e)
 	}
 
-	protected onDelete (st: StorageObject, e: StorageEvent, initialScan?: boolean) {
+	protected onDelete (st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
 		this._tracked.getById(e.path).then((tmi) => {
 			if (tmi.sourceStorageId === st.id) {
 				tmi.targetStorageIds.forEach((sId) => {

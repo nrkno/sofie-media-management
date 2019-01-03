@@ -98,7 +98,7 @@ export interface WorkFlow {
 
 	source: WorkFlowSource
 	/** Id of the expectedMedia Item */
-	expectedMediaItemId?: string
+	expectedMediaItemId?: string[]
 	mediaObjectId?: string
 	steps: Array<WorkStepBase>
 	created: Time

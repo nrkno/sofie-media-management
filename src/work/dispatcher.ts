@@ -4,7 +4,7 @@ import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
 import { EventEmitter } from 'events'
 
-import { extendMandadory, randomId } from '../lib/lib'
+import { extendMandadory, randomId, LogEvents } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStepBase, WorkStepStatus } from '../api'
 import { WorkStep, workStepToPlain, plainToWorkStep } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
@@ -21,6 +21,10 @@ export class Dispatcher extends EventEmitter {
 	private _workSteps: PouchDB.Database<WorkStep>
 	private _availableStorage: StorageObject[]
 	private _tmi: TrackedMediaItems
+
+	on (type: LogEvents, listener: (e: string) => void): this {
+		return super.on(type, listener)
+	}
 
 	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, workersCount: number) {
 		super()
@@ -77,9 +81,12 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	async destroy (): Promise<void> {
-		return Promise.all(this.generators.map(gen => gen.destroy())).then(() => {
-			this.emit('debug', `Dispatcher destroyed.`)
-		})
+		return Promise.all(this.generators.map(gen => gen.destroy()))
+		.then(() => this.emit('debug', 'WorkFlow generators destroyed'))
+		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
+		.then(() => this.emit('debug', 'Storage handlers destroyed'))
+		.then(() => this.emit('debug', `Dispatcher destroyed.`))
+		.then(() => { })
 	}
 
 	private attachLogEvents = (prefix: string, ee: EventEmitter) => {

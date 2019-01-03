@@ -8,6 +8,8 @@ import { TrackedMediaItems } from './mediaItemTracker'
 import { Dispatcher } from './work/dispatcher'
 import { BaseWorkFlowGenerator } from './workflowGenerators/baseWorkFlowGenerator'
 import { WatchFolderGenerator } from './workflowGenerators/watchFolderGenerator'
+import { LocalStorageGenerator } from './workflowGenerators/localStorageGenerator'
+import { ExpectedItemsGenerator } from './workflowGenerators/expectedItemsGenerator'
 
 export interface Config {
 	device: DeviceConfig
@@ -36,13 +38,52 @@ export class MediaManager {
 		this._config = config
 
 		try {
-			// await Promise.resolve();
 			this._logger.info('Initializing Core...')
-			// await this.initCore()
+			await this.initCore()
 			this._logger.info('Skipping core initialization, just for now')
 			this._logger.info('Core initialized')
 			this._logger.info('Initializing MediaManager...')
-			await this.initMediaManager()
+			// const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
+			// await this.initMediaManager(peripheralDevice.settings)
+			await this.coreHandler.core.getPeripheralDevice()
+			const settings = {
+				mediaFlows: [
+					{
+						id: 'flow0',
+						sourceId: 'local0',
+						destinationId: 'local1',
+						mediaFlowType: MediaFlowType.EXPECTED_ITEMS
+					}
+				],
+				storages: [
+					{
+						id: 'local0',
+						type: StorageType.LOCAL_FOLDER,
+						support: {
+							read: true,
+							write: false
+						},
+						options: {
+							basePath: './source'
+						}
+					},
+					{
+						id: 'local1',
+						type: StorageType.LOCAL_FOLDER,
+						support: {
+							read: true,
+							write: true
+						},
+						options: {
+							basePath: './target'
+						}
+					}
+				],
+				lingerTime: 3 * 24 * 60 * 60 * 1000,
+				workers: 3
+			}
+			await this.initMediaManager(settings)
+
 			this._logger.info('MediaManager initialized')
 			this._logger.info('Initialization done')
 			return
@@ -65,47 +106,13 @@ export class MediaManager {
 			return
 		}
 	}
-	initCore () {
+	async initCore () {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
 		return this.coreHandler.init(this._config.core)
 	}
-	initMediaManager (): Promise<void> {
-		const settings: DeviceSettings = {
-			mediaFlows: [
-				{
-					id: 'flow0',
-					sourceId: 'local0',
-					destinationId: 'local1',
-					mediaFlowType: MediaFlowType.WATCH_FOLDER
-				}
-			],
-			storages: [
-				{
-					id: 'local0',
-					type: StorageType.LOCAL_FOLDER,
-					support: {
-						read: true,
-						write: false
-					},
-					options: {
-						basePath: './source'
-					}
-				},
-				{
-					id: 'local1',
-					type: StorageType.LOCAL_FOLDER,
-					support: {
-						read: true,
-						write: true
-					},
-					options: {
-						basePath: './target'
-					}
-				}
-			],
-			lingerTime: 3 * 24 * 60 * 60 * 1000,
-			workers: 3
-		}
+	async initMediaManager (settings: DeviceSettings): Promise<void> {
+		// console.log(this.coreHandler.deviceSettings)
+		this._logger.debug(JSON.stringify(settings))
 
 		// TODO: Initialize Media Manager
 
@@ -119,7 +126,9 @@ export class MediaManager {
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
-			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows)
+			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows),
+			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows),
+			new ExpectedItemsGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows, this.coreHandler),
 		)
 
 		this._dispatcher = new Dispatcher(
@@ -133,9 +142,7 @@ export class MediaManager {
 		.on('info', this._logger.info)
 		.on('debug', this._logger.debug)
 
-		return Promise.resolve()
-			.then(() => Promise.all(this._availableStorage.map((st) => st.handler.init())))
-			.then(() => this._dispatcher.init())
-			.then(() => { })
+		await Promise.all(this._availableStorage.map((st) => st.handler.init()))
+		await this._dispatcher.init()
 	}
 }

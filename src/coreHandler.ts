@@ -32,6 +32,7 @@ export interface PeripheralDeviceCommand {
 export class CoreHandler {
 	core: CoreConnection
 	logger: Winston.LoggerInstance
+
 	public _observers: Array<any> = []
 	public deviceSettings: {[key: string]: any} = {}
 
@@ -92,7 +93,7 @@ export class CoreHandler {
 		])
 		this.logger.info('Core: Subscriptions are set up!')
 		if (this._observers.length) {
-			this.logger.info('CoreMos: Clearing observers..')
+			this.logger.info('Core: Clearing observers..')
 			this._observers.forEach((obs) => {
 				obs.stop()
 			})

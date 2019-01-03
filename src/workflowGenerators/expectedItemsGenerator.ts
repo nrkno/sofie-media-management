@@ -16,8 +16,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _tracked: TrackedMediaItems
 	private _availableStorage: StorageObject[]
 	private _storage: StorageObject[] = []
-	private _flows: MediaFlow[]
-	private _handledFlows: MediaFlow[]
+	private _flows: MediaFlow[] = []
+	private _handledFlows: MediaFlow[] = []
 	logger: Winston.LoggerInstance
 
 	private expectedMediaItems: Collection
@@ -25,7 +25,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	private _cronJob: NodeJS.Timer
 
-	private CRON_JOB_INTERVAL = 10 * 60 * 1000
+	private _expectedMediaItemsSub: string
+
+	private CRON_JOB_INTERVAL = 1 * 20 * 1000
 
 	private LINGER_TIME = 3 * 24 * 60 * 60 * 1000
 
@@ -53,22 +55,47 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				}
 			})
 
-			this.expectedMediaItems = this._coreHandler.core.getCollection('expectedMediaItems')
-			const observer = this._coreHandler.core.observe('expectedMediaItems')
-			observer.added = this.onExpectedAdded
-			observer.changed = this.onExpectedChanged
-			observer.removed = this.onExpectedRemoved
+			this._coreHandler.core.onConnected(() => {
+				this.setupSubscribtionsAndObservers().catch((e) => {
+					this.emit('debug', `Error while resetting the subscribtions: ${e}`)
+				})
+			})
 
-			this.observer = observer
-
-			this._cronJob = setInterval(this.cronJob, this.CRON_JOB_INTERVAL)
-
-			return this.initialExpectedCheck()
+			return this.setupSubscribtionsAndObservers()
 		})
+	}
+
+	async setupSubscribtionsAndObservers (): Promise<void> {
+		if (this._expectedMediaItemsSub) {
+			this._coreHandler.core.unsubscribe(this._expectedMediaItemsSub)
+		}
+		this._expectedMediaItemsSub = await this._coreHandler.core.subscribe('expectedMediaItems', {
+			mediaFlowId: {
+				$in: this._handledFlows.map(i => i.id)
+			}
+		})
+		this.emit('debug', 'Subscribed to expectedMediaItems.')
+
+		this.expectedMediaItems = this._coreHandler.core.getCollection('expectedMediaItems')
+
+		const observer = this._coreHandler.core.observe('expectedMediaItems')
+		observer.added = this.onExpectedAdded
+		observer.changed = this.onExpectedChanged
+		observer.removed = this.onExpectedRemoved
+
+		this.observer = observer
+
+		this.emit('debug', 'Observer set up')
+
+		this._cronJob = setInterval(() => {
+			this.cronJob()
+		}, this.CRON_JOB_INTERVAL)
+		return this.initialExpectedCheck()
 	}
 
 	async destroy (): Promise<void> {
 		return Promise.resolve().then(() => {
+			this._coreHandler.core.unsubscribe(this._expectedMediaItemsSub)
 			clearInterval(this._cronJob)
 			this.observer.stop()
 		})
@@ -84,7 +111,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const baseObj = {
 			_id: item.path,
 			name: item.path,
-			expectedMediaItemId: item._id,
+			expectedMediaItemId: [ item._id ],
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
@@ -95,7 +122,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	private onExpectedChanged = (id: string, oldFields: any, clearedFields: any, newFields: any) => {
+	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
 		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
 
@@ -105,7 +132,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const baseObj = {
 			_id: item.path,
 			name: item.path,
-			expectedMediaItemId: item._id,
+			expectedMediaItemId: [ item._id ],
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
@@ -115,7 +142,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this._tracked.getById(item.path).then((tracked) => {
 			if (tracked.sourceStorageId === flow.sourceId) {
 				const update = _.extend(tracked, baseObj)
-				this._tracked.put(update).then(() => this.checkAndEmitCopyWorkflow(update))
+				this._tracked.put(update).then(() => this.checkAndEmitCopyWorkflow(update)).catch((e) => {
+					this.emit(`An error happened when trying to create a copy workflow: ${e}`)
+				})
 			} else {
 				this.emit('warn', `File "${item.path}" is already tracked from a different source storage than "${flow.sourceId}".`)
 			}
@@ -126,7 +155,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	private onExpectedRemoved = (id: string, oldValue: any) => {
+	private onExpectedRemoved = (id: string, _oldValue: any) => {
 		this.emit('debug', `${id} was removed from Core expectedMediaItems collection`)
 	}
 
@@ -134,10 +163,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const sourceStorage = this._storage.find(i => i.id === sourceStorageId)
 		if (!sourceStorage) throw new Error(`Source storage "${sourceStorageId}" could not be found.`)
 
-		return new Promise<File | undefined>((resolve, reject) => {
+		return new Promise<File | undefined>((resolve, _reject) => {
 			sourceStorage.handler.getFile(fileName).then((file) => {
 				resolve(file)
-			}, (reason) => {
+			}, (_reason) => {
 				resolve(undefined)
 			})
 		})
@@ -162,7 +191,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			if (tracked.sourceStorageId === st.id) {
 				this.emit('warn', `File "${e.path}" has been deleted from source storage "${st.id}".`)
 			}
-		}).catch((e) => { })
+		}).catch((_e) => { })
 	}
 
 	protected cronJob () {
@@ -201,10 +230,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	protected async initialExpectedCheck (): Promise<void> {
-		const currentExpectedContents = this.expectedMediaItems.find({
-			mediaFlowId: {
-				$in: this._handledFlows.map(i => i.id)
-			}
+		const handledIds = this._handledFlows.map(i => i.id)
+		const currentExpectedContents = this.expectedMediaItems.find((item: ExpectedMediaItem) => {
+			return handledIds.indexOf(item.mediaFlowId) >= 0
 		}) as ExpectedMediaItem[]
 		const expectedItems: TrackedMediaItemBase[] = []
 		currentExpectedContents.forEach((i) => {
@@ -219,27 +247,43 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				name: i.path,
 				lastSeen: i.lastSeen,
 				lingerTime: i.lingerTime || this.LINGER_TIME,
-				expectedMediaItemId: i._id,
+				expectedMediaItemId: [ i._id ],
 				sourceStorageId: flow.sourceId,
 				targetStorageIds: [ flow.destinationId ]
 			})
-			expectedItems.push(expectedItem)
+
+			// check if an item doesn't already exist in the list with the same id
+			const overlapItem = expectedItems.find(i => i._id === expectedItem._id)
+			if (overlapItem) {
+				if ((overlapItem.sourceStorageId === expectedItem.sourceStorageId)) {
+					overlapItem.targetStorageIds = _.union(overlapItem.targetStorageIds, expectedItem.targetStorageIds)
+					overlapItem.lastSeen = Math.max(expectedItem.lastSeen, overlapItem.lastSeen)
+					overlapItem.lingerTime = Math.max(expectedItem.lingerTime, overlapItem.lingerTime)
+					overlapItem.expectedMediaItemId = _.union(overlapItem.expectedMediaItemId || [], expectedItem.expectedMediaItemId || [])
+				} else {
+					this.emit('error', `Only a single item of a given name can be expected across all sources. Item "${expectedItem.name}" is expected from multiple sources: "${expectedItem.sourceStorageId}" & "${overlapItem.sourceStorageId}."`)
+				}
+			} else {
+				expectedItems.push(expectedItem)
+			}
 		})
 		Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
 		.then((result) => {
-			const allTrackedFiles = _.flatten(result)
+			const allTrackedFiles = _.flatten(result) as TrackedMediaItem[]
 			const newItems = _.compact(expectedItems.map((i) => {
-				return allTrackedFiles.find(j => j._id === i._id) ? null : i
+				return allTrackedFiles.find(j => j.expectedMediaItemId === i.expectedMediaItemId) ? null : i
 			}))
-			this._tracked.bulkChange(newItems).catch((e) => {
+			this._tracked.bulkChange(newItems).then(() => {
+				return newItems.map(item => this.checkAndEmitCopyWorkflow(item))
+			}).catch((e) => {
 				this.emit('error', `There has been an error writing to tracked items database: ${e}`)
 			})
-		}).catch((e) => {
+		}).catch((_e) => {
 			this.emit('error')
 		})
 	}
 
-	protected purgeOldExpectedItems(): Promise<void> {
+	protected purgeOldExpectedItems (): Promise<void> {
 		return Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
 		.then((result) => {
 			const allTrackedFiles = _.flatten(result) as TrackedMediaItem[]
@@ -258,7 +302,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	protected generateNewFileWorkSteps(file: File, st: StorageObject): WorkStepBase[] {
+	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
 		return [
 			new FileWorkStep({
 				action: WorkStepAction.COPY,
@@ -291,7 +335,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this.getFile(tmi.name, tmi.sourceStorageId).then((file) => {
 			if (file && storage) {
 				file.getProperties().then((sFileProps) => {
-					this._availableStorage.filter(i => tmi.targetStorageIds.indexOf(i.id) >= 1)
+					this._availableStorage.filter(i => tmi.targetStorageIds.indexOf(i.id) >= 0)
 					.forEach((i) => {
 						// check if the file exists on the target storage
 						i.handler.getFile(tmi.name).then((rFile) => {
@@ -306,8 +350,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked: ${e}. Attempting to write over.`)
 								this.emitCopyWorkflow(file, i)
 							})
-						}, () => {
+						}, (err) => {
 							// the file not found
+							this.emit('error', err)
 							this.emitCopyWorkflow(file, i)
 						})
 					})

@@ -73,6 +73,11 @@ export interface StorageEvent {
  * Handler for storage device/service
  */
 export abstract class StorageHandler extends EventEmitter {
+
+	on (type: StorageEventType.add | StorageEventType.change | StorageEventType.delete, listener: (e: StorageEvent) => void): this {
+		return super.on(type, listener)
+	}
+
 	/**
 	 * Get all file handles on the storage
 	 * @abstract
