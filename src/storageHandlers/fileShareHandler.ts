@@ -12,6 +12,8 @@ export class FileShareHandler extends LocalFolderHandler {
 	private _password: string | undefined
 
 	constructor (settings: FileShareStorage) {
+		if (!settings.options.mappedNetworkedDriveTarget) throw new Error(`"${settings.id}": mappedNetworkedDriveTarget not set!`)
+		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
 		const targetBasePath = settings.options.mappedNetworkedDriveTarget + '://'
 		if (!targetBasePath.match(/[a-zA-Z]/)) throw Error('mappedNetworkedDriveTarget needs to be a drive letter')
 		const settingsObj: LocalFolderStorage = {

@@ -84,6 +84,14 @@ export class MediaManager {
 			}
 			await this.initMediaManager(settings) */
 
+			this.coreHandler.onChanged(async () => {
+				if (this._dispatcher) {
+					await this._dispatcher.destroy()
+				}
+				const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
+				await this.initMediaManager(peripheralDevice.settings)
+			})
+
 			this._logger.info('MediaManager initialized')
 			this._logger.info('Initialization done')
 			return
@@ -112,6 +120,7 @@ export class MediaManager {
 	}
 	async initMediaManager (settings: DeviceSettings): Promise<void> {
 		// console.log(this.coreHandler.deviceSettings)
+		this._logger.debug('Initializing Media Manager with the following settings:')
 		this._logger.debug(JSON.stringify(settings))
 
 		// TODO: Initialize Media Manager
@@ -122,7 +131,7 @@ export class MediaManager {
 			})
 		})
 
-		this._trackedMedia = new TrackedMediaItems()
+		this._trackedMedia = this._trackedMedia || new TrackedMediaItems()
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(

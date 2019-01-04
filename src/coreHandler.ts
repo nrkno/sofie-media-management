@@ -42,6 +42,7 @@ export class CoreHandler {
 
 	private _deviceOptions: DeviceConfig
 	private _onConnected?: () => any
+	private _onChanged?: () => any
 	private _executedFunctions: {[id: string]: boolean} = {}
 	private _coreConfig?: CoreConfig
 
@@ -143,6 +144,9 @@ export class CoreHandler {
 	onConnected (fcn: () => any) {
 		this._onConnected = fcn
 	}
+	onChanged (fcn: () => any) {
+		this._onChanged = fcn
+	}
 	onDeviceChanged (id: string) {
 		if (id === this.core.deviceId) {
 			let col = this.core.getCollection('peripheralDevices')
@@ -175,6 +179,8 @@ export class CoreHandler {
 
 				this.logger.debug('End test debug logging')
 			}
+
+			if (this._onChanged) this._onChanged()
 		}
 	}
 	get logDebug (): boolean {

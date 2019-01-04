@@ -77,6 +77,8 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	constructor (settings: LocalFolderStorage) {
 		super()
 
+		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
+
 		this._writable = settings.support.write
 		this._readable = settings.support.read
 
