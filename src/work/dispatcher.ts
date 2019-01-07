@@ -102,7 +102,11 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private attachLogEvents = (prefix: string, ee: EventEmitter) => {
-		ee.on('error', (e) => this.emit('error', prefix + ': ' + e))
+		ee.removeAllListeners('error')
+		.removeAllListeners('warn')
+		.removeAllListeners('info')
+		.removeAllListeners('debug')
+		.on('error', (e) => this.emit('error', prefix + ': ' + e))
 		.on('warn', (e) => this.emit('warn', prefix + ': ' + e))
 		.on('info', (e) => this.emit('info', prefix + ': ' + e))
 		.on('debug', (e) => this.emit('debug', prefix + ': ' + e))

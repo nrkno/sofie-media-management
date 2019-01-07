@@ -84,13 +84,13 @@ export class MediaManager {
 			}
 			await this.initMediaManager(settings) */
 
-			this.coreHandler.onChanged(async () => {
+			/* this.coreHandler.onChanged(async () => {
 				if (this._dispatcher) {
 					await this._dispatcher.destroy()
 				}
 				const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
 				await this.initMediaManager(peripheralDevice.settings)
-			})
+			}) */
 
 			this._logger.info('MediaManager initialized')
 			this._logger.info('Initialization done')
@@ -144,6 +144,7 @@ export class MediaManager {
 			this._workFlowGenerators,
 			this._availableStorage,
 			this._trackedMedia,
+			settings,
 			3)
 
 		this._dispatcher.on('error', this._logger.error)
