@@ -2,8 +2,9 @@ import { EventEmitter } from 'events'
 import { literal, LogEvents } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction } from '../api'
-import { FileWorkStep, WorkStep } from './workStep'
+import { FileWorkStep, WorkStep, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems } from '../mediaItemTracker'
+import * as request from 'request-promise-native'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -34,24 +35,28 @@ export class Worker extends EventEmitter {
 			this.emit('warn', `Worker could not report progress: ${e}`)
 		}
 
+		const unBusyAndFailStep = (p: Promise<WorkResult>) => {
+			return p.then((result: WorkResult) => {
+				this._busy = false
+				return result
+			})
+			.catch((e) => this.failStep(e))
+		}
+
 		if (this._busy) throw new Error(`Busy worker was assigned to do "${step._id}"`)
 		this._busy = true
 		switch (step.action) {
 			case WorkStepAction.COPY:
-				return this.doCopy(step as any as FileWorkStep,
-					(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed))
-					.then((result: WorkResult) => {
-						this._busy = false
-						return result
-					})
-					.catch((e) => this.failStep(e))
+				return unBusyAndFailStep(this.doCopy(step as any as FileWorkStep,
+					(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed)))
 			case WorkStepAction.DELETE:
-				return this.doDelete(step as any as FileWorkStep)
-					.then((result: WorkResult) => {
-						this._busy = false
-						return result
-					})
-					.catch((e) => this.failStep(e))
+				return unBusyAndFailStep(this.doDelete(step as any as FileWorkStep))
+			case WorkStepAction.GENERATE_METADATA:
+				return unBusyAndFailStep(this.doGenerateMetadata(step as any as ScannerWorkStep))
+			case WorkStepAction.GENERATE_PREVIEW:
+				return unBusyAndFailStep(this.doGeneratePreview(step as any as ScannerWorkStep))
+			case WorkStepAction.GENERATE_THUMBNAIL:
+				return unBusyAndFailStep(this.doGenerateThumbnail(step as any as ScannerWorkStep))
 			default:
 				return Promise.resolve().then(() => {
 					return this.failStep(`Worker could not recognize action: ${step.action}`)
@@ -74,6 +79,38 @@ export class Worker extends EventEmitter {
 			(obj as WorkStep).progress = progress
 			return this._db.put(obj).then(() => { })
 		})
+	}
+
+	private async doGenerateThumbnail (step: ScannerWorkStep): Promise<WorkResult> {
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR
+		})
+	}
+
+	private async doGeneratePreview (step: ScannerWorkStep): Promise<WorkResult> {
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR
+		})
+	}
+
+	private async doGenerateMetadata (step: ScannerWorkStep): Promise<WorkResult> {
+		try {
+			const res = await request(`http://localhost:8000/media/scan/${step.fileName}`).promise()
+			if (((res || '') as string).startsWith('202')) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.DONE
+				})
+			} else {
+				return literal<WorkResult>({
+					status: WorkStepStatus.ERROR,
+					messages: [ (res + '') ]
+				})
+			}
+		} catch (e) {
+			return literal<WorkResult>({
+				status: WorkStepStatus.ERROR
+			})
+		}
 	}
 
 	private async doCopy (step: FileWorkStep, reportProgress?: (progress: number) => void): Promise<WorkResult> {

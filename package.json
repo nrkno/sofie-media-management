@@ -73,10 +73,15 @@
     "node": ">=4.5"
   },
   "devDependencies": {
+    "@types/asap": "^2.0.0",
+    "@types/chokidar": "^1.7.5",
     "@types/jest": "^23.1.0",
     "@types/node": "^8.0.4",
+    "@types/pouchdb-node": "^6.1.2",
+    "@types/request-promise-native": "^1.0.15",
     "@types/underscore": "^1.8.8",
     "@types/winston": "^2.3.9",
+    "asap": "^2.0.6",
     "codecov": "^3.0.2",
     "cpx": "^1.5.0",
     "gh-pages": "^1.2.0",
@@ -108,10 +113,6 @@
     "production"
   ],
   "dependencies": {
-    "@types/asap": "^2.0.0",
-    "@types/chokidar": "^1.7.5",
-    "@types/pouchdb-node": "^6.1.2",
-    "asap": "^2.0.6",
     "axios": "^0.18.0",
     "chokidar": "^2.0.4",
     "class-transformer": "^0.2.0",
@@ -119,6 +120,7 @@
     "pouchdb-find": "^7.0.0",
     "pouchdb-node": "^7.0.0",
     "reflect-metadata": "^0.1.12",
+    "request-promise-native": "^1.0.5",
     "tslib": "^1.9.2",
     "tv-automation-server-core-integration": "0.6.2",
     "underscore": "^1.9.1",

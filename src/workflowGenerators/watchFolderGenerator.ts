@@ -40,8 +40,8 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				file: file,
 				target: st,
 				priority: 1
-			})
-		]
+			}) as WorkStepBase
+		].concat(super.generateNewFileWorkSteps(file, st))
 	}
 
 	protected generateDeleteFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {

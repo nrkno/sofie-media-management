@@ -9,8 +9,19 @@ export class WorkStep extends WorkStepBase {
 	workFlowId: string
 }
 
+export class ScannerWorkStep extends WorkStepBase {
+	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+	status = WorkStepStatus.IDLE
+	priority = 1
+	fileName: string
+
+	constructor (init?: Partial<ScannerWorkStep>) {
+		super(init)
+	}
+}
+
 export class FileWorkStep extends WorkStepBase {
-	action: WorkStepAction.COPY | WorkStepAction.DELETE | WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_THUMBNAIL
+	action: WorkStepAction.COPY | WorkStepAction.DELETE
 	status = WorkStepStatus.IDLE
 	priority = 1
 

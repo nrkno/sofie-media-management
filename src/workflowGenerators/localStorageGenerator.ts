@@ -4,7 +4,7 @@ import { TrackedMediaItems, TrackedMediaItemBase } from '../mediaItemTracker'
 export * from './baseWorkFlowGenerator'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
 import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepBase, MediaFlow, MediaFlowType } from '../api'
-import { FileWorkStep } from '../work/workStep'
+import { ScannerWorkStep } from '../work/workStep'
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	protected _availableStorage: StorageObject[]
@@ -56,18 +56,21 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		return this.generateNewFileWorkSteps(file, st)
 	}
 
-	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+	protected generateNewFileWorkSteps (file: File, _st: StorageObject): WorkStepBase[] {
 		return [
-			new FileWorkStep({
+			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_METADATA,
-				file: file,
-				target: st,
+				fileName: file.name,
 				priority: 1
 			}),
-			new FileWorkStep({
+			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
-				file: file,
-				target: st,
+				fileName: file.name,
+				priority: 0.5
+			}),
+			new ScannerWorkStep({
+				action: WorkStepAction.GENERATE_PREVIEW,
+				fileName: file.name,
 				priority: 0.5
 			})
 		]
