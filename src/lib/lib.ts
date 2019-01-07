@@ -12,6 +12,10 @@ export function randomId (): string {
 	return Math.random().toString(36).substring(2, 8)
 }
 
+export function getID (fileName: string): string {
+	return fileName.replace(/\.[\w]+$/i, '').toUpperCase()
+}
+
 /**
  * Returns the difference between object A and B
  */

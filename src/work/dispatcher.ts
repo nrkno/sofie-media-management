@@ -2,10 +2,11 @@ import * as _ from 'underscore'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
+import * as request from 'request-promise-native'
 import { EventEmitter } from 'events'
 
 import { extendMandadory, randomId, LogEvents } from '../lib/lib'
-import { WorkFlow, WorkFlowDB, WorkStepBase, WorkStepStatus } from '../api'
+import { WorkFlow, WorkFlowDB, WorkStepBase, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStep, workStepToPlain, plainToWorkStep } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
 import { StorageObject } from '../storageHandlers/storageHandler'
@@ -21,16 +22,18 @@ export class Dispatcher extends EventEmitter {
 	private _workSteps: PouchDB.Database<WorkStep>
 	private _availableStorage: StorageObject[]
 	private _tmi: TrackedMediaItems
+	private _config: DeviceSettings
 
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
 	}
 
-	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, workersCount: number) {
+	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, config: DeviceSettings, workersCount: number) {
 		super()
 
 		this.generators = generators
 		this._tmi = tmi
+		this._config = config
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
 		fs.ensureDirSync('./db')
@@ -63,14 +66,21 @@ export class Dispatcher extends EventEmitter {
 		this._availableStorage = availableStorage
 
 		for (let i = 0; i < workersCount; i++) {
-			const newWorker = new Worker(this._workSteps, this._tmi)
+			const newWorker = new Worker(this._workSteps, this._tmi, this._config)
 			this.attachLogEvents(`Worker ${i}`, newWorker)
 			this._workers.push(newWorker)
 		}
 	}
 
+	async scannerManualMode(manual: boolean): Promise<object> {
+		return request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${manual ? 'true' : 'false'}`).promise()
+	}
+
 	async init (): Promise<void> {
-		return Promise.all(this.generators.map(gen => gen.init())).then(() => {
+		return this.scannerManualMode(true)
+		.catch((e) => {
+			this.emit('debug', `Could not place media scanner in manual mode: ${e}`)
+		}).then(() => Promise.all(this.generators.map(gen => gen.init()))).then(() => {
 			this.emit('debug', `Dispatcher initialized.`)
 		}).then(() => {
 			this.generators.forEach((gen) => {
@@ -85,6 +95,8 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', 'WorkFlow generators destroyed'))
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
+		.then(() => this.scannerManualMode(false))
+		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
 	}

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
-import { literal, LogEvents } from '../lib/lib'
+import { literal, LogEvents, getID } from '../lib/lib'
 
-import { WorkStepStatus, WorkStepAction } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings } from '../api'
 import { FileWorkStep, WorkStep, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
@@ -15,11 +15,13 @@ export class Worker extends EventEmitter {
 	private _busy: boolean = false
 	private _db: PouchDB.Database<WorkStep>
 	private _trackedMediaItems: TrackedMediaItems
+	private _config: DeviceSettings
 
-	constructor (db: PouchDB.Database<WorkStep>, tmi: TrackedMediaItems) {
+	constructor (db: PouchDB.Database<WorkStep>, tmi: TrackedMediaItems, config: DeviceSettings) {
 		super()
 		this._db = db
 		this._trackedMediaItems = tmi
+		this._config = config
 	}
 
 	on (type: LogEvents, listener: (e: string) => void): this {
@@ -82,20 +84,48 @@ export class Worker extends EventEmitter {
 	}
 
 	private async doGenerateThumbnail (step: ScannerWorkStep): Promise<WorkResult> {
-		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR
-		})
+		try {
+			const res = await request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/thumbnail/generate/${getID(step.fileName)}`).promise()
+			if (((res || '') as string).startsWith('202')) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.DONE
+				})
+			} else {
+				return literal<WorkResult>({
+					status: WorkStepStatus.ERROR,
+					messages: [ (res + '') ]
+				})
+			}
+		} catch (e) {
+			return literal<WorkResult>({
+				status: WorkStepStatus.ERROR
+			})
+		}
 	}
 
 	private async doGeneratePreview (step: ScannerWorkStep): Promise<WorkResult> {
-		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR
-		})
+		try {
+			const res = await request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/preview/generate/${getID(step.fileName)}`).promise()
+			if (((res || '') as string).startsWith('202')) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.DONE
+				})
+			} else {
+				return literal<WorkResult>({
+					status: WorkStepStatus.ERROR,
+					messages: [ (res + '') ]
+				})
+			}
+		} catch (e) {
+			return literal<WorkResult>({
+				status: WorkStepStatus.ERROR
+			})
+		}
 	}
 
 	private async doGenerateMetadata (step: ScannerWorkStep): Promise<WorkResult> {
 		try {
-			const res = await request(`http://localhost:8000/media/scan/${step.fileName}`).promise()
+			const res = await request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/media/scan/${step.fileName}`).promise()
 			if (((res || '') as string).startsWith('202')) {
 				return literal<WorkResult>({
 					status: WorkStepStatus.DONE
