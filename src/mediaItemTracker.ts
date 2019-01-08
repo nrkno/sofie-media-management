@@ -5,7 +5,7 @@ import * as _ from 'underscore'
 import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
 
-export interface TrackedMediaItemBase {
+export interface TrackedMediaItem {
 	_id: string
 
 	expectedMediaItemId?: string[]
@@ -18,12 +18,12 @@ export interface TrackedMediaItemBase {
 	lingerTime: Duration
 }
 
-export interface TrackedMediaItem extends TrackedMediaItemBase {
+export interface TrackedMediaItemDB extends TrackedMediaItem {
 	_rev: string
 }
 
 export class TrackedMediaItems extends EventEmitter {
-	private _db: PouchDB.Database<TrackedMediaItemBase>
+	private _db: PouchDB.Database<TrackedMediaItem>
 
 	constructor (dbAdapter?: string, dbPrefix?: string) {
 		super()
@@ -53,13 +53,13 @@ export class TrackedMediaItems extends EventEmitter {
 		}, () => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.'))
 	}
 
-	async put (tmi: TrackedMediaItemBase): Promise<string> {
+	async put (tmi: TrackedMediaItem): Promise<string> {
 		return this._db.put(tmi).then(value => value.id)
 	}
 
-	async getById (_id: string): Promise<TrackedMediaItem> {
+	async getById (_id: string): Promise<TrackedMediaItemDB> {
 		return this._db.get(_id).then((value) => {
-			return value as any as TrackedMediaItem
+			return value as TrackedMediaItemDB
 		})
 	}
 
@@ -67,15 +67,15 @@ export class TrackedMediaItems extends EventEmitter {
 		return this._db.find({selector: _.extend({
 			sourceStorageId: storageId
 		}, query || {})}).then((value) => {
-			return value.docs as TrackedMediaItem[]
+			return value.docs as TrackedMediaItemDB[]
 		})
 	}
 
-	async remove (tmi: TrackedMediaItem): Promise<boolean> {
+	async remove (tmi: TrackedMediaItemDB): Promise<boolean> {
 		return this._db.remove(tmi._id, tmi._rev).then((value) => value.ok)
 	}
 
-	async bulkChange (tmis: TrackedMediaItemBase[]): Promise<void> {
+	async bulkChange (tmis: TrackedMediaItem[]): Promise<void> {
 		return this._db.bulkDocs(tmis).then(({}) => { })
 	}
 

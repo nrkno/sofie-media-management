@@ -4,6 +4,8 @@ import { EventEmitter } from 'events'
 import { LocalFolderHandler } from './localFolderHandler'
 import { FileShareHandler } from './fileShareHandler'
 
+export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage
+
 export interface StorageObject extends StorageSettings {
 	handler: StorageHandler
 }
@@ -140,13 +142,11 @@ export abstract class StorageHandler extends EventEmitter {
  * @param  {StorageSettings} storage
  * @return StorageHandler
  */
-export function buildStorageHandler (storage: StorageSettings): StorageHandler {
+export function buildStorageHandler (storage: GeneralStorageSettings): StorageHandler {
 	switch (storage.type) {
 		case StorageType.LOCAL_FOLDER:
-			return new LocalFolderHandler(storage as any as LocalFolderStorage)
+			return new LocalFolderHandler(storage)
 		case StorageType.FILE_SHARE:
-			return new FileShareHandler(storage as any as FileShareStorage)
-		default:
-			throw new Error(`Could not build a storage handler for storage type: ${storage.type}`)
+			return new FileShareHandler(storage)
 	}
 }

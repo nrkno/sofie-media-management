@@ -6,8 +6,8 @@ import * as request from 'request-promise-native'
 import { EventEmitter } from 'events'
 
 import { extendMandadory, randomId, LogEvents } from '../lib/lib'
-import { WorkFlow, WorkFlowDB, WorkStepBase, WorkStepStatus, DeviceSettings } from '../api'
-import { WorkStep, workStepToPlain, plainToWorkStep } from './workStep'
+import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
+import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
 import { StorageObject } from '../storageHandlers/storageHandler'
 import { Worker, WorkResult } from './worker'
@@ -19,7 +19,7 @@ export class Dispatcher extends EventEmitter {
 	private _workers: Worker[] = []
 
 	private _workFlows: PouchDB.Database<WorkFlowDB>
-	private _workSteps: PouchDB.Database<WorkStep>
+	private _workSteps: PouchDB.Database<WorkStepDB>
 	private _availableStorage: StorageObject[]
 	private _tmi: TrackedMediaItems
 	private _config: DeviceSettings
@@ -72,7 +72,7 @@ export class Dispatcher extends EventEmitter {
 		}
 	}
 
-	async scannerManualMode(manual: boolean): Promise<object> {
+	async scannerManualMode (manual: boolean): Promise<object> {
 		return request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${manual ? 'true' : 'false'}`).promise()
 	}
 
@@ -112,17 +112,18 @@ export class Dispatcher extends EventEmitter {
 		.on('debug', (e) => this.emit('debug', prefix + ': ' + e))
 	}
 
-	private onNewWorkFlow = (wf: WorkFlow) => {
+	private onNewWorkFlow = (wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
 		const workFlowDb: WorkFlowDB = _.omit(wf, 'steps')
-		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}"`)
+		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
 		this._workFlows.put(workFlowDb).then(() => {
 			this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
 			return Promise.all(wf.steps.map(step => {
-				const stepDb = extendMandadory<WorkStepBase, WorkStep>(step, {
+				const stepDb = extendMandadory<WorkStep, WorkStepDB>(step, {
 					_id: workFlowDb._id + '_' + randomId(),
 					workFlowId: workFlowDb._id
 				})
-				return this._workSteps.put(workStepToPlain(stepDb) as WorkStep)
+				stepDb.priority = workFlowDb.priority * stepDb.priority
+				return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
 			}))
 		}, (e) => {
 			this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
@@ -133,14 +134,28 @@ export class Dispatcher extends EventEmitter {
 		})
 	}
 
-	private async getOutstandingWork (): Promise<WorkStep[]> {
+	private async getOutstandingWork (): Promise<WorkStepDB[]> {
 		return this._workSteps.find({selector: {
 			status: WorkStepStatus.IDLE
 		}}).then((result) => {
 			return (result.docs as object[]).map((item) => {
 				return plainToWorkStep(item, this._availableStorage)
 			})
+		}).then((docs) => {
+			return docs.sort((a, b) => b.priority - a.priority)
 		})
+	}
+
+	private getOnlyHighestPrio (docs: WorkStepDB[]): WorkStepDB[] {
+		const onlyHighestOnes: {
+			[key: string]: WorkStepDB
+		} = {}
+		docs.forEach(i => {
+			if (!onlyHighestOnes[i.workFlowId]) {
+				onlyHighestOnes[i.workFlowId] = i
+			}
+		})
+		return _.values(onlyHighestOnes)
 	}
 
 	private async blockStepsInWorkFlow (workFlowId: string): Promise<void> {
@@ -159,7 +174,7 @@ export class Dispatcher extends EventEmitter {
 		}).then(() => { })
 	}
 
-	private async processResult (job: WorkStep, result: WorkResult): Promise<void> {
+	private async processResult (job: WorkStepDB, result: WorkResult): Promise<void> {
 		switch (result.status) {
 			case WorkStepStatus.CANCELED:
 			case WorkStepStatus.ERROR:
@@ -228,15 +243,17 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private dispatchWork () {
-		this.getOutstandingWork().then((jobs) => {
-			this.emit('debug', `Got ${jobs.length} outstanding jobs`)
-			if (jobs.length === 0) return
+		this.getOutstandingWork().then((allJobs) => {
+			if (allJobs.length === 0) return
+			this.emit('debug', `Got ${allJobs.length} outstanding jobs`)
+
+			const jobs = this.getOnlyHighestPrio(allJobs)
 
 			for (let i = 0; i < this._workers.length; i++) {
 				if (!this._workers[i].busy) {
 					const nextJob = jobs.shift()
 					if (!nextJob) return // No work is left to be assigned at this moment
-					this._workers[i].doWork(nextJob)
+					this._workers[i].doWork(nextJob as GeneralWorkStepDB)
 					.then((result) => this.processResult(nextJob, result))
 					.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done

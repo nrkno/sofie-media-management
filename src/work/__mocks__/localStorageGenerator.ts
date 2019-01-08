@@ -19,6 +19,6 @@ export class LocalStorageGenerator extends EventEmitter {
 			steps: [],
 			created: Date.now(),
 			success: false
-		}))
+		}), this)
 	}
 }

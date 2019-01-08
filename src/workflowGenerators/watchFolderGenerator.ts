@@ -1,6 +1,6 @@
 import * as _ from 'underscore'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStepBase, WorkStepAction, MediaFlow, MediaFlowType } from '../api'
+import { WorkFlow, WorkFlowSource, WorkStep, WorkStepAction, MediaFlow, MediaFlowType } from '../api'
 import { LocalStorageGenerator, WorkFlowGeneratorEventType } from './localStorageGenerator'
 import { File, StorageObject, StorageEvent, StorageEventType } from '../storageHandlers/storageHandler'
 import { TrackedMediaItems } from '../mediaItemTracker'
@@ -33,24 +33,24 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		super.registerStorage(srcStorage)
 	}
 
-	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStep[] {
 		return [
 			new FileWorkStep({
 				action: WorkStepAction.COPY,
 				file: file,
 				target: st,
-				priority: 1
-			}) as WorkStepBase
+				priority: 2
+			}) as WorkStep
 		].concat(super.generateNewFileWorkSteps(file, st))
 	}
 
-	protected generateDeleteFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+	protected generateDeleteFileWorkSteps (file: File, st: StorageObject): WorkStep[] {
 		return [
 			new FileWorkStep({
 				action: WorkStepAction.DELETE,
 				file: file,
 				target: st,
-				priority: 1
+				priority: 2
 			})
 		]
 	}
@@ -82,7 +82,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					steps: this.generateNewFileWorkSteps(localFile, targetStorage),
 					created: getCurrentTime(),
 					success: false
-				}))
+				}), this)
 				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}
 
@@ -125,7 +125,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 								steps: this.generateDeleteFileWorkSteps(file, storageObject),
 								created: getCurrentTime(),
 								success: false
-							}))
+							}), this)
 							// return storageObject.handler.deleteFile(file)
 						}).then(() => {
 							this.emit('debug', `New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`)

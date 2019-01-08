@@ -4,8 +4,8 @@ import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlo
 export * from './baseWorkFlowGenerator'
 
 import { CoreHandler } from '../coreHandler'
-import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAction, WorkStepBase, WorkFlow } from '../api'
-import { TrackedMediaItems, TrackedMediaItem, TrackedMediaItemBase } from '../mediaItemTracker'
+import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAction, WorkStep, WorkFlow } from '../api'
+import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime } from '../lib/lib'
@@ -121,7 +121,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			targetStorageIds: [flow.destinationId]
 		}
 		this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
-			this.emit(`An error happened when trying to create a copy workflow: ${e}`)
+			this.emit('error', `An error happened when trying to create a copy workflow: ${e}`)
 		})
 	}
 
@@ -237,7 +237,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const currentExpectedContents = this.expectedMediaItems.find((item: ExpectedMediaItem) => {
 			return handledIds.indexOf(item.mediaFlowId) >= 0
 		}) as ExpectedMediaItem[]
-		const expectedItems: TrackedMediaItemBase[] = []
+		const expectedItems: TrackedMediaItem[] = []
 		currentExpectedContents.forEach((i) => {
 			const flow = this._handledFlows.find((j) => j.id === i.mediaFlowId)
 			if (!flow) return
@@ -245,7 +245,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				this.emit('error', `Media flow "${flow.id}" does not have a destinationId`)
 				return
 			}
-			const expectedItem = literal<TrackedMediaItemBase>({
+			const expectedItem = literal<TrackedMediaItem>({
 				_id: i.path,
 				name: i.path,
 				lastSeen: i.lastSeen,
@@ -272,7 +272,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 		Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
 		.then((result) => {
-			const allTrackedFiles = _.flatten(result) as TrackedMediaItem[]
+			const allTrackedFiles = _.flatten(result) as TrackedMediaItemDB[]
 			const newItems = _.compact(expectedItems.map((i) => {
 				return allTrackedFiles.find(j => j.expectedMediaItemId === i.expectedMediaItemId) ? null : i
 			}))
@@ -289,14 +289,14 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	protected purgeOldExpectedItems (): Promise<void> {
 		return Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
 		.then((result) => {
-			const allTrackedFiles = _.flatten(result) as TrackedMediaItem[]
+			const allTrackedFiles = _.flatten(result) as TrackedMediaItemDB[]
 			const toBeDeleted = allTrackedFiles.filter(i => ((i.lastSeen + i.lingerTime) < getCurrentTime())).map((i) => {
 				this.emit('debug', `Marking file "${i.name}" coming from "${i.sourceStorageId}" to be deleted because it was last seen ${new Date(i.lastSeen)} & linger time is ${i.lingerTime / (60 * 60 * 1000)} hours`)
 				return _.extend(i, {
 					_deleted: true
 				})
 			})
-			return Promise.all(toBeDeleted.map((i: TrackedMediaItem) => {
+			return Promise.all(toBeDeleted.map((i: TrackedMediaItemDB) => {
 				return Promise.all(this._availableStorage
 				// get only storages that contain the file as a target storage
 				.filter(j => (i.targetStorageIds.indexOf(j.id) >= 0))
@@ -310,13 +310,13 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStep[] {
 		return [
 			new FileWorkStep({
 				action: WorkStepAction.COPY,
 				file: file,
 				target: st,
-				priority: 1
+				priority: 2
 			})
 		]
 	}
@@ -331,11 +331,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			steps: this.generateNewFileWorkSteps(file, targetStorage),
 			created: getCurrentTime(),
 			success: false
-		}))
+		}), this)
 		this.emit('debug', `New forkflow started for "${file.name}": "${workflowId}".`)
 	}
 
-	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItemBase) {
+	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItem) {
 		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
 		const storage = this._storage.find(i => i.id === tmi.sourceStorageId)
 		if (!storage) throw new Error(`Could not find storage "${tmi.sourceStorageId}"`)

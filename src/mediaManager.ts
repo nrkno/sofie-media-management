@@ -3,7 +3,7 @@ import * as _ from 'underscore'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
 import { StorageSettings, DeviceSettings } from './api'
-import { StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
+import { GeneralStorageSettings, StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
 import { TrackedMediaItems } from './mediaItemTracker'
 import { Dispatcher } from './work/dispatcher'
 import { BaseWorkFlowGenerator } from './workflowGenerators/baseWorkFlowGenerator'
@@ -127,7 +127,7 @@ export class MediaManager {
 
 		this._availableStorage = _.map(settings.storages, (item) => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
-				handler: buildStorageHandler(item)
+				handler: buildStorageHandler(item as GeneralStorageSettings)
 			})
 		})
 

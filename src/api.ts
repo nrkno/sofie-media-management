@@ -83,6 +83,7 @@ export interface LocalFolderStorage extends StorageSettings {
 	type: StorageType.LOCAL_FOLDER
 	options: {
 		basePath: string
+		mediaPath?: string
 	}
 }
 export interface FileShareStorage extends StorageSettings {
@@ -90,6 +91,8 @@ export interface FileShareStorage extends StorageSettings {
 	options: {
 		/** URI to the network share, eg "\\somehting\share" */
 		basePath: string
+		/** A folder prefix relative to the Playout media folder */
+		mediaPath?: string
 		/** A virtual local drive letter, "E", the basePath should be mounted to */
 		mappedNetworkedDriveTarget: string
 		username?: string // wip?
@@ -104,7 +107,7 @@ export interface WorkFlow {
 	/** Id of the expectedMedia Item */
 	expectedMediaItemId?: string[]
 	mediaObjectId?: string
-	steps: Array<WorkStepBase>
+	steps: Array<WorkStep>
 	created: Time
 
 	priority: number
@@ -124,7 +127,7 @@ export enum WorkFlowSource {
 	TARGET_STORAGE_REMOVE = 'local_storage_remove'
 }
 
-export abstract class WorkStepBase {
+export abstract class WorkStep {
 	action: WorkStepAction
 	status: WorkStepStatus
 	messages?: Array<string>
@@ -135,7 +138,7 @@ export abstract class WorkStepBase {
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 
-	constructor (init?: Partial<WorkStepBase>) {
+	constructor (init?: Partial<WorkStep>) {
 		Object.assign(this, init)
 	}
 }

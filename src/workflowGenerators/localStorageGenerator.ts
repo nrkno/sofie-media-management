@@ -1,9 +1,9 @@
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 import { File, StorageEvent, StorageObject, StorageEventType } from '../storageHandlers/storageHandler'
-import { TrackedMediaItems, TrackedMediaItemBase } from '../mediaItemTracker'
+import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 export * from './baseWorkFlowGenerator'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStepBase, MediaFlow, MediaFlowType } from '../api'
+import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStep, MediaFlow, MediaFlowType } from '../api'
 import { ScannerWorkStep } from '../work/workStep'
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
@@ -52,32 +52,35 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	protected generateChangedFileWorkSteps (file: File, st: StorageObject): WorkStepBase[] {
+	protected generateChangedFileWorkSteps (file: File, st: StorageObject): WorkStep[] {
 		return this.generateNewFileWorkSteps(file, st)
 	}
 
-	protected generateNewFileWorkSteps (file: File, _st: StorageObject): WorkStepBase[] {
+	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStep[] {
 		return [
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_METADATA,
-				fileName: file.name,
+				file,
+				target: st,
 				priority: 1
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
-				fileName: file.name,
+				file,
+				target: st,
 				priority: 0.5
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
-				fileName: file.name,
-				priority: 0.5
+				file,
+				target: st,
+				priority: 0.3
 			})
 		]
 	}
 
 	protected registerFile (file: File, st: StorageObject, targetStorages?: StorageObject[]): Promise<void> {
-		return this._tracked.put(literal<TrackedMediaItemBase>({
+		return this._tracked.put(literal<TrackedMediaItem>({
 			_id: file.name,
 			sourceStorageId: st.id,
 			lastSeen: getCurrentTime(),
@@ -104,7 +107,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					steps: this.generateNewFileWorkSteps(localFile, st),
 					created: getCurrentTime(),
 					success: false
-				}))
+				}), this)
 				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}).catch((e) => {
 				this.emit('error', `Tracked file registration failed: ${e}`)
@@ -126,7 +129,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					steps: this.generateNewFileWorkSteps(localFile, st),
 					created: getCurrentTime(),
 					success: false
-				}))
+				}), this)
 				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}
 		}).catch((e) => {

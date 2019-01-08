@@ -1,29 +1,20 @@
 import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
-import { WorkStepBase, WorkStepAction, WorkStepStatus } from '../api'
+import { WorkStep, WorkStepAction, WorkStepStatus } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
 
-export class WorkStep extends WorkStepBase {
+export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
+
+export class WorkStepDB extends WorkStep {
 	_id: string
 	_rev?: string
 	workFlowId: string
 }
 
-export class ScannerWorkStep extends WorkStepBase {
-	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+export class FileWorkStep extends WorkStep {
+	action: WorkStepAction.COPY | WorkStepAction.DELETE | WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
 	status = WorkStepStatus.IDLE
-	priority = 1
-	fileName: string
-
-	constructor (init?: Partial<ScannerWorkStep>) {
-		super(init)
-	}
-}
-
-export class FileWorkStep extends WorkStepBase {
-	action: WorkStepAction.COPY | WorkStepAction.DELETE
-	status = WorkStepStatus.IDLE
-	priority = 1
+	priority = this.priority === undefined ? 1 : this.priority
 
 	@Type(() => File, {
 		discriminator: {
@@ -44,24 +35,29 @@ export class FileWorkStep extends WorkStepBase {
 	}
 }
 
+export class ScannerWorkStep extends FileWorkStep {
+
+}
+
 export function workStepToPlain (obj: WorkStep): object {
 	return classToPlain(obj)
 }
 
-export function plainToWorkStep (obj: object, availableStorage: StorageObject[]): WorkStep {
+export function plainToWorkStep (obj: object, availableStorage: StorageObject[]): WorkStepDB {
 	const action = obj['action'] as WorkStepAction
 	switch (action) {
 		case WorkStepAction.COPY:
 		case WorkStepAction.DELETE:
 		case WorkStepAction.GENERATE_METADATA:
 		case WorkStepAction.GENERATE_THUMBNAIL:
+		case WorkStepAction.GENERATE_PREVIEW:
 			try {
 				const cls = plainToClass(FileWorkStep, obj)
 				const storageId = cls.target as any as string
 				const storage = availableStorage.find((i) => i.id === storageId)
 				if (!storage) throw new Error(`Unknown storage: "${storageId}"`)
 				cls.target = storage
-				return cls as any as WorkStep
+				return cls as any as WorkStepDB
 			} catch (e) {
 				throw new Error(`Error when deserializing WorkStep: ${e}`)
 			}
