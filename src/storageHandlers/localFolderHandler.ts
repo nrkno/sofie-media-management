@@ -74,6 +74,8 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _writable: boolean = false
 	private _readable: boolean = false
 
+	private _usePolling: boolean = false
+
 	constructor (settings: LocalFolderStorage) {
 		super()
 
@@ -83,6 +85,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		this._readable = settings.support.read
 
 		this._basePath = settings.options.basePath
+		this._usePolling = settings.options.usePolling || false
 	}
 
 	async init (): Promise<void> {
@@ -95,7 +98,8 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			},
 			atomic: true,
 			disableGlobbing: true,
-			alwaysStat: true
+			alwaysStat: true,
+			usePolling: this._usePolling
 		})
 		.on('error', this.onError)
 		.on('add', this.onAdd)

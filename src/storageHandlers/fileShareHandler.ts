@@ -21,7 +21,8 @@ export class FileShareHandler extends LocalFolderHandler {
 			support: settings.support,
 			type: StorageType.LOCAL_FOLDER,
 			options: {
-				basePath: targetBasePath
+				basePath: targetBasePath,
+				usePolling: true
 			}
 		}
 

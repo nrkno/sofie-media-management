@@ -84,6 +84,7 @@ export interface LocalFolderStorage extends StorageSettings {
 	options: {
 		basePath: string
 		mediaPath?: string
+		usePolling?: boolean
 	}
 }
 export interface FileShareStorage extends StorageSettings {
