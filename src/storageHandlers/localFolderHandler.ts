@@ -272,7 +272,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	 * @memberof LocalFolderHandler
 	 */
 	private onError = (e: any) => {
-		process.stderr.write(e)
+		this.emit('error', e)
 	}
 
 	/**

@@ -14,7 +14,7 @@ export class FileShareHandler extends LocalFolderHandler {
 	constructor (settings: FileShareStorage) {
 		if (!settings.options.mappedNetworkedDriveTarget) throw new Error(`"${settings.id}": mappedNetworkedDriveTarget not set!`)
 		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
-		const targetBasePath = settings.options.mappedNetworkedDriveTarget + '://'
+		const targetBasePath = settings.options.mappedNetworkedDriveTarget + ':\/'
 		if (!targetBasePath.match(/[a-zA-Z]/)) throw Error('mappedNetworkedDriveTarget needs to be a drive letter')
 		const settingsObj: LocalFolderStorage = {
 			id: settings.id,
@@ -26,6 +26,7 @@ export class FileShareHandler extends LocalFolderHandler {
 		}
 
 		super(settingsObj)
+		this._uncPath = settings.options.basePath
 		this._driveLetter = settings.options.mappedNetworkedDriveTarget
 		this._username = settings.options.username
 		this._password = settings.options.password
@@ -33,8 +34,8 @@ export class FileShareHandler extends LocalFolderHandler {
 
 	async init (): Promise<void> {
 		const mounts = await networkDrive.find(this._uncPath)
-		if (mounts.indexOf(this._driveLetter) < 0) {
-			await networkDrive.mount(this._driveLetter, this._uncPath, this._username, this._password)
+		if (mounts.indexOf(this._driveLetter.toUpperCase()) < 0) {
+			await networkDrive.mount(this._uncPath, this._driveLetter, this._username, this._password)
 		}
 		return super.init()
 	}
