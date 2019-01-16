@@ -6,7 +6,7 @@ import { CoreConnection,
 import * as _ from 'underscore'
 import * as Winston from 'winston'
 import { DeviceConfig } from './mediaManager'
-import * as fs from 'fs'
+const depsVersions = require('./deps-metadata.json')
 
 export interface CoreConfig {
 	host: string,
@@ -317,35 +317,7 @@ export class CoreHandler {
 		})
 	}
 	private _getVersions () {
-		let versions: {[packageName: string]: string} = {}
-
-		if (process.env.npm_package_version) {
-			versions['_process'] = process.env.npm_package_version
-		}
-
-		let dirNames: Array<string> = [
-			// TODO: add any relevant sub-libraries here, to report to Core
-			'tv-automation-server-core-integration',
-			// 'timeline-state-resolver',
-		]
-		try {
-			let nodeModulesDirectories = fs.readdirSync('node_modules')
-			_.each(nodeModulesDirectories, (dir) => {
-				try {
-					if (dirNames.indexOf(dir) !== -1) {
-						let file = 'node_modules/' + dir + '/package.json'
-						file = fs.readFileSync(file, 'utf8')
-						let json = JSON.parse(file)
-						versions[dir] = json.version || 'N/A'
-					}
-				} catch (e) {
-					this.logger.error(e)
-				}
-			})
-		} catch (e) {
-			this.logger.error(e)
-		}
-		return versions
+		return depsVersions || {}
 	}
 
 }

@@ -44,7 +44,7 @@ export class MediaManager {
 			this._logger.info('Core initialized')
 			this._logger.info('Initializing MediaManager...')
 			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
-			await this.initMediaManager(peripheralDevice.settings)
+			await this.initMediaManager(peripheralDevice.settings || {})
 			// await this.coreHandler.core.getPeripheralDevice()
 			/* const settings = {
 				mediaFlows: [
@@ -125,7 +125,7 @@ export class MediaManager {
 
 		// TODO: Initialize Media Manager
 
-		this._availableStorage = _.map(settings.storages, (item) => {
+		this._availableStorage = _.map(settings.storages || [], (item) => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
 				handler: buildStorageHandler(item as GeneralStorageSettings)
 			})
@@ -135,9 +135,9 @@ export class MediaManager {
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
-			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows),
-			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows),
-			new ExpectedItemsGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows, this.coreHandler, settings.lingerTime, settings.cronJobTime),
+			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || []),
+			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || []),
+			new ExpectedItemsGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this.coreHandler, settings.lingerTime, settings.cronJobTime),
 		)
 
 		this._dispatcher = new Dispatcher(
@@ -145,7 +145,7 @@ export class MediaManager {
 			this._availableStorage,
 			this._trackedMedia,
 			settings,
-			3)
+			settings.workers || 3)
 
 		this._dispatcher.on('error', this._logger.error)
 		.on('warn', this._logger.warn)
