@@ -24,6 +24,8 @@ export class Dispatcher extends EventEmitter {
 	private _tmi: TrackedMediaItems
 	private _config: DeviceSettings
 
+	private _bestEffort: NodeJS.Timer | undefined = undefined
+
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
 	}
@@ -72,7 +74,23 @@ export class Dispatcher extends EventEmitter {
 		}
 	}
 
+	scannerManualModeBestEffort (manual: boolean) {
+		this._bestEffort = undefined
+		this.scannerManualMode(manual).then(() => {
+			this.emit('debug', `Scanner placed in manual mode`)
+		}, (e) => {
+			this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
+			this._bestEffort = setTimeout(() => {
+				this.scannerManualModeBestEffort(manual)
+			}, 5000)
+		})
+	}
+
 	async scannerManualMode (manual: boolean): Promise<object> {
+		if (this._bestEffort !== undefined) {
+			clearTimeout(this._bestEffort)
+			this._bestEffort = undefined
+		}
 		return request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${manual ? 'true' : 'false'}`).promise()
 	}
 
@@ -80,6 +98,7 @@ export class Dispatcher extends EventEmitter {
 		return this.scannerManualMode(true)
 		.catch((e) => {
 			this.emit('debug', `Could not place media scanner in manual mode: ${e}`)
+			this.scannerManualModeBestEffort(true)
 		}).then(() => Promise.all(this.generators.map(gen => gen.init()))).then(() => {
 			this.emit('debug', `Dispatcher initialized.`)
 		}).then(() => {
@@ -96,6 +115,7 @@ export class Dispatcher extends EventEmitter {
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
 		.then(() => this.scannerManualMode(false))
+		.catch((e) => this.emit('error', `Error when disabling manual mode in scanner: ${e}`))
 		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
