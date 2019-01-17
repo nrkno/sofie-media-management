@@ -1,6 +1,8 @@
 node_modules
 dist
 test
+deploy
+db
 src/**.js
 
 coverage
@@ -12,3 +14,5 @@ wallaby.conf.js
 .DS_Store
 
 local/
+source/
+target/
