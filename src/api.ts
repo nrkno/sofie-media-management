@@ -107,6 +107,8 @@ export interface FileShareStorage extends StorageSettings {
 export interface WorkFlow {
 	_id: string
 
+	name?: string
+
 	source: WorkFlowSource
 	/** Id of the expectedMedia Item */
 	expectedMediaItemId?: string[]

@@ -337,6 +337,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const workflowId = file.name + '_' + randomId()
 		this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 			_id: workflowId,
+			name: file.name,
 			finished: false,
 			priority: 1,
 			source: WorkFlowSource.EXPECTED_MEDIA_ITEM,

@@ -13,6 +13,7 @@ export class LocalStorageGenerator extends EventEmitter {
 	emitNewEvent = () => {
 		this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 			_id: 'testWorkFlow0',
+			name: 'TEST FILE',
 			finished: false,
 			priority: 1,
 			source: WorkFlowSource.LOCAL_MEDIA_ITEM,

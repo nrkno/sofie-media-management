@@ -158,52 +158,61 @@ export class Worker extends EventEmitter {
 	}
 
 	private async doCopy (step: FileWorkStep, reportProgress?: (progress: number) => void): Promise<WorkResult> {
-		return step.target.handler.putFile(step.file, reportProgress).then(async () => {
-			return this._trackedMediaItems.getById(step.file.name).then((tmi) => {
-				if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
-					tmi.targetStorageIds.push(step.target.id)
-				}
-				return this._trackedMediaItems.put(tmi)
-			}).then(() => {
+		try {
+			await step.target.handler.putFile(step.file, reportProgress)
+			this.emit('debug', `Starting updating TMI on "${step.file.name}"`)
+			try {
+				await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
+					if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
+						tmi.targetStorageIds.push(step.target.id)
+					}
+					return tmi
+				})
+				this.emit('debug', `Finish updating TMI on "${step.file.name}"`)
 				return literal<WorkResult>({
 					status: WorkStepStatus.DONE
 				})
-			}).catch((e) => {
+			} catch (e) {
+				this.emit('debug', `Failure updating TMI: ${e}`)
 				return this.failStep(e)
-			})
-		}, (e) => {
-			return this.failStep(e)
-		})
+			}
+		} catch (e1) {
+			return this.failStep(e1)
+		}
 	}
 
 	private async doDelete (step: FileWorkStep): Promise<WorkResult> {
-		return step.target.handler.deleteFile(step.file).then(() => {
-			return this._trackedMediaItems.getById(step.file.name).then((tmi) => {
-				const idx = tmi.targetStorageIds.indexOf(step.target.id)
-				if (idx >= 0) {
-					tmi.targetStorageIds.splice(idx, 1)
-				} else {
-					this.emit('warn', `Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
-				}
-				return this._trackedMediaItems.put(tmi)
-			}, (e) => {
-				if (e.status === 404) {
-					this.emit('info', `File "${step.file.name}" to be deleted was already removed from tracking database`)
-					return literal<WorkResult>({
-						status: WorkStepStatus.DONE
+		try {
+			await step.target.handler.deleteFile(step.file)
+			try {
+				try {
+					await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
+						const idx = tmi.targetStorageIds.indexOf(step.target.id)
+						if (idx >= 0) {
+							tmi.targetStorageIds.splice(idx, 1)
+						} else {
+							this.emit('warn', `Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
+						}
+						return tmi
 					})
-				} else {
-					throw e
+				} catch (e) {
+					if (e.status === 404) {
+						this.emit('info', `File "${step.file.name}" to be deleted was already removed from tracking database`)
+						return literal<WorkResult>({
+							status: WorkStepStatus.DONE
+						})
+					} else {
+						throw e
+					}
 				}
-			}).then(() => {
 				return literal<WorkResult>({
 					status: WorkStepStatus.DONE
 				})
-			}).catch((e) => {
-				return this.failStep(e)
-			})
-		}, (e) => {
-			return this.failStep(e)
-		})
+			} catch (e1) {
+				return this.failStep(e1)
+			}
+		} catch (e2) {
+			return this.failStep(e2)
+		}
 	}
 }

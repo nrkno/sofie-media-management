@@ -76,6 +76,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 					_id: workflowId,
+					name: localFile.name,
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
@@ -119,6 +120,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 							const workflowId = e.path + '_' + randomId()
 							this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 								_id: workflowId,
+								name: file.name,
 								finished: false,
 								priority: 1,
 								source: WorkFlowSource.SOURCE_STORAGE_REMOVE,
