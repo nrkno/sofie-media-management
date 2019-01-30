@@ -9,7 +9,7 @@ import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../medi
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime } from '../lib/lib'
-import { FileWorkStep } from '../work/workStep'
+import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 
 export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _coreHandler: CoreHandler
@@ -60,7 +60,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 			this._coreHandler.core.onConnected(() => {
 				this.setupSubscribtionsAndObservers().catch((e) => {
-					this.emit('debug', `Error while resetting the subscribtions: ${e}`)
+					this.emit('error', `Error while resetting the subscribtions: ${e}`)
 				})
 			})
 
@@ -317,6 +317,18 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				file: file,
 				target: st,
 				priority: 2
+			}),
+			new ScannerWorkStep({
+				action: WorkStepAction.GENERATE_THUMBNAIL,
+				file,
+				target: st,
+				priority: 0.5
+			}),
+			new ScannerWorkStep({
+				action: WorkStepAction.GENERATE_PREVIEW,
+				file,
+				target: st,
+				priority: 0.3
 			})
 		]
 	}
@@ -327,7 +339,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			_id: workflowId,
 			finished: false,
 			priority: 1,
-			source: WorkFlowSource.LOCAL_MEDIA_ITEM,
+			source: WorkFlowSource.EXPECTED_MEDIA_ITEM,
 			steps: this.generateNewFileWorkSteps(file, targetStorage),
 			created: getCurrentTime(),
 			success: false

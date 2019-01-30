@@ -48,7 +48,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		this.initialCheck(st).then(() => {
 			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" complete.`)
 		}).catch((e) => {
-			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
+			this.emit('error', `Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
 		})
 	}
 

@@ -37,8 +37,8 @@ export class CoreHandler {
 	public deviceSettings: {[key: string]: any} = {}
 
 	// Mediascanner statuses: temporary implementation, to be moved into casparcg device later:
-	public mediaScannerStatus: P.StatusCode = P.StatusCode.GOOD
-	public mediaScannerMessages: Array<string> = []
+	public deviceStatus: P.StatusCode = P.StatusCode.GOOD
+	public deviceMessages: Array<string> = []
 
 	private _deviceOptions: DeviceConfig
 	private _onConnected?: () => any
@@ -49,9 +49,17 @@ export class CoreHandler {
 	private _statusInitialized: boolean = false
 	private _statusDestroyed: boolean = false
 
+	private _processState: {
+		[key: string]: {
+			comments: string[],
+			status: P.StatusCode
+		}
+	}
+
 	constructor (logger: Winston.LoggerInstance, deviceOptions: DeviceConfig) {
 		this.logger = logger
 		this._deviceOptions = deviceOptions
+		this._processState = {}
 	}
 
 	async init (config: CoreConfig): Promise<void> {
@@ -294,10 +302,10 @@ export class CoreHandler {
 		let statusCode = P.StatusCode.GOOD
 		let messages: Array<string> = []
 
-		if (this.mediaScannerStatus !== P.StatusCode.GOOD) {
-			statusCode = this.mediaScannerStatus
-			if (this.mediaScannerMessages) {
-				_.each(this.mediaScannerMessages, (msg) => {
+		if (this.deviceStatus !== P.StatusCode.GOOD) {
+			statusCode = this.deviceStatus
+			if (this.deviceMessages) {
+				_.each(this.deviceMessages, (msg) => {
 					messages.push(msg)
 				})
 			}
@@ -314,6 +322,37 @@ export class CoreHandler {
 		return this.core.setStatus({
 			statusCode: statusCode,
 			messages: messages
+		})
+	}
+	setProcessState = (processName: string, comments: string[], status: P.StatusCode) => {
+		this._processState[processName] = {
+			comments,
+			status
+		}
+
+		const deviceState = _.reduce(this._processState, (memo, value) => {
+			let status = memo.status
+			let comments = memo.comments
+			if (value.status > status) {
+				status = value.status
+			}
+			if (value.comments) {
+				comments = comments.concat(value.comments)
+			}
+
+			return {
+				status,
+				comments
+			}
+		}, {
+			status: P.StatusCode.GOOD,
+			comments: [] as string[]
+		})
+
+		this.deviceStatus = deviceState.status
+		this.deviceMessages = deviceState.comments
+		this.updateCoreStatus().catch(() => {
+			this.logger.error('Could not update Media Manager status in Core')
 		})
 	}
 	private _getVersions () {

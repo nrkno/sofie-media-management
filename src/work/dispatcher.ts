@@ -2,16 +2,30 @@ import * as _ from 'underscore'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
+import * as PromiseSequence from 'promise-sequence'
 import * as request from 'request-promise-native'
 import { EventEmitter } from 'events'
 
-import { extendMandadory, randomId, LogEvents } from '../lib/lib'
+import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
+
+import { extendMandadory, randomId, LogEvents, getCurrentTime } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
 import { StorageObject } from '../storageHandlers/storageHandler'
 import { Worker, WorkResult } from './worker'
 import { TrackedMediaItems } from '../mediaItemTracker'
+import { CoreHandler } from '../coreHandler'
+
+const CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000
+
+// TODO: Move this into server-core-integration
+enum MMPDMethods {
+	'getMediaWorkFlowRevisions' = 'peripheralDevice.mediaManager.getMediaWorkFlowRevisions',
+	'updateMediaWorkFlow' = 'peripheralDevice.mediaManager.updateMediaWorkFlow',
+	'getMediaWorkFlowStepRevisions' = 'peripheralDevice.mediaManager.getMediaWorkFlowStepRevisions',
+	'updateMediaWorkFlowStep' = 'peripheralDevice.mediaManager.updateMediaWorkFlowStep'
+}
 
 export class Dispatcher extends EventEmitter {
 	generators: BaseWorkFlowGenerator[]
@@ -23,19 +37,22 @@ export class Dispatcher extends EventEmitter {
 	private _availableStorage: StorageObject[]
 	private _tmi: TrackedMediaItems
 	private _config: DeviceSettings
+	private _coreHandler: CoreHandler
 
 	private _bestEffort: NodeJS.Timer | undefined = undefined
+	private _workflowCleanUp: NodeJS.Timer | undefined = undefined
 
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
 	}
 
-	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, config: DeviceSettings, workersCount: number) {
+	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, config: DeviceSettings, workersCount: number, workFlowLingerTime: number, coreHandler: CoreHandler) {
 		super()
 
 		this.generators = generators
 		this._tmi = tmi
 		this._config = config
+		this._coreHandler = coreHandler
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
 		fs.ensureDirSync('./db')
@@ -45,25 +62,83 @@ export class Dispatcher extends EventEmitter {
 		} as any)
 
 		this._workFlows = new PrefixedPouchDB('workFlows')
-		this._workFlows.createIndex({ index: {
-			fields: ['priority']
-		}}).then(() => this._workFlows.createIndex({ index: {
-			fields: ['finished']
-		}})).then(() => {
-			this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
-		}).catch((e) => {
-			throw new Error(`Could not initialize "workFlows" database: ${e}`)
-		})
 		this._workSteps = new PrefixedPouchDB('workSteps')
-		this._workSteps.createIndex({ index: {
-			fields: ['workFlowId']
-		}}).then(() => this._workSteps.createIndex({ index: {
-			fields: ['status']
-		}})).then(() => {
-			this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
-		}).catch((e) => {
-			throw new Error(`Could not initialize "workSteps" database: ${e}`)
+
+		Promise.all([
+			this._workFlows.createIndex({ index: {
+				fields: ['priority']
+			}}).then(() => this._workFlows.createIndex({ index: {
+				fields: ['finished']
+			}})).then(() => {
+				this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
+			}).catch((e) => {
+				throw new Error(`Could not initialize "workFlows" database: ${e}`)
+			}),
+			this._workSteps.createIndex({ index: {
+				fields: ['workFlowId']
+			}}).then(() => this._workSteps.createIndex({ index: {
+				fields: ['status']
+			}})).then(() => {
+				this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
+			}).catch((e) => {
+				throw new Error(`Could not initialize "workSteps" database: ${e}`)
+			})
+		]).then(() => this.initialWorkFlowAndStepsSync())
+		.catch((e) => { 
+			this.emit('error', `Failed to synchronize with core: ${e}`)
+			process.exit(1)
+			throw e
 		})
+
+		// Maintain one-to-many relationship for the WorkFlows and WorkSteps
+		// Update WorkFlows and WorkSteps in Core
+		this._workFlows.changes({
+			since: 'now',
+			live: true,
+			include_docs: true
+		}).on('change', (change) => {
+			if (change.deleted) {
+				this._workSteps.find({
+					selector: {
+						workFlowId: change.id
+					}
+				}).then((value) => Promise.all(value.docs.map(i => this._workSteps.remove(i)))
+				.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)))
+				.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps: ${reason}`))
+
+				this.pushWorkFlowToCore(change.id, null).catch(() => {})
+			} else if (change.doc) {
+				this.pushWorkFlowToCore(change.id, change.doc).catch(() => {})
+			}
+		}).on('error', (err) => {
+			this.emit('error', `An error happened in the workFlow changes stream: "${err}"`)
+		})
+		this._workSteps.changes({
+			since: 'now',
+			live: true,
+			include_docs: true
+		}).on('change', (change) => {
+			if (change.deleted) {
+				this.pushWorkStepToCore(change.id, null).catch(() => {})
+			} else if (change.doc) {
+				this.pushWorkStepToCore(change.id, change.doc).catch(() => {})
+			}
+		})
+
+		this._workflowCleanUp = setInterval(() => {
+			this._workFlows.find({
+				selector: {
+					created: { $lt: getCurrentTime() - workFlowLingerTime },
+					finished: true
+				}
+			}).then((value) => {
+				Promise.all(value.docs.map(i => this._workFlows.remove(i).catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}": ${e}`)))).then(() => {
+					this.emit('debug', `Removed ${value.docs.length} stale WorkFlows`)
+				}).catch(e => this.emit('error', `Failed to remove stale workflows: ${e}`))
+			}, (reason) => {
+				this.emit('error', `Could not get stale WorkFlows: ${reason}`)
+			})
+		}, config.cronJobTime || CRON_JOB_INTERVAL)
 
 		this._availableStorage = availableStorage
 
@@ -77,9 +152,10 @@ export class Dispatcher extends EventEmitter {
 	scannerManualModeBestEffort (manual: boolean) {
 		this._bestEffort = undefined
 		this.scannerManualMode(manual).then(() => {
+			this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
 			this.emit('debug', `Scanner placed in manual mode`)
-		}, (e) => {
-			this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
+		}, () => {
+			// this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
 			this._bestEffort = setTimeout(() => {
 				this.scannerManualModeBestEffort(manual)
 			}, 5000)
@@ -96,8 +172,9 @@ export class Dispatcher extends EventEmitter {
 
 	async init (): Promise<void> {
 		return this.scannerManualMode(true)
-		.catch((e) => {
+		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
 			this.emit('debug', `Could not place media scanner in manual mode: ${e}`)
+			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${e}`], P.StatusCode.WARNING_MAJOR)
 			this.scannerManualModeBestEffort(true)
 		}).then(() => Promise.all(this.generators.map(gen => gen.init()))).then(() => {
 			this.emit('debug', `Dispatcher initialized.`)
@@ -112,6 +189,8 @@ export class Dispatcher extends EventEmitter {
 	async destroy (): Promise<void> {
 		return Promise.all(this.generators.map(gen => gen.destroy()))
 		.then(() => this.emit('debug', 'WorkFlow generators destroyed'))
+		.then(() => { if (this._workflowCleanUp) clearInterval(this._workflowCleanUp) })
+		.then(() => this.emit('debug', 'WorkFlow clean up task destroyed'))
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
 		.then(() => this.scannerManualMode(false))
@@ -284,6 +363,143 @@ export class Dispatcher extends EventEmitter {
 			}
 		}, (e) => {
 			throw new Error(`Could not get outstanding work from DB: ${e}`)
+		})
+	}
+
+	private initialWorkFlowAndStepsSync () {
+		return Promise.all([
+			this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
+			this._workFlows.allDocs({
+				include_docs: true,
+				attachments: false
+			})
+		])
+		.then(([coreObjects, allDocsResponse]) => {
+
+			this._coreHandler.logger.info('WorkFlows: synchronizing objectlists', coreObjects.length, allDocsResponse.total_rows)
+
+			let tasks: Array<() => Promise<any>> = []
+
+			let coreObjRevisions: { [id: string]: string } = {}
+			_.each(coreObjects, (obj: any) => {
+				coreObjRevisions[obj._id] = obj.rev
+			})
+			tasks = tasks.concat(_.compact(_.map(allDocsResponse.rows.filter(i => i.doc && !((i.doc as any).views)), (doc) => {
+				const docId = doc.id
+
+				if (doc.value.deleted) {
+					if (coreObjRevisions[docId]) {
+						// deleted
+					}
+					return null // handled later
+				} else if (
+					!coreObjRevisions[docId] ||				// created
+					coreObjRevisions[docId] !== doc.value.rev	// changed
+				) {
+					delete coreObjRevisions[docId]
+
+					return () => {
+						return this._workFlows.get(doc.id).then((doc) => {
+							return this.pushWorkFlowToCore(doc._id, doc)
+						})
+						.then(() => {
+							return new Promise(resolve => {
+								setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+							})
+						})
+					}
+				} else {
+					delete coreObjRevisions[docId]
+					// identical
+					return null
+				}
+			})))
+			// The ones left in coreObjRevisions have not been touched, ie they should be deleted
+			_.each(coreObjRevisions, (_rev, id) => {
+				// deleted
+
+				tasks.push(() => {
+					return this.pushWorkFlowToCore(id, null)
+				})
+			})
+			return PromiseSequence(tasks)
+		})
+		.then(() => {
+			this._coreHandler.logger.info('WorkFlows: Done objects sync init')
+			return
+		})
+		.then(() => Promise.all([
+			this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
+			this._workSteps.allDocs({
+				include_docs: true,
+				attachments: false
+			})
+		]))
+		.then(([coreObjects, allDocsResponse]) => {
+
+			this._coreHandler.logger.info('WorkSteps: synchronizing objectlists', coreObjects.length, allDocsResponse.total_rows)
+
+			let tasks: Array<() => Promise<any>> = []
+
+			let coreObjRevisions: { [id: string]: string } = {}
+			_.each(coreObjects, (obj: any) => {
+				coreObjRevisions[obj._id] = obj.rev
+			})
+			tasks = tasks.concat(_.compact(_.map(allDocsResponse.rows.filter(i => i.doc && !((i.doc as any).views)), (doc) => {
+				const docId = doc.id
+
+				if (doc.value.deleted) {
+					if (coreObjRevisions[docId]) {
+						// deleted
+					}
+					return null // handled later
+				} else if (
+					!coreObjRevisions[docId] ||				// created
+					coreObjRevisions[docId] !== doc.value.rev	// changed
+				) {
+					delete coreObjRevisions[docId]
+
+					return () => {
+						return this._workSteps.get(doc.id).then((doc) => {
+							return this.pushWorkStepToCore(doc._id, doc)
+						})
+						.then(() => {
+							return new Promise(resolve => {
+								setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+							})
+						})
+					}
+				} else {
+					delete coreObjRevisions[docId]
+					// identical
+					return null
+				}
+			})))
+			// The ones left in coreObjRevisions have not been touched, ie they should be deleted
+			_.each(coreObjRevisions, (_rev, id) => {
+				// deleted
+
+				tasks.push(() => {
+					return this.pushWorkStepToCore(id, null)
+				})
+			})
+			return PromiseSequence(tasks)
+		})
+		.then(() => {
+			this._coreHandler.logger.info('WorkSteps: Done objects sync init')
+			return
+		})
+	}
+
+	private pushWorkFlowToCore (id: string, wf: WorkFlowDB | null) {
+		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlow, [ id, wf ]).catch(() => {
+			this.emit('error', `Could not update WorkFlow "${id}" in Core`)
+		})
+	}
+
+	private pushWorkStepToCore (id: string, ws: WorkStepDB | null) {
+		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlowStep, [id, ws]).catch(() => {
+			this.emit('error', `Could not update WorkStep "${id}" in Core`)
 		})
 	}
 }

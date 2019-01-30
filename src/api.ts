@@ -17,6 +17,9 @@ export interface DeviceSettings {
 	/** Cron job time - how often to check the file system for consistency - do a poll of the filesystem to check that the files are where they are supposed to be, clean out expired files */
 	cronJobTime?: number
 
+	/** WorkFlow cleanup time */
+	workFlowLingerTime?: number
+
 	/** Connection details for the media scanner */
 	mediaScanner: {
 		host: string

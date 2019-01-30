@@ -16,7 +16,7 @@ export function getID (fileName: string): string {
 	return fileName.replace('\\', '/').replace(/\.[\w]+$/i, '').toUpperCase()
 }
 
-export function retryNumber<T>(test: () => Promise<T>, count: number, doneSoFar?: number): Promise<T> {
+export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar?: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		test().then((res) => {
 			resolve(res)

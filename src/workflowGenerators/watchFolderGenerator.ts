@@ -121,7 +121,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 								_id: workflowId,
 								finished: false,
 								priority: 1,
-								source: WorkFlowSource.LOCAL_MEDIA_ITEM,
+								source: WorkFlowSource.SOURCE_STORAGE_REMOVE,
 								steps: this.generateDeleteFileWorkSteps(file, storageObject),
 								created: getCurrentTime(),
 								success: false
