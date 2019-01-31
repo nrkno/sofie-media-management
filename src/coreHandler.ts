@@ -11,6 +11,7 @@ const depsVersions = require('./deps-metadata.json')
 export interface CoreConfig {
 	host: string,
 	port: number,
+	ssl: boolean,
 	watchdog: boolean
 }
 export interface PeripheralDeviceCommand {

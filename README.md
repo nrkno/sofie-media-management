@@ -19,6 +19,7 @@ yarn build-win32
 | ------------- | ------------- | --- |
 | -host  | Hostname or IP of Core  | CORE_HOST  |
 | -port  | Port of Core   |  CORE_PORT |
+| -ssl	| Enable a secure connection to Core |  CORE_SSL |
 | -log  | Path to output log |  CORE_LOG |
 | -id   | Device ID to use | DEVICE_ID |
 

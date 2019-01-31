@@ -3,6 +3,7 @@ import { Config } from './mediaManager'
 // CLI arguments / Environment variables --------------
 let host: string 		= process.env.CORE_HOST 					|| '127.0.0.1'
 let port: number 		= parseInt(process.env.CORE_PORT + '', 10) 	|| 3000
+let ssl: boolean		= process.env.CORE_SSL						|| false
 let logPath: string 	= process.env.CORE_LOG						|| ''
 let deviceId: string 	= process.env.DEVICE_ID						|| ''
 let deviceToken: string 	= process.env.DEVICE_TOKEN 				|| ''
@@ -17,6 +18,8 @@ process.argv.forEach((val) => {
 		host = val
 	} else if (prevProcessArg.match(/-port/i)) {
 		port = parseInt(val, 10)
+	} else if (val.match(/-ssl/)) {
+		ssl = true
 	} else if (prevProcessArg.match(/-log/i)) {
 		logPath = val
 	} else if (prevProcessArg.match(/-id/i)) {
@@ -37,7 +40,8 @@ const config: Config = {
 	core: {
 		host: host,
 		port: port,
-		watchdog: !disableWatchdog
+		watchdog: !disableWatchdog,
+		ssl: ssl
 	}
 }
 
