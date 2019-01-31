@@ -37,6 +37,9 @@ export interface ExpectedMediaItem {
 	/** Local path to the media object */
 	path: string
 
+	/** Global path to the media object */
+	url: string
+
 	/** True if the media item has been marked as possibly unavailable */
 	disabled: boolean
 

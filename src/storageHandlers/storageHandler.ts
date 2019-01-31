@@ -80,6 +80,8 @@ export abstract class StorageHandler extends EventEmitter {
 		return super.on(type, listener)
 	}
 
+	abstract parseUrl (url: string): string
+
 	/**
 	 * Get all file handles on the storage
 	 * @abstract

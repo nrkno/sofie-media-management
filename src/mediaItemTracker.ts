@@ -53,9 +53,22 @@ export class TrackedMediaItems extends EventEmitter {
 		}, () => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.'))
 	}
 
-	async upsert (id: string, delta: (tmi: TrackedMediaItem) => TrackedMediaItem): Promise<string> {
-		const original = await this._db.get(id)
-		const modified = delta(original)
+	async upsert (id: string, delta: (tmi: TrackedMediaItemDB | undefined) => TrackedMediaItem): Promise<string> {
+		let original: TrackedMediaItemDB | undefined = undefined
+		try {
+			original = await this._db.get(id)
+		} catch (e0) {
+			const e = e0 as PouchDB.Core.Error
+			if (e.status !== 404) {
+				throw e
+			}
+		}
+
+		const modified = delta(original) as TrackedMediaItemDB
+		if (original) {
+			modified._id = original._id
+			modified._rev = original._rev
+		}
 		return this.tryAndPut(id, modified, delta)
 	}
 
@@ -85,7 +98,7 @@ export class TrackedMediaItems extends EventEmitter {
 		return this._db.bulkDocs(tmis).then(({}) => { })
 	}
 
-	private async tryAndPut (id: string, doc: TrackedMediaItem, delta: (tmi: TrackedMediaItem) => TrackedMediaItem): Promise<string> {
+	private async tryAndPut (id: string, doc: TrackedMediaItemDB, delta: (tmi: TrackedMediaItemDB | undefined) => TrackedMediaItem): Promise<string> {
 		try {
 			await this._db.put(doc)
 			return id

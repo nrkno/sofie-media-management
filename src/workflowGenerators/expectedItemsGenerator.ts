@@ -104,37 +104,69 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	private onExpectedAdded = (id: string) => {
-		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
+		let item
+		if (obj) {
+			item = obj
+		} else {
+			item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+		}
+		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
 
+		const sourceStorage = this._storage.find(i => i.id === flow.sourceId)
+		if (!sourceStorage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
+
+		let fileName
+		try {
+			fileName = sourceStorage.handler.parseUrl(item.url)
+		} catch (e) {
+			throw new Error(`Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+		}
+
 		const baseObj = {
-			_id: item.path,
-			name: item.path,
+			_id: fileName,
+			name: fileName,
 			expectedMediaItemId: [ item._id ],
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
 			targetStorageIds: [flow.destinationId]
 		}
-		this._tracked.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
+		this._tracked.upsert(baseObj._id, () => baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
 			this.emit('error', `An error happened when trying to create a copy workflow: ${e}`)
 		})
 	}
 
-	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
-		const item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+	private onExpectedChanged = (id: string, oldFields: any, clearedFields: any, newFields: any) => {
+		let item
+		if (oldFields) {
+			item = _.extend(_.omit(oldFields, clearedFields), newFields) as ExpectedMediaItem
+		} else {
+			item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+		}
+		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 		const flow = this._flows.find((f) => f.id === item.mediaFlowId)
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
 
+		const sourceStorage = this._storage.find(i => i.id === flow.sourceId)
+		if (!sourceStorage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
+
+		let fileName
+		try {
+			fileName = sourceStorage.handler.parseUrl(item.url)
+		} catch (e) {
+			throw new Error(`Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+		}
+
 		const baseObj = {
-			_id: item.path,
-			name: item.path,
+			_id: fileName,
+			name: fileName,
 			expectedMediaItemId: [ item._id ],
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
@@ -145,7 +177,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this._tracked.getById(item.path).then((tracked) => {
 			if (tracked.sourceStorageId === flow.sourceId) {
 				const update = _.extend(tracked, baseObj)
-				this._tracked.put(update).then(() => this.checkAndEmitCopyWorkflow(update)).catch((e) => {
+				this._tracked.upsert(tracked._id, () => update).then(() => this.checkAndEmitCopyWorkflow(update)).catch((e) => {
 					this.emit(`An error happened when trying to create a copy workflow: ${e}`)
 				})
 			} else {
@@ -245,9 +277,21 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				this.emit('error', `Media flow "${flow.id}" does not have a destinationId`)
 				return
 			}
+
+			const sourceStorage = this._storage.find(i => i.id === flow.sourceId)
+			if (!sourceStorage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
+
+			let fileName
+			try {
+				fileName = sourceStorage.handler.parseUrl(i.url)
+			} catch (e) {
+				this.emit('error', `Assigned source storage "${sourceStorage.id}" does not support file "${i.url}"`)
+				return
+			}
+
 			const expectedItem = literal<TrackedMediaItem>({
-				_id: i.path,
-				name: i.path,
+				_id: fileName,
+				name: fileName,
 				lastSeen: i.lastSeen,
 				lingerTime: i.lingerTime || this.LINGER_TIME,
 				expectedMediaItemId: [ i._id ],

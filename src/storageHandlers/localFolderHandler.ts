@@ -232,6 +232,13 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return getLocalFileProperties(file.url)
 	}
 
+	parseUrl (url: string): string {
+		if (url.startsWith(this._basePath)) {
+			return url.substr(this._basePath.length).replace(/^\\/, '')
+		}
+		throw new Error(`This storage handler does not support file URL "${url}"`)
+	}
+
 	/**
 	 * Handles delete events from the File System watcher
 	 * @private

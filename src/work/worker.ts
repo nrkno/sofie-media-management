@@ -163,6 +163,7 @@ export class Worker extends EventEmitter {
 			this.emit('debug', `Starting updating TMI on "${step.file.name}"`)
 			try {
 				await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
+					if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 					if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
 						tmi.targetStorageIds.push(step.target.id)
 					}
@@ -187,6 +188,7 @@ export class Worker extends EventEmitter {
 			try {
 				try {
 					await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
+						if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 						const idx = tmi.targetStorageIds.indexOf(step.target.id)
 						if (idx >= 0) {
 							tmi.targetStorageIds.splice(idx, 1)

@@ -40,4 +40,11 @@ export class FileShareHandler extends LocalFolderHandler {
 		}
 		return super.init()
 	}
+
+	parseUrl (url: string): string {
+		if (url.startsWith(this._uncPath)) {
+			return url.substr(this._uncPath.length).replace(/^\\/, '')
+		}
+		throw new Error(`This storage handler does not support file URL "${url}"`)
+	}
 }

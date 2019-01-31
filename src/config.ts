@@ -3,7 +3,7 @@ import { Config } from './mediaManager'
 // CLI arguments / Environment variables --------------
 let host: string 		= process.env.CORE_HOST 					|| '127.0.0.1'
 let port: number 		= parseInt(process.env.CORE_PORT + '', 10) 	|| 3000
-let ssl: boolean		= process.env.CORE_SSL						|| false
+let ssl: boolean		= process.env.CORE_SSL !== undefined		|| false
 let logPath: string 	= process.env.CORE_LOG						|| ''
 let deviceId: string 	= process.env.DEVICE_ID						|| ''
 let deviceToken: string 	= process.env.DEVICE_TOKEN 				|| ''
