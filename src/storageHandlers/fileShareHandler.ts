@@ -34,7 +34,12 @@ export class FileShareHandler extends LocalFolderHandler {
 	}
 
 	async init (): Promise<void> {
-		const mounts = await networkDrive.find(this._uncPath)
+		let mounts
+		try {
+			mounts = await networkDrive.find(this._uncPath)
+		} catch (e) {
+			mounts = []
+		}
 		if (mounts.indexOf(this._driveLetter.toUpperCase()) < 0) {
 			await networkDrive.mount(this._uncPath, this._driveLetter, this._username, this._password)
 		}
