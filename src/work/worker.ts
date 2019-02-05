@@ -44,7 +44,10 @@ export class Worker extends EventEmitter {
 				this._busy = false
 				return result
 			})
-			.catch((e) => this.failStep(e))
+			.catch((e) => {
+				this._busy = false 
+				return this.failStep(e)
+			})
 		}
 
 		if (this._busy) throw new Error(`Busy worker was assigned to do "${step._id}"`)
@@ -69,10 +72,11 @@ export class Worker extends EventEmitter {
 	}
 
 	private async failStep (reason: string): Promise<WorkResult> {
+		this.emit('error', reason)
 		return literal<WorkResult>({
 			status: WorkStepStatus.ERROR,
 			messages: [
-				reason
+				reason.toString()
 			]
 		})
 	}
@@ -103,9 +107,7 @@ export class Worker extends EventEmitter {
 				})
 			}
 		} catch (e) {
-			return literal<WorkResult>({
-				status: WorkStepStatus.ERROR
-			})
+			return this.failStep(e)
 		}
 	}
 
@@ -127,9 +129,7 @@ export class Worker extends EventEmitter {
 				})
 			}
 		} catch (e) {
-			return literal<WorkResult>({
-				status: WorkStepStatus.ERROR
-			})
+			return this.failStep(e)
 		}
 	}
 
@@ -151,9 +151,7 @@ export class Worker extends EventEmitter {
 				})
 			}
 		} catch (e) {
-			return literal<WorkResult>({
-				status: WorkStepStatus.ERROR
-			})
+			return this.failStep(e)
 		}
 	}
 
