@@ -7,6 +7,8 @@ import * as _ from 'underscore'
 import * as Winston from 'winston'
 import { DeviceConfig } from './mediaManager'
 const depsVersions = require('./deps-metadata.json')
+import { Process } from './process'
+import { DDPConnectorOptions } from 'tv-automation-server-core-integration/dist/lib/ddpConnector'
 
 export interface CoreConfig {
 	host: string,
@@ -46,6 +48,7 @@ export class CoreHandler {
 	private _onChanged?: () => any
 	private _executedFunctions: {[id: string]: boolean} = {}
 	private _coreConfig?: CoreConfig
+	private _process?: Process
 
 	private _statusInitialized: boolean = false
 	private _statusDestroyed: boolean = false
@@ -63,10 +66,12 @@ export class CoreHandler {
 		this._processState = {}
 	}
 
-	async init (config: CoreConfig): Promise<void> {
+	async init (config: CoreConfig, process: Process): Promise<void> {
 		// this.logger.info('========')
 		this._statusInitialized = false
 		this._coreConfig = config
+		this._process = process
+
 		this.core = new CoreConnection(this.getCoreConnectionOptions('Media Manager', 'MediaManager', true))
 
 		this.core.onConnected(() => {
@@ -84,7 +89,17 @@ export class CoreHandler {
 			this.logger.error('Core Error: ' + (err.message || err.toString() || err))
 		})
 
-		await this.core.init(config)
+		let ddpConfig: DDPConnectorOptions = {
+			host: config.host,
+			port: config.port,
+			ssl: config.ssl
+		}
+		if (this._process && this._process.certificates.length) {
+			ddpConfig.tlsOpts = {
+				ca: this._process.certificates
+			}
+		}
+		await this.core.init(ddpConfig)
 		this.logger.info('Core id: ' + this.core.deviceId)
 		await this.setupObserversAndSubscriptions()
 		this._statusInitialized = true

@@ -13,6 +13,7 @@ import { BaseWorkFlowGenerator } from './workflowGenerators/baseWorkFlowGenerato
 import { WatchFolderGenerator } from './workflowGenerators/watchFolderGenerator'
 import { LocalStorageGenerator } from './workflowGenerators/localStorageGenerator'
 import { ExpectedItemsGenerator } from './workflowGenerators/expectedItemsGenerator'
+import { Process } from './process'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -20,8 +21,15 @@ const DEFAULT_WORKFLOW_LINGER_TIME = 24 * 60 * 60 * 1000
 const DEFAULT_WORKERS = 3
 
 export interface Config {
+	process: ProcessConfig
 	device: DeviceConfig
 	core: CoreConfig
+}
+export interface ProcessConfig {
+	/** Will cause the Node applocation to blindly accept all certificates. Not recommenced unless in local, controlled networks. */
+	unsafeSSL: boolean
+	/** Paths to certificates to load, for SSL-connections */
+	certificates: string[]
 }
 export interface DeviceConfig {
 	deviceId: string
@@ -37,6 +45,7 @@ export class MediaManager {
 	private _trackedMedia: TrackedMediaItems
 	private _dispatcher: Dispatcher
 	private _workFlowGenerators: BaseWorkFlowGenerator[]
+	private _process: Process
 
 	constructor (logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -46,14 +55,19 @@ export class MediaManager {
 		this._config = config
 
 		try {
+			this._logger.info('Initializing Process...')
+			await this.initProcess()
+			this._logger.info('Process initialized')
+
 			this._logger.info('Initializing Core...')
 			await this.initCore()
 			this._logger.info('Core initialized')
+
 			this._logger.info('Initializing MediaManager...')
 			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
 			await this.initMediaManager(peripheralDevice.settings || {})
-
 			this._logger.info('MediaManager initialized')
+
 			this._logger.info('Initialization done')
 			return
 		} catch (e) {
@@ -75,10 +89,13 @@ export class MediaManager {
 			return
 		}
 	}
-
+	initProcess () {
+		this._process = new Process(this._logger)
+		this._process.init(this._config.process)
+	}
 	async initCore () {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
-		return this.coreHandler.init(this._config.core)
+		return this.coreHandler.init(this._config.core, this._process)
 	}
 
 	async initMediaManager (settings: DeviceSettings): Promise<void> {
