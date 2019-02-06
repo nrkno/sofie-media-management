@@ -84,7 +84,7 @@ export class Dispatcher extends EventEmitter {
 				throw new Error(`Could not initialize "workSteps" database: ${e}`)
 			})
 		]).then(() => this.initialWorkFlowAndStepsSync())
-		.catch((e) => { 
+		.catch((e) => {
 			this.emit('error', `Failed to synchronize with core: ${e}`)
 			process.exit(1)
 			throw e

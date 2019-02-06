@@ -56,7 +56,7 @@ export class MediaManager {
 
 		try {
 			this._logger.info('Initializing Process...')
-			await this.initProcess()
+			this.initProcess()
 			this._logger.info('Process initialized')
 
 			this._logger.info('Initializing Core...')

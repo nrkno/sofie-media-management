@@ -33,21 +33,21 @@ export abstract class File {
 	/**
 	 * Return a writable stream that can be written to, to fill the file with contents.
 	 * @abstract
-	 * @return Promise<stream.Writable> 
+	 * @return Promise<stream.Writable>
 	 * @memberof File
 	 */
 	abstract getWritableStream (): Promise<stream.Writable>
 	/**
 	 * Return a readable stream to read from the file
 	 * @abstract
-	 * @return Promise<stream.Readable> 
+	 * @return Promise<stream.Readable>
 	 * @memberof File
 	 */
 	abstract getReadableStream (): Promise<stream.Readable>
 	/**
 	 * Get the properties (created timestamp, modified timestamp and file size)
 	 * @abstract
-	 * @return Promise<FileProperties> 
+	 * @return Promise<FileProperties>
 	 * @memberof File
 	 */
 	abstract getProperties (): Promise<FileProperties>
@@ -101,22 +101,22 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @abstract
 	 * @param  file The file to be written to the storage
 	 * @param  progressCallback? An optional callback to be called when the progress of the operation changes
-	 * @returns The file created on the storage 
+	 * @returns The file created on the storage
 	 */
 	abstract putFile (file: File, progressCallback?: (progress: number) => void): Promise<File>
 	/**
-	 * 
+	 *
 	 * @abstract Delete a file from storage
 	 * @param  file The file to be deleted from this storage
-	 * @return 
+	 * @return
 	 */
 	abstract deleteFile (file: File): Promise<void>
 
 	/**
 	 * Get file properties (file size, created timestamp and modified timestamp)
 	 * @abstract
-	 * @param  file The file to check the properties of 
-	 * @return Promise<FileProperties> 
+	 * @param  file The file to check the properties of
+	 * @return Promise<FileProperties>
 	 * @memberof StorageHandler
 	 */
 	abstract getFileProperties (file: File): Promise<FileProperties>
@@ -124,7 +124,7 @@ export abstract class StorageHandler extends EventEmitter {
 	/**
 	 * Initialize the handler, set up the environment to be whatever it needs to be.
 	 * @abstract
-	 * @return 
+	 * @return
 	 * @memberof StorageHandler
 	 */
 	abstract init (): Promise<void>
@@ -132,7 +132,7 @@ export abstract class StorageHandler extends EventEmitter {
 	/**
 	 * Uninitialize the handler, stop sending events.
 	 * @abstract
-	 * @return  
+	 * @return
 	 * @memberof StorageHandler
 	 */
 	abstract destroy (): Promise<void>

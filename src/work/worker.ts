@@ -45,7 +45,7 @@ export class Worker extends EventEmitter {
 				return result
 			})
 			.catch((e) => {
-				this._busy = false 
+				this._busy = false
 				return this.failStep(e)
 			})
 		}
