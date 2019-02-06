@@ -1,5 +1,5 @@
 import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
-import { WorkStep, WorkStepAction, WorkStepStatus } from '../api'
+import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
 
@@ -14,11 +14,22 @@ export class WorkStepDB extends WorkStep {
 	workFlowId: string
 }
 
-export class FileWorkStep extends WorkStep {
+interface FileWorkStepInitial extends WorkStepInitial {
 	action: WorkStepAction.COPY | WorkStepAction.DELETE | WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
-	status = WorkStepStatus.IDLE
+	file: File
+	target: StorageObject
+}
+interface FileWorkStepInitialConstr extends FileWorkStepInitial {
+	status: WorkStepStatus.IDLE
+}
+/**
+ * The FileWorkStep is a WorkStep that performs a file operation
+ */
+export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
+	action: WorkStepAction.COPY | WorkStepAction.DELETE
 	priority = this.priority === undefined ? 1 : this.priority
 
+	// code annotations for class-transformer to automate serialization and deserialization
 	@Type(() => File, {
 		discriminator: {
 			property: '__type',
@@ -33,13 +44,43 @@ export class FileWorkStep extends WorkStep {
 	@Transform((value: string) => value, { toClassOnly: true })
 	target: StorageObject
 
-	constructor (init?: Partial<FileWorkStep>) {
+	constructor (init?: FileWorkStepInitialConstr) {
 		super(init)
 	}
 }
+interface ScannerWorkStepInitial extends WorkStepInitial {
+	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+	file: File
+	target: StorageObject
+}
+interface ScannerWorkStepInitialConstr extends ScannerWorkStepInitial {
+	status: WorkStepStatus.IDLE
+}
+/**
+ */
 
-export class ScannerWorkStep extends FileWorkStep {
+export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial {
+	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+	priority = this.priority === undefined ? 1 : this.priority
 
+	// code annotations for class-transformer to automate serialization and deserialization
+	@Type(() => File, {
+		discriminator: {
+			property: '__type',
+			subTypes: [
+				{ value: LocalFolderFile, name: 'localFolderFile' }
+			]
+		}
+	})
+	file: File
+
+	@Transform((value: StorageObject) => value.id, { toPlainOnly: true })
+	@Transform((value: string) => value, { toClassOnly: true })
+	target: StorageObject
+
+	constructor (init?: ScannerWorkStepInitialConstr) {
+		super(init)
+	}
 }
 
 export function workStepToPlain (obj: WorkStep): object {

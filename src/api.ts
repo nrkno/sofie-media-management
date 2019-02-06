@@ -136,7 +136,22 @@ export enum WorkFlowSource {
 	TARGET_STORAGE_REMOVE = 'local_storage_remove'
 }
 
-export abstract class WorkStep {
+export interface WorkStepInitial {
+	action: WorkStepAction
+	status: WorkStepStatus
+	messages?: Array<string>
+
+	priority: number
+	/** 0-1 */
+	progress?: number
+	/** Calculated time left of this step */
+	expectedLeft?: Duration
+}
+
+/**
+ * A Workstep represents an action that is to be performed
+ */
+export abstract class WorkStep implements WorkStepInitial {
 	action: WorkStepAction
 	status: WorkStepStatus
 	messages?: Array<string>
@@ -147,7 +162,7 @@ export abstract class WorkStep {
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 
-	constructor (init?: Partial<WorkStep>) {
+	constructor (init?: WorkStepInitial) {
 		Object.assign(this, init)
 	}
 }

@@ -3,7 +3,7 @@ import { File, StorageEvent, StorageObject, StorageEventType } from '../storageH
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 export * from './baseWorkFlowGenerator'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStep, MediaFlow, MediaFlowType } from '../api'
+import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStep, MediaFlow, MediaFlowType, WorkStepStatus } from '../api'
 import { ScannerWorkStep } from '../work/workStep'
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
@@ -62,19 +62,22 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				action: WorkStepAction.GENERATE_METADATA,
 				file,
 				target: st,
-				priority: 1
+				priority: 1,
+				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
 				file,
 				target: st,
-				priority: 0.5
+				priority: 0.5,
+				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
 				file,
 				target: st,
-				priority: 0.3
+				priority: 0.3,
+				status: WorkStepStatus.IDLE
 			})
 		]
 	}

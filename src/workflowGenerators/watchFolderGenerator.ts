@@ -1,6 +1,6 @@
 import * as _ from 'underscore'
 import { getCurrentTime, literal, randomId } from '../lib/lib'
-import { WorkFlow, WorkFlowSource, WorkStep, WorkStepAction, MediaFlow, MediaFlowType } from '../api'
+import { WorkFlow, WorkFlowSource, WorkStep, WorkStepAction, MediaFlow, MediaFlowType, WorkStepStatus } from '../api'
 import { LocalStorageGenerator, WorkFlowGeneratorEventType } from './localStorageGenerator'
 import { File, StorageObject, StorageEvent, StorageEventType } from '../storageHandlers/storageHandler'
 import { TrackedMediaItems } from '../mediaItemTracker'
@@ -39,7 +39,8 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				action: WorkStepAction.COPY,
 				file: file,
 				target: st,
-				priority: 2
+				priority: 2,
+				status: WorkStepStatus.IDLE
 			}) as WorkStep
 		].concat(super.generateNewFileWorkSteps(file, st))
 	}
@@ -50,7 +51,8 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				action: WorkStepAction.DELETE,
 				file: file,
 				target: st,
-				priority: 2
+				priority: 2,
+				status: WorkStepStatus.IDLE
 			})
 		]
 	}

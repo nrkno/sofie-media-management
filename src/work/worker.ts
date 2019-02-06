@@ -60,20 +60,16 @@ export class Worker extends EventEmitter {
 		this._busy = true
 		switch (step.action) {
 			case WorkStepAction.COPY:
-				return unBusyAndFailStep(this.doCopy(step as FileWorkStep,
+				return unBusyAndFailStep(this.doCopy(step,
 					(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed)))
 			case WorkStepAction.DELETE:
-				return unBusyAndFailStep(this.doDelete(step as FileWorkStep))
+				return unBusyAndFailStep(this.doDelete(step))
 			case WorkStepAction.GENERATE_METADATA:
-				return unBusyAndFailStep(this.doGenerateMetadata(step as ScannerWorkStep))
+				return unBusyAndFailStep(this.doGenerateMetadata(step))
 			case WorkStepAction.GENERATE_PREVIEW:
-				return unBusyAndFailStep(this.doGeneratePreview(step as ScannerWorkStep))
+				return unBusyAndFailStep(this.doGeneratePreview(step))
 			case WorkStepAction.GENERATE_THUMBNAIL:
-				return unBusyAndFailStep(this.doGenerateThumbnail(step as ScannerWorkStep))
-			default:
-				return Promise.resolve().then(() => {
-					return this.failStep(`Worker could not recognize action: ${step.action}`)
-				})
+				return unBusyAndFailStep(this.doGenerateThumbnail(step))
 		}
 	}
 	/**

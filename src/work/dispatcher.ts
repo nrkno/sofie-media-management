@@ -17,7 +17,7 @@ import { Worker, WorkResult } from './worker'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import { CoreHandler } from '../coreHandler'
 
-const CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000
+const CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000 // 10 hours (ms)
 
 // TODO: Move this into server-core-integration
 enum MMPDMethods {
@@ -50,7 +50,15 @@ export class Dispatcher extends EventEmitter {
 		return super.on(type, listener)
 	}
 
-	constructor (generators: BaseWorkFlowGenerator[], availableStorage: StorageObject[], tmi: TrackedMediaItems, config: DeviceSettings, workersCount: number, workFlowLingerTime: number, coreHandler: CoreHandler) {
+	constructor (
+		generators: BaseWorkFlowGenerator[],
+		availableStorage: StorageObject[],
+		tmi: TrackedMediaItems,
+		config: DeviceSettings,
+		workersCount: number,
+		workFlowLingerTime: number,
+		coreHandler: CoreHandler
+	) {
 		super()
 
 		this.generators = generators
@@ -137,9 +145,16 @@ export class Dispatcher extends EventEmitter {
 					finished: true
 				}
 			}).then((value) => {
-				Promise.all(value.docs.map(i => this._workFlows.remove(i).catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}": ${e}`)))).then(() => {
+				Promise.all(
+					value.docs.map(i => {
+						return this._workFlows.remove(i)
+						.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}": ${e}`))
+					})
+				)
+				.then(() => {
 					this.emit('debug', `Removed ${value.docs.length} stale WorkFlows`)
-				}).catch(e => this.emit('error', `Failed to remove stale workflows: ${e}`))
+				})
+				.catch(e => this.emit('error', `Failed to remove stale workflows: ${e}`))
 			}, (reason) => {
 				this.emit('error', `Could not get stale WorkFlows: ${reason}`)
 			})
@@ -154,29 +169,8 @@ export class Dispatcher extends EventEmitter {
 		}
 	}
 
-	scannerManualModeBestEffort (manual: boolean) {
-		this._bestEffort = undefined
-		this.scannerManualMode(manual).then(() => {
-			this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
-			this.emit('debug', `Scanner placed in manual mode`)
-		}, () => {
-			// this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
-			this._bestEffort = setTimeout(() => {
-				this.scannerManualModeBestEffort(manual)
-			}, 5000)
-		})
-	}
-
-	async scannerManualMode (manual: boolean): Promise<object> {
-		if (this._bestEffort !== undefined) {
-			clearTimeout(this._bestEffort)
-			this._bestEffort = undefined
-		}
-		return request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${manual ? 'true' : 'false'}`).promise()
-	}
-
 	async init (): Promise<void> {
-		return this.scannerManualMode(true)
+		return this.setScannerManualMode(true)
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
 			this.emit('debug', `Could not place media scanner in manual mode: ${e}`)
 			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${e}`], P.StatusCode.WARNING_MAJOR)
@@ -198,7 +192,7 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', 'WorkFlow clean up task destroyed'))
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
-		.then(() => this.scannerManualMode(false))
+		.then(() => this.setScannerManualMode(false))
 		.catch((e) => this.emit('error', `Error when disabling manual mode in scanner: ${e}`))
 		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
@@ -219,20 +213,47 @@ export class Dispatcher extends EventEmitter {
 	/**
 	 * Continously try to place media-scanner in manual mode and set status to GOOD once that's done
 	 */
+	private scannerManualModeBestEffort (manual: boolean) {
+		this._bestEffort = undefined
+		this.setScannerManualMode(manual).then(() => {
+			this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
+			this.emit('debug', `Scanner placed in manual mode`)
+		}, () => {
+			// this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
+			this._bestEffort = setTimeout(() => {
+				this.scannerManualModeBestEffort(manual)
+			}, 5000)
+		})
+	}
+
 	/**
 	 * Try to place media-scanner in manual mode and reject promise if fails
 	 */
+	private async setScannerManualMode (manual: boolean): Promise<object> {
+		if (this._bestEffort !== undefined) {
+			clearTimeout(this._bestEffort)
+			this._bestEffort = undefined
+		}
+		return request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${manual ? 'true' : 'false'}`).promise()
+	}
+	/**
+	 * Called whenever there's a new workflow from a WorkflowGenerator
+	 */
 	private onNewWorkFlow = (wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
+		// TODO: This should also handle extra workflows using a hash of the basic WorkFlow object to check if there is a WORKING or IDLE workflow that is the same
 		const workFlowDb: WorkFlowDB = _.omit(wf, 'steps')
 		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
-		this._workFlows.put(workFlowDb).then(() => {
+		// persist workflow to db:
+		this._workFlows.put(workFlowDb)
+		.then(() => {
 			this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
+			// persist the workflow steps separately to db:
 			return Promise.all(wf.steps.map(step => {
 				const stepDb = extendMandadory<WorkStep, WorkStepDB>(step, {
 					_id: workFlowDb._id + '_' + randomId(),
 					workFlowId: workFlowDb._id
 				})
-				stepDb.priority = workFlowDb.priority * stepDb.priority
+				stepDb.priority = workFlowDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
 				return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
 			}))
 		}, (e) => {
@@ -249,27 +270,31 @@ export class Dispatcher extends EventEmitter {
 	private async getOutstandingWork (): Promise<WorkStepDB[]> {
 		return this._workSteps.find({selector: {
 			status: WorkStepStatus.IDLE
-		}}).then((result) => {
+		}})
+		.then((result) => {
 			return (result.docs as object[]).map((item) => {
 				return plainToWorkStep(item, this._availableStorage)
 			})
-		}).then((docs) => {
+		})
+		.then((docs) => {
 			return docs.sort((a, b) => b.priority - a.priority)
 		})
 	}
-
-	private getOnlyHighestPrio (docs: WorkStepDB[]): WorkStepDB[] {
-		const onlyHighestOnes: {
+	/**
+	 * Get all of the highest priority steps for each WorkFlow
+	 * @param steps sorted array of steps
+	 */
+	private getFirstTaskForWorkFlows (steps: WorkStepDB[]): WorkStepDB[] {
+		const firstSteps: {
 			[key: string]: WorkStepDB
 		} = {}
-		docs.forEach(i => {
-			if (!onlyHighestOnes[i.workFlowId]) {
-				onlyHighestOnes[i.workFlowId] = i
+		steps.forEach(i => {
+			if (!firstSteps[i.workFlowId]) {
+				firstSteps[i.workFlowId] = i
 			}
 		})
-		return _.values(onlyHighestOnes)
+		return _.values(firstSteps)
 	}
-
 	/**
 	 * Block all idle steps in a workflow
 	 * @param workFlowId
@@ -279,7 +304,8 @@ export class Dispatcher extends EventEmitter {
 			selector: {
 				workFlowId: workFlowId
 			}
-		}).then((result) => {
+		})
+		.then((result) => {
 			return Promise.all(result.docs.map(item => {
 				if (item.status === WorkStepStatus.IDLE) {
 					item.status = WorkStepStatus.BLOCKED
@@ -371,7 +397,7 @@ export class Dispatcher extends EventEmitter {
 			if (allJobs.length === 0) return
 			this.emit('debug', `Got ${allJobs.length} outstanding jobs`)
 
-			const jobs = this.getOnlyHighestPrio(allJobs)
+			const jobs = this.getFirstTaskForWorkFlows(allJobs)
 
 			for (let i = 0; i < this._workers.length; i++) {
 				if (!this._workers[i].busy) {
