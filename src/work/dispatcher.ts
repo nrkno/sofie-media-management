@@ -27,6 +27,10 @@ enum MMPDMethods {
 	'updateMediaWorkFlowStep' = 'peripheralDevice.mediaManager.updateMediaWorkFlowStep'
 }
 
+/**
+ * The dispatcher connects the storages to the workflow generators
+ * And then dispathes the work to the workers
+ */
 export class Dispatcher extends EventEmitter {
 	generators: BaseWorkFlowGenerator[]
 
@@ -125,6 +129,7 @@ export class Dispatcher extends EventEmitter {
 			}
 		})
 
+		// clean up old work-flows every now and then
 		this._workflowCleanUp = setInterval(() => {
 			this._workFlows.find({
 				selector: {
@@ -211,6 +216,12 @@ export class Dispatcher extends EventEmitter {
 		.on('debug', (e) => this.emit('debug', prefix + ': ' + e))
 	}
 
+	/**
+	 * Continously try to place media-scanner in manual mode and set status to GOOD once that's done
+	 */
+	/**
+	 * Try to place media-scanner in manual mode and reject promise if fails
+	 */
 	private onNewWorkFlow = (wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
 		const workFlowDb: WorkFlowDB = _.omit(wf, 'steps')
 		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
@@ -232,7 +243,9 @@ export class Dispatcher extends EventEmitter {
 			this.emit('error', `Adding new WorkFlow to queue failed: ${e}`)
 		})
 	}
-
+	/**
+	 * Returns the work-steps that are yet to be done and return them in order of priority (highest first)
+	 */
 	private async getOutstandingWork (): Promise<WorkStepDB[]> {
 		return this._workSteps.find({selector: {
 			status: WorkStepStatus.IDLE
@@ -257,6 +270,10 @@ export class Dispatcher extends EventEmitter {
 		return _.values(onlyHighestOnes)
 	}
 
+	/**
+	 * Block all idle steps in a workflow
+	 * @param workFlowId
+	 */
 	private async blockStepsInWorkFlow (workFlowId: string): Promise<void> {
 		return this._workSteps.find({
 			selector: {
@@ -272,7 +289,11 @@ export class Dispatcher extends EventEmitter {
 			}))
 		}).then(() => { })
 	}
-
+	/**
+	 * Check the result of a job (work) and then set the WorkStep status accordingly
+	 * @param job
+	 * @param result
+	 */
 	private async processResult (job: WorkStepDB, result: WorkResult): Promise<void> {
 		switch (result.status) {
 			case WorkStepStatus.CANCELED:
@@ -292,7 +313,9 @@ export class Dispatcher extends EventEmitter {
 		this.emit('debug', `Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ': ' : '') + (result.messages || []).join(', '))
 		return this._workSteps.put(workStep).then(() => { })
 	}
-
+	/**
+	 * Update the status of all non-finished work-flows
+	 */
 	private async updateWorkFlowStatus (): Promise<void> {
 		// Get all unfinished workFlows
 		return this._workFlows.find({ selector: {
@@ -340,7 +363,9 @@ export class Dispatcher extends EventEmitter {
 			this.emit('error', `Failed to update WorkFlows' status: ${e}`)
 		})
 	}
-
+	/**
+	 * Assign outstanding work to available workers and process result
+	 */
 	private dispatchWork () {
 		this.getOutstandingWork().then((allJobs) => {
 			if (allJobs.length === 0) return
@@ -365,7 +390,9 @@ export class Dispatcher extends EventEmitter {
 			throw new Error(`Could not get outstanding work from DB: ${e}`)
 		})
 	}
-
+	/**
+	 * Synchronize the WorkFlows and WorkSteps databases with core after connecting
+	 */
 	private initialWorkFlowAndStepsSync () {
 		return Promise.all([
 			this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),

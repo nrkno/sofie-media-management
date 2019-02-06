@@ -13,6 +13,10 @@ export interface WorkResult {
 	messages?: string[]
 }
 
+/**
+ * A worker is given a work-step, and will perform actions, using that step
+ * The workers are kept by the dispatcher and given work from it
+ */
 export class Worker extends EventEmitter {
 	private _busy: boolean = false
 	private _db: PouchDB.Database<WorkStepDB>
@@ -33,7 +37,9 @@ export class Worker extends EventEmitter {
 	get busy (): boolean {
 		return this._busy
 	}
-
+	/**
+	 * Receive work from the Dispatcher
+	 */
 	async doWork (step: GeneralWorkStepDB): Promise<WorkResult> {
 		const progressReportFailed = (e) => {
 			this.emit('warn', `Worker could not report progress: ${e}`)
@@ -70,7 +76,10 @@ export class Worker extends EventEmitter {
 				})
 		}
 	}
-
+	/**
+	 * Return a "failed" workResult
+	 * @param reason
+	 */
 	private async failStep (reason: string): Promise<WorkResult> {
 		this.emit('error', reason)
 		return literal<WorkResult>({
@@ -80,7 +89,11 @@ export class Worker extends EventEmitter {
 			]
 		})
 	}
-
+	/**
+	 * Report on the progress of a work step
+	 * @param step
+	 * @param progress
+	 */
 	private async reportProgress (step: WorkStepDB, progress: number): Promise<void> {
 		this.emit('debug', `${step._id}: Progress ${Math.round(progress * 100)}%`)
 		return this._db.get(step._id).then((obj) => {

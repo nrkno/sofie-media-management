@@ -53,6 +53,9 @@ export class TrackedMediaItems extends EventEmitter {
 		}, () => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.'))
 	}
 
+	/**
+	 * Find an item of a given ID (will return undefined if not found), transform it using the delta function and store it in the DB
+	 */
 	async upsert (id: string, delta: (tmi: TrackedMediaItemDB | undefined) => TrackedMediaItem): Promise<string> {
 		let original: TrackedMediaItemDB | undefined = undefined
 		try {
@@ -98,6 +101,9 @@ export class TrackedMediaItems extends EventEmitter {
 		return this._db.bulkDocs(tmis).then(({}) => { })
 	}
 
+	/**
+	 * Used internally by the upsert function, will fail if if error != 409, will re-upsert if 409 (revision mismatch)
+	 */
 	private async tryAndPut (id: string, doc: TrackedMediaItemDB, delta: (tmi: TrackedMediaItemDB | undefined) => TrackedMediaItem): Promise<string> {
 		try {
 			await this._db.put(doc)

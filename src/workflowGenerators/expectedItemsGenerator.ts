@@ -11,6 +11,9 @@ import { Collection } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 
+/**
+ * Monitors the expected items from Core and generates workflows needed to make it so
+ */
 export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _coreHandler: CoreHandler
 	private _tracked: TrackedMediaItems
@@ -28,6 +31,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private _expectedMediaItemsSub: string
 
 	private CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000
+	/** The interval of which to check whether files are still expected. */
 
 	private LINGER_TIME = 3 * 24 * 60 * 60 * 1000
 
@@ -141,6 +145,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
+	/** Called when an item is changed in Core */
 	private onExpectedChanged = (id: string, oldFields: any, clearedFields: any, newFields: any) => {
 		let item
 		if (oldFields) {
@@ -189,8 +194,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			})
 		})
 	}
-
+	/** Called when an item is removed (from Core) */
 	private onExpectedRemoved = (id: string, _oldValue: any) => {
+		// Don't have to do anything, the cronjob is responsible of handling stale (removed) items later
 		this.emit('debug', `${id} was removed from Core expectedMediaItems collection`)
 	}
 
@@ -206,7 +212,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			})
 		})
 	}
-
+	/** Called whenever a file is added (or changed) in a storage */
 	private onFileAdd = (st: StorageObject, e: StorageEvent) => {
 		if (!e.file) throw new Error(`Event for file "${e.path}" has no file argument`)
 		this._tracked.getById(e.path).then((tracked) => {
@@ -220,7 +226,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	private onFileChange = this.onFileAdd
-
+	/** Called whenever a file is deleted in a storage */
 	private onFileDelete = (st: StorageObject, e: StorageEvent) => {
 		this._tracked.getById(e.path).then((tracked) => {
 			if (tracked.sourceStorageId === st.id) {
@@ -263,7 +269,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const tmis = await this._tracked.getAllFromStorage(st.id)
 		tmis.forEach((item) => this.checkAndEmitCopyWorkflow(item))
 	}
-
+	/**
+	 * Checks all expectedMediaItems, makes sure that we're tracking them, and starts any work that might be due
+	 */
 	protected async initialExpectedCheck (): Promise<void> {
 		const handledIds = this._handledFlows.map(i => i.id)
 		const currentExpectedContents = this.expectedMediaItems.find((item: ExpectedMediaItem) => {
@@ -329,7 +337,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this.emit('error')
 		})
 	}
-
+	/**
+	 * Goes through the list of expected items and removes them if they are stale and too old (older than lingerTime)
+	 */
 	protected purgeOldExpectedItems (): Promise<void> {
 		return Promise.all(this._storage.map((s) => this._tracked.getAllFromStorage(s.id)))
 		.then((result) => {
@@ -391,7 +401,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}), this)
 		this.emit('debug', `New forkflow started for "${file.name}": "${workflowId}".`)
 	}
-
+	/**
+	 * Checks if the item exists on the storage and issues workflows
+	 * @param tmi
+	 */
 	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItem) {
 		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
 		const storage = this._storage.find(i => i.id === tmi.sourceStorageId)

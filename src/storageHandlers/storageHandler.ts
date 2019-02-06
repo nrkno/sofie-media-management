@@ -73,6 +73,8 @@ export interface StorageEvent {
 
 /**
  * Handler for storage device/service
+ * A StorageHandler represents some kind of storage, to unify the interface.
+ * ( to abstract storage to local folders, network shared, FTP:s, Amazon G3 etc...)
  */
 export abstract class StorageHandler extends EventEmitter {
 

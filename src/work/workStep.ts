@@ -5,6 +5,9 @@ import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
 
 export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
 
+/**
+ * The object that's stored in the DB
+ */
 export class WorkStepDB extends WorkStep {
 	_id: string
 	_rev?: string
