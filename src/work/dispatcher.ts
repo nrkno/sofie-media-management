@@ -283,6 +283,12 @@ export class Dispatcher extends EventEmitter {
 			return docs.sort((a, b) => b.priority - a.priority)
 		})
 	}
+	/**
+	 * Restart unfinished worksteps (to be run after startup)
+	 * @private
+	 * @return Promise<void> 
+	 * @memberof Dispatcher
+	 */
 	private async restartWorkSteps (): Promise<void> {
 		const brokenItems = await this._workSteps.find({ selector: {
 			status: WorkStepStatus.WORKING
