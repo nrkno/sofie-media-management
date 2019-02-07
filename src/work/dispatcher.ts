@@ -175,14 +175,17 @@ export class Dispatcher extends EventEmitter {
 			this.emit('debug', `Could not place media scanner in manual mode: ${e}`)
 			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${e}`], P.StatusCode.WARNING_MAJOR)
 			this.scannerManualModeBestEffort(true)
-		}).then(() => Promise.all(this.generators.map(gen => gen.init()))).then(() => {
+		})
+		.then(() => Promise.all(this._availableStorage.map(st => this.attachLogEvents(st.id, st.handler))))
+		.then(() => Promise.all(this.generators.map(gen => this.attachLogEvents(gen.constructor.name, gen))))
+		.then(() => Promise.all(this.generators.map(gen => gen.init()))).then(() => {
 			this.emit('debug', `Dispatcher initialized.`)
 		}).then(() => {
 			this.generators.forEach((gen) => {
 				gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
 				this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
 			})
-		})
+		}).then(() => this.restartWorkSteps())
 	}
 
 	async destroy (): Promise<void> {
@@ -279,6 +282,31 @@ export class Dispatcher extends EventEmitter {
 		.then((docs) => {
 			return docs.sort((a, b) => b.priority - a.priority)
 		})
+	}
+	private async restartWorkSteps (): Promise<void> {
+		const brokenItems = await this._workSteps.find({ selector: {
+			status: WorkStepStatus.WORKING
+		}})
+		return Promise.all(brokenItems.docs.map(i => {
+			i.status = WorkStepStatus.IDLE
+			return this._workSteps.put(i)
+		})).then(() => {
+			this.dispatchWork()
+		}).catch((e) => {
+			this.emit('error', `Unable to restart old workSteps: ${e}`)
+		})
+	}
+	/**
+	 * Set a step as WORKING
+	 * @private
+	 * @param  {string} stepId 
+	 * @return Promise<void> 
+	 * @memberof Dispatcher
+	 */
+	private async setStepWorking (stepId: string): Promise<void> {
+		const job = await this._workSteps.get(stepId)
+		job.status = WorkStepStatus.WORKING
+		return this._workSteps.put(job).then(() => {})
 	}
 	/**
 	 * Get all of the highest priority steps for each WorkFlow
@@ -403,7 +431,8 @@ export class Dispatcher extends EventEmitter {
 				if (!this._workers[i].busy) {
 					const nextJob = jobs.shift()
 					if (!nextJob) return // No work is left to be assigned at this moment
-					this._workers[i].doWork(nextJob as GeneralWorkStepDB)
+					this.setStepWorking(nextJob._id)
+					.then(() => this._workers[i].doWork(nextJob as GeneralWorkStepDB))
 					.then((result) => this.processResult(nextJob, result))
 					.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done
