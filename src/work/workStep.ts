@@ -14,12 +14,12 @@ export class WorkStepDB extends WorkStep {
 	workFlowId: string
 }
 
-interface FileWorkStepInitial extends WorkStepInitial {
+export interface FileWorkStepInitial extends WorkStepInitial {
 	action: WorkStepAction.COPY | WorkStepAction.DELETE | WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
 	file: File
 	target: StorageObject
 }
-interface FileWorkStepInitialConstr extends FileWorkStepInitial {
+export interface FileWorkStepInitialConstr extends FileWorkStepInitial {
 	status: WorkStepStatus.IDLE
 }
 /**
@@ -48,12 +48,12 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 		super(init)
 	}
 }
-interface ScannerWorkStepInitial extends WorkStepInitial {
+export interface ScannerWorkStepInitial extends WorkStepInitial {
 	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
 	file: File
 	target: StorageObject
 }
-interface ScannerWorkStepInitialConstr extends ScannerWorkStepInitial {
+export interface ScannerWorkStepInitialConstr extends ScannerWorkStepInitial {
 	status: WorkStepStatus.IDLE
 }
 /**

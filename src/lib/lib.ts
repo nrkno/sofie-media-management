@@ -34,7 +34,7 @@ export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar
 /**
  * Returns the difference between object A and B
  */
-type Difference<A, B extends A> = Pick<B, Exclude<keyof B, keyof A>>
+export type Difference<A, B extends A> = Pick<B, Exclude<keyof B, keyof A>>
 /**
  * Somewhat like _.extend, but with strong types & mandated additional properties
  * @param original Object to be extended
