@@ -9,7 +9,7 @@ let deviceId: string 	= process.env.DEVICE_ID						|| ''
 let deviceToken: string 	= process.env.DEVICE_TOKEN 				|| ''
 let disableWatchdog: boolean = (process.env.DISABLE_WATCHDOG === '1') 		|| false
 let unsafeSSL: boolean			= process.env.UNSAFE_SSL === '1' || false
-let certs: string[] = (process.env.CERTIFICATES || '').split(';') || []
+let certs: string[] = process.env.CERTIFICATES ? process.env.CERTIFICATES.split(';') : []
 
 logPath = logPath
 
