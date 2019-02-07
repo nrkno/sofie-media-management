@@ -151,7 +151,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		try {
 			fileName = sourceStorage.handler.parseUrl(item.url)
 		} catch (e) {
-			throw new Error(`Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+			this.emit('error', `Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+			return
 		}
 
 		const baseObj: TrackedMediaItem = {
@@ -191,7 +192,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		try {
 			fileName = sourceStorage.handler.parseUrl(item.url)
 		} catch (e) {
-			throw new Error(`Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+			this.emit('error', `Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+			return
 		}
 
 		const baseObj: TrackedMediaItem = {
@@ -403,6 +405,13 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				file: file,
 				target: st,
 				priority: 2,
+				status: WorkStepStatus.IDLE
+			}),
+			new ScannerWorkStep({
+				action: WorkStepAction.GENERATE_METADATA,
+				file,
+				target: st,
+				priority: 1,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({
