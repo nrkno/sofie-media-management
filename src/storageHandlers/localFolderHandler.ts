@@ -6,6 +6,7 @@ import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
+import { robocopy } from '../lib/robocopy';
 
 /**
  * A shared method to get the file properties from the underlying file system.
@@ -164,12 +165,34 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			return new Promise((resolve, reject) => {
 				const localFile = this.createFile(file)
 				file.getProperties().then((sourceProperties) => {
-					fs.ensureDir(path.dirname(localFile.url)).then(() => {
-						fs.access(file.url, async (exists) => {
-							if (exists) {
-								await fs.unlink(file.url)
+					fs.ensureDir(path.dirname(localFile.url)).then(async () => {
+						let dstFileNotFound = false
+						try {
+							await fs.access(localFile.url)
+						} catch (e0) {
+							// this is alright, we expect fs.access to throw an exception, since
+							// we expect the target file path not to exist
+							dstFileNotFound = true
+						}
+						if (dstFileNotFound === false) {
+							try {
+								await fs.unlink(localFile.url)
+							} catch (e1) {
+								reject(e1)
 							}
+						}
 
+						if (process.platform === 'win32') {
+							robocopy.copyFile(file.url, localFile.url, (progress) => {
+								if (typeof progressCallback === 'function') {
+									progressCallback(progress)
+								}
+							}).then(() => {
+								resolve()
+							}).catch((e) => {
+								reject(e)
+							})
+						} else {
 							const progressMonitor = setInterval(progressMonitorFunc(localFile, sourceProperties), 500)
 
 							fs.copyFile(file.url, localFile.url, (err) => {
@@ -182,8 +205,9 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 
 								resolve()
 							})
-						})
+						}
 					}, (err) => reject(err))
+					.catch((err) => reject(err))
 				}, (err) => reject(err))
 			})
 		} else {
