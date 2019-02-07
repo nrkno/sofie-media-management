@@ -127,6 +127,7 @@ export interface WorkFlow {
 
 export interface WorkFlowDB extends WorkFlow {
 	steps: never
+	hash: string
 }
 
 export enum WorkFlowSource {

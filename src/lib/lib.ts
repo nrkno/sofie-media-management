@@ -1,4 +1,6 @@
 import * as _ from 'underscore'
+import * as crypto from 'crypto'
+import { WorkFlow } from '../api'
 
 export function getCurrentTime (): number {
 	return Date.now()
@@ -14,6 +16,11 @@ export function randomId (): string {
 
 export function getID (fileName: string): string {
 	return fileName.replace('\\', '/').replace(/\.[\w]+$/i, '').toUpperCase()
+}
+
+export function getHash (str: string): string {
+	const hash = crypto.createHash('sha1')
+	return hash.update(str).digest('base64').replace(/[\+\/\=]/g, '_') // remove +/= from strings, because they cause troubles
 }
 
 export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar?: number): Promise<T> {
@@ -45,3 +52,18 @@ export function extendMandadory<A, B extends A> (original: A, extendObj: Differe
 }
 
 export type LogEvents = 'debug' | 'info' | 'warn' | 'error'
+
+export function getFlowHash (wf: WorkFlow): string {
+	const stringified = (wf.name || 'UNNAMED') + ';' +
+		wf.steps.map(i => _.values(
+			_.omit(i, ['expectedLeft', 'messages', 'priority', 'progress', 'status'])
+			).map(j => {
+				if (typeof j === 'object') {
+					return _.compact(_.values(j).map(k => typeof k === 'object' ? null : k)).join(':')
+				} else {
+					return j
+				}
+			}).join('_')
+		).join(';')
+	return getHash(stringified)
+}

@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
-import { extendMandadory, randomId, LogEvents, getCurrentTime } from '../lib/lib'
+import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
@@ -244,27 +244,45 @@ export class Dispatcher extends EventEmitter {
 	 */
 	private onNewWorkFlow = (wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
 		// TODO: This should also handle extra workflows using a hash of the basic WorkFlow object to check if there is a WORKING or IDLE workflow that is the same
-		const workFlowDb: WorkFlowDB = _.omit(wf, 'steps')
+		const hash = getFlowHash(wf)
+		const wfDb: WorkFlowDB = _.omit(wf, 'steps')
+		wfDb.hash = hash
+
+		console.log(`Current hash: ${hash}`)
+
 		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
 		// persist workflow to db:
-		this._workFlows.put(workFlowDb)
-		.then(() => {
-			this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
-			// persist the workflow steps separately to db:
-			return Promise.all(wf.steps.map(step => {
-				const stepDb = extendMandadory<WorkStep, WorkStepDB>(step, {
-					_id: workFlowDb._id + '_' + randomId(),
-					workFlowId: workFlowDb._id
-				})
-				stepDb.priority = workFlowDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
-				return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
-			}))
-		}, (e) => {
-			this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
-		}).then(() => {
-			this.dispatchWork()
-		}).catch((e) => {
-			this.emit('error', `Adding new WorkFlow to queue failed: ${e}`)
+		this._workFlows.allDocs({
+			include_docs: true
+		}).then((docs) => {
+			for (let i=0; i<docs.rows.length; i++) {
+				const item: WorkFlowDB | undefined = docs.rows[i].doc
+				if (item === undefined) continue
+				if (!item.finished && item.hash === hash) {
+					this.emit('warn', `Ignoring new workFlow: "${wf._id}", because other workflow has been found: "${item._id}".`)
+					return
+				}
+			}
+			// Did not find an outstanding workflow with the same hash
+			this._workFlows.put(wfDb)
+			.then(() => {
+				this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
+				// persist the workflow steps separately to db:
+				return Promise.all(wf.steps.map(step => {
+					const stepDb = extendMandadory<WorkStep, WorkStepDB>(step, {
+						_id: wfDb._id + '_' + randomId(),
+						workFlowId: wfDb._id
+					})
+					stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
+					return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
+				}))
+			}, (e) => {
+				this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
+			}).then(() => {
+				this.dispatchWork()
+			}).catch((e) => {
+				this.emit('error', `Adding new WorkFlow to queue failed: ${e}`)
+			})
 		})
 	}
 	/**
