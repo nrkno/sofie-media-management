@@ -90,7 +90,7 @@ export function keyThrottle<T extends ((key: string, ...args: any[]) => void | P
 			if (p) keyThrottleHistory[id].isPromise = true
 			return p
 		} else {
-			console.log(`Call to ${id} throttled for ${wait}ms`)
+			// console.log(`Call to ${id} throttled for ${wait}ms`)
 			if (keyThrottleHistory[id].timeout) {
 				keyThrottleHistory[id].args = args
 				if (keyThrottleHistory[id].isPromise) {
@@ -100,7 +100,7 @@ export function keyThrottle<T extends ((key: string, ...args: any[]) => void | P
 				keyThrottleHistory[id].args = args
 				keyThrottleHistory[id].timeout = setTimeout(() => {
 					keyThrottleHistory[id].timeout = undefined
-					console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)
+					// console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)
 					const p = fcn(key, ...keyThrottleHistory[id].args)
 					if (p) {
 						p.catch((e) => {
