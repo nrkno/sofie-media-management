@@ -115,3 +115,87 @@ export function keyThrottle<T extends ((key: string, ...args: any[]) => void | P
 		}
 	}) as T
 }
+
+enum syncFunctionFcnStatus {
+	WAITING = 0,
+	RUNNING = 1,
+	DONE = 2
+}
+
+interface SyncFunctionFcn {
+	id: string
+	fcn: Function
+	args: Array<any>
+	timeout: number
+	status: syncFunctionFcnStatus
+}
+const syncFunctionFcns: Array<SyncFunctionFcn> = []
+const syncFunctionRunningFcns: { [id: string]: number } = {}
+/**
+ * Only allow one instane of the function (and its arguments) to run at the same time
+ * If trying to run several at the same time, the subsequent are put on a queue and run later
+ * @param fcn
+ * @param id0 (Optional) Id to determine which functions are to wait for each other. Can use "$0" to refer first argument. Example: "myFcn_$0,$1" will let myFcn(0, 0, 13) and myFcn(0, 1, 32) run in parallell, byt not myFcn(0, 0, 13) and myFcn(0, 0, 14)
+ * @param timeout (Optional)
+ */
+export function atomic<T extends (finished: () => void, ...args: any[]) => void>
+	(fcn: T, id0?: string, timeout: number = 10000): ((...args: any[]) => void) {
+	// TODO: typing for the returned function could be improved with TypeScript 3.3
+
+	let id = id0 || randomId()
+
+	return (function (...args: any[]): void {
+		syncFunctionFcns.push({
+			id: id,
+			fcn: fcn,
+			args: args,
+			timeout: timeout,
+			status: syncFunctionFcnStatus.WAITING
+		})
+		evaluateFunctions()
+	}) as T
+}
+function evaluateFunctions() {
+
+	_.each(syncFunctionFcns, (o) => {
+		if (o.status === syncFunctionFcnStatus.WAITING) {
+
+			let runIt = false
+			// is the function running?
+			if (syncFunctionRunningFcns[o.id]) {
+				// Yes, an instance of the function is running
+				let timeSinceStart = Date.now() - syncFunctionRunningFcns[o.id]
+				if (timeSinceStart > o.timeout) {
+					// The function has run too long
+					runIt = true
+				} else {
+					// Do nothing, another is running
+				}
+			} else {
+				// No other instance of the funciton is running
+				runIt = true
+			}
+			if (runIt) {
+				o.status = syncFunctionFcnStatus.RUNNING
+				syncFunctionRunningFcns[o.id] = Date.now()
+				setTimeout(() => {
+					const finished = () => {
+						delete syncFunctionRunningFcns[o.id]
+						o.status = syncFunctionFcnStatus.DONE
+						evaluateFunctions()
+					}
+					try {
+						o.fcn(finished, ...o.args)
+					} catch (e) {
+						finished()
+					}
+				}, 0)
+			}
+		}
+	})
+	for (let i = syncFunctionFcns.length - 1; i >= 0; i--) {
+		if (syncFunctionFcns[i].status === syncFunctionFcnStatus.DONE) {
+			syncFunctionFcns.splice(i, 1)
+		}
+	}
+}

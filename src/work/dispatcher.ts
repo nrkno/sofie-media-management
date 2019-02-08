@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
-import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, keyThrottle } from '../lib/lib'
+import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, keyThrottle, atomic } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
@@ -242,7 +242,7 @@ export class Dispatcher extends EventEmitter {
 	/**
 	 * Called whenever there's a new workflow from a WorkflowGenerator
 	 */
-	private onNewWorkFlow = (wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
+	private onNewWorkFlow = atomic((finished: () => void, wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
 		// TODO: This should also handle extra workflows using a hash of the basic WorkFlow object to check if there is a WORKING or IDLE workflow that is the same
 		const hash = getFlowHash(wf)
 		const wfDb: WorkFlowDB = _.omit(wf, 'steps')
@@ -260,6 +260,7 @@ export class Dispatcher extends EventEmitter {
 				if (item === undefined) continue
 				if (!item.finished && item.hash === hash) {
 					this.emit('warn', `Ignoring new workFlow: "${wf._id}", because other workflow has been found: "${item._id}".`)
+					finished()
 					return
 				}
 			}
@@ -275,16 +276,22 @@ export class Dispatcher extends EventEmitter {
 					})
 					stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
 					return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
-				}))
+				})).then(() => {
+					finished()
+				})
 			}, (e) => {
 				this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
 			}).then(() => {
 				this.dispatchWork()
+				finished()
 			}).catch((e) => {
 				this.emit('error', `Adding new WorkFlow to queue failed: ${e}`)
+				finished()
 			})
+		}).catch(() => {
+			finished()
 		})
-	}
+	})
 	/**
 	 * Returns the work-steps that are yet to be done and return them in order of priority (highest first)
 	 */
