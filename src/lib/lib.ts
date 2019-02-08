@@ -77,7 +77,7 @@ const keyThrottleHistory: {
 	}
 } = {}
 
-export function keyThrottle<T extends ((key: string, ...args: any[]) => void | Promise<any>)>(fcn: T, wait: number, functionName?: string): T {
+export function throttleOnKey<T extends ((key: string, ...args: any[]) => void | Promise<any>)>(fcn: T, wait: number, functionName?: string): T {
 	return (function (key: string, ...args: any[]): void | Promise<any> {
 		const id = (fcn.name || functionName || randomId()) + '_' + key
 		if (!keyThrottleHistory[id] || (keyThrottleHistory[id].lastCalled + wait < Date.now())) {
@@ -93,13 +93,16 @@ export function keyThrottle<T extends ((key: string, ...args: any[]) => void | P
 			// console.log(`Call to ${id} throttled for ${wait}ms`)
 			if (keyThrottleHistory[id].timeout) {
 				keyThrottleHistory[id].args = args
+				keyThrottleHistory[id].lastCalled = Date.now()
 				if (keyThrottleHistory[id].isPromise) {
 					return Promise.resolve()
 				}
 			} else {
 				keyThrottleHistory[id].args = args
+				keyThrottleHistory[id].lastCalled = Date.now()
 				keyThrottleHistory[id].timeout = setTimeout(() => {
 					keyThrottleHistory[id].timeout = undefined
+					keyThrottleHistory[id].lastCalled = Date.now()
 					// console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)
 					const p = fcn(key, ...keyThrottleHistory[id].args)
 					if (p) {
