@@ -405,6 +405,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				file: file,
 				target: st,
 				priority: 2,
+				keyStep: true,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({
@@ -412,6 +413,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				file,
 				target: st,
 				priority: 1,
+				keyStep: true,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({

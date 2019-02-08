@@ -63,6 +63,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				file,
 				target: st,
 				priority: 1,
+				keyStep: true,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({

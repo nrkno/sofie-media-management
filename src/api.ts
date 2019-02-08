@@ -145,6 +145,8 @@ export interface WorkStepInitial {
 	priority: number
 	/** 0-1 */
 	progress?: number
+	/** If this step is key (mission critical) */
+	keyStep?: boolean
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 }
@@ -160,6 +162,8 @@ export abstract class WorkStep implements WorkStepInitial {
 	priority: number
 	/** 0-1 */
 	progress?: number
+	/** If this step is key (mission critical) */
+	keyStep?: boolean
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 
