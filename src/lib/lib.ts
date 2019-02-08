@@ -67,3 +67,51 @@ export function getFlowHash (wf: WorkFlow): string {
 		).join(';')
 	return getHash(stringified)
 }
+
+const keyThrottleHistory: {
+	[functionName: string]: {
+		args: any[]
+		lastCalled: number
+		timeout: NodeJS.Timer | undefined
+		isPromise?: boolean
+	}
+} = {}
+
+export function keyThrottle<T extends ((key: string, ...args: any[]) => void | Promise<any>)>(fcn: T, wait: number, functionName?: string): T {
+	return (function (key: string, ...args: any[]): void | Promise<any> {
+		const id = (fcn.name || functionName || randomId()) + '_' + key
+		if (!keyThrottleHistory[id] || (keyThrottleHistory[id].lastCalled + wait < Date.now())) {
+			keyThrottleHistory[id] = {
+				args,
+				lastCalled: Date.now(),
+				timeout: undefined,
+			}
+			const p = fcn(key, ...args)
+			if (p) keyThrottleHistory[id].isPromise = true
+			return p
+		} else {
+			console.log(`Call to ${id} throttled for ${wait}ms`)
+			if (keyThrottleHistory[id].timeout) {
+				keyThrottleHistory[id].args = args
+				if (keyThrottleHistory[id].isPromise) {
+					return Promise.resolve()
+				}
+			} else {
+				keyThrottleHistory[id].args = args
+				keyThrottleHistory[id].timeout = setTimeout(() => {
+					keyThrottleHistory[id].timeout = undefined
+					console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)
+					const p = fcn(key, ...keyThrottleHistory[id].args)
+					if (p) {
+						p.catch((e) => {
+							console.error(`There was an error in a throttled function ${fcn.name}: ${e}`)
+						})
+					}
+				}, wait)
+				if (keyThrottleHistory[id].isPromise) {
+					return Promise.resolve()
+				}
+			}
+		}
+	}) as T
+}

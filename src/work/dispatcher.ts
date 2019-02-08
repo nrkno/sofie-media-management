@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
-import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash } from '../lib/lib'
+import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, keyThrottle } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
@@ -597,15 +597,15 @@ export class Dispatcher extends EventEmitter {
 		})
 	}
 
-	private pushWorkFlowToCore (id: string, wf: WorkFlowDB | null) {
+	private pushWorkFlowToCore = keyThrottle((id: string, wf: WorkFlowDB | null) => {
 		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlow, [ id, wf ]).catch(() => {
 			this.emit('error', `Could not update WorkFlow "${id}" in Core`)
 		})
-	}
+	}, 1000, 'pushWorkFlowToCore')
 
-	private pushWorkStepToCore (id: string, ws: WorkStepDB | null) {
+	private pushWorkStepToCore = keyThrottle((id: string, ws: WorkStepDB | null) => {
 		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlowStep, [id, ws]).catch(() => {
 			this.emit('error', `Could not update WorkStep "${id}" in Core`)
 		})
-	}
+	}, 1000, 'pushWorkStepToCore')
 }
