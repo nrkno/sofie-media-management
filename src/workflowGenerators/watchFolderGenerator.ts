@@ -73,7 +73,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 			return this.registerFile(localFile, st, [ targetStorage ]).then(() => {
 				this.emit('debug', `File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`)
 			}).catch((e) => {
-				this.emit('error', `Tracked file registration failed: ${e}`)
+				this.emit('error', `Tracked file registration failed`, e)
 			})
 		}).then(() => {
 			const emitCopy = () => {
@@ -103,7 +103,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				emitCopy()
 			})
 		}).then(() => { })
-		.catch((e) => this.emit('error', `An error was thrown when handling an updated file: ${e}`))
+		.catch((e) => this.emit('error', `An error was thrown when handling an updated file`, e))
 	}
 
 	protected onAdd (st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
@@ -136,14 +136,14 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 						}).then(() => {
 							this.emit('debug', `New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`)
 						}).catch((e) => {
-							this.emit('warn', `Could not find file in target storage: "${storageObject.id}": ${e}`)
+							this.emit('warn', `Could not find file in target storage: "${storageObject.id}"`, e)
 						})
 					}
 				})
 				this._tracked.remove(tmi).then(() => {
 					this.emit('debug', `Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
 				}, (e) => {
-					this.emit('error', `Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
+					this.emit('error', `Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`, e)
 				})
 			}
 			// TODO: generate a pull from sourceStorage?

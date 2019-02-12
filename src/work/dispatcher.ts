@@ -97,7 +97,7 @@ export class Dispatcher extends EventEmitter {
 			})
 		]).then(() => this.initialWorkFlowAndStepsSync())
 		.catch((e) => {
-			this.emit('error', `Failed to synchronize with core: ${e}`)
+			this.emit('error', `Failed to synchronize with core`, e)
 			process.exit(1)
 			throw e
 		})
@@ -148,13 +148,13 @@ export class Dispatcher extends EventEmitter {
 				Promise.all(
 					value.docs.map(i => {
 						return this._workFlows.remove(i)
-						.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}": ${e}`))
+						.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}"`, e))
 					})
 				)
 				.then(() => {
 					this.emit('debug', `Removed ${value.docs.length} stale WorkFlows`)
 				})
-				.catch(e => this.emit('error', `Failed to remove stale workflows: ${e}`))
+				.catch(e => this.emit('error', `Failed to remove stale workflows`, e))
 			}, (reason) => {
 				this.emit('error', `Could not get stale WorkFlows: ${reason}`)
 			})
@@ -172,8 +172,8 @@ export class Dispatcher extends EventEmitter {
 	async init (): Promise<void> {
 		return this.setScannerManualMode(true)
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
-			this.emit('debug', `Could not place media scanner in manual mode: ${e}`)
-			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${e}`], P.StatusCode.WARNING_MAJOR)
+			this.emit('debug', `Could not place media scanner in manual mode`, e)
+			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${JSON.stringify(e)}`], P.StatusCode.WARNING_MAJOR)
 			this.scannerManualModeBestEffort(true)
 		})
 		.then(() => Promise.all(this._availableStorage.map(st => this.attachLogEvents(st.id, st.handler))))
@@ -196,7 +196,7 @@ export class Dispatcher extends EventEmitter {
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
 		.then(() => this.setScannerManualMode(false))
-		.catch((e) => this.emit('error', `Error when disabling manual mode in scanner: ${e}`))
+		.catch((e) => this.emit('error', `Error when disabling manual mode in scanner`, e))
 		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
@@ -207,10 +207,10 @@ export class Dispatcher extends EventEmitter {
 		.removeAllListeners('warn')
 		.removeAllListeners('info')
 		.removeAllListeners('debug')
-		.on('error', (e) => this.emit('error', prefix + ': ' + e))
-		.on('warn', (e) => this.emit('warn', prefix + ': ' + e))
-		.on('info', (e) => this.emit('info', prefix + ': ' + e))
-		.on('debug', (e) => this.emit('debug', prefix + ': ' + e))
+		.on('error', (e, ...args: any[]) => this.emit('error', prefix + ': ' + e, ...args))
+		.on('warn', (e, ...args: any[]) => this.emit('warn', prefix + ': ' + e, ...args))
+		.on('info', (e, ...args: any[]) => this.emit('info', prefix + ': ' + e, ...args))
+		.on('debug', (e, ...args: any[]) => this.emit('debug', prefix + ': ' + e, ...args))
 	}
 
 	/**
@@ -280,12 +280,12 @@ export class Dispatcher extends EventEmitter {
 					finished()
 				})
 			}, (e) => {
-				this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}": ${e}`)
+				this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}"`, e)
 			}).then(() => {
 				this.dispatchWork()
 				finished()
 			}).catch((e) => {
-				this.emit('error', `Adding new WorkFlow to queue failed: ${e}`)
+				this.emit('error', `Adding new WorkFlow to queue failed`, e)
 				finished()
 			})
 		}).catch(() => {
@@ -324,7 +324,7 @@ export class Dispatcher extends EventEmitter {
 		})).then(() => {
 			this.dispatchWork()
 		}).catch((e) => {
-			this.emit('error', `Unable to restart old workSteps: ${e}`)
+			this.emit('error', `Unable to restart old workSteps`, e)
 		})
 	}
 	/**
@@ -386,7 +386,7 @@ export class Dispatcher extends EventEmitter {
 				try {
 					await this.blockStepsInWorkFlow(job.workFlowId)
 				} catch (e) {
-					this.emit('error', `Could not block outstanding work steps: ${e}`)
+					this.emit('error', `Could not block outstanding work steps`, e)
 				}
 				break
 		}
@@ -436,7 +436,7 @@ export class Dispatcher extends EventEmitter {
 						})
 						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfuly' : 'unsuccesfuly'}`))
 						.catch((e) => {
-							this.emit('error', `Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}: ${e}`)
+							this.emit('error', `Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}`, e)
 						})
 					}
 
@@ -445,7 +445,7 @@ export class Dispatcher extends EventEmitter {
 				})
 			})).then(() => {})
 		}).catch((e) => {
-			this.emit('error', `Failed to update WorkFlows' status: ${e}`)
+			this.emit('error', `Failed to update WorkFlows' status`, e)
 		})
 	}
 	/**
@@ -468,7 +468,7 @@ export class Dispatcher extends EventEmitter {
 					.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done
 					.catch(e => {
-						this.emit('error', `There was an unhandled error when handling job "${nextJob._id}": ${e}`)
+						this.emit('error', `There was an unhandled error when handling job "${nextJob._id}"`, e)
 					})
 				}
 			}

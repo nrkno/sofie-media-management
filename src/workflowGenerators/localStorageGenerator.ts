@@ -48,7 +48,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		this.initialCheck(st).then(() => {
 			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" complete.`)
 		}).catch((e) => {
-			this.emit('error', `Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
+			this.emit('error', `Initial ${this.constructor.name} scan for "${st.id}" failed`, e)
 		})
 	}
 
@@ -115,7 +115,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				}), this)
 				this.emit('debug', `New forkflow started for "${e.path}": "${workflowId}".`)
 			}).catch((e) => {
-				this.emit('error', `Tracked file registration failed: ${e}`)
+				this.emit('error', `Tracked file registration failed`, e)
 			})
 		})
 	}
@@ -149,7 +149,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				this._tracked.remove(tmi).then(() => {
 					this.emit('debug', `Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`)
 				}, (e) => {
-					this.emit('error', `Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked: ${e}`)
+					this.emit('error', `Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`, e)
 				})
 			}
 			// TODO: generate a pull from sourceStorage?

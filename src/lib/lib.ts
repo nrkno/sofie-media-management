@@ -107,7 +107,7 @@ export function throttleOnKey<T extends ((key: string, ...args: any[]) => void |
 					const p = fcn(key, ...keyThrottleHistory[id].args)
 					if (p) {
 						p.catch((e) => {
-							console.error(`There was an error in a throttled function ${fcn.name}: ${e}`)
+							console.error(`There was an error in a throttled function ${fcn.name}: ${JSON.stringify(e)}`)
 						})
 					}
 				}, wait)

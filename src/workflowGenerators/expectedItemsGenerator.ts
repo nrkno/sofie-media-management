@@ -85,7 +85,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this._coreHandler.core.onConnected(() => {
 			this.setupSubscribtionsAndObservers()
 			.catch((e) => {
-				this.emit('error', `Error while resetting the subscribtions: ${e}`)
+				this.emit('error', `Error while resetting the subscribtions`, e)
 			})
 		})
 
@@ -167,7 +167,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this._trackedItems.upsert(baseObj._id, () => baseObj)
 		.then(() => this.checkAndEmitCopyWorkflow(baseObj))
 		.catch((e) => {
-			this.emit('error', `An error happened when trying to create a copy workflow: ${e}`)
+			this.emit('error', `An error happened when trying to create a copy workflow`, e)
 		})
 	}
 
@@ -213,14 +213,14 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				this._trackedItems.upsert(tracked._id, () => update)
 				.then(() => this.checkAndEmitCopyWorkflow(update))
 				.catch((e) => {
-					this.emit(`An error happened when trying to create a copy workflow: ${e}`)
+					this.emit(`An error happened when trying to create a copy workflow`, e)
 				})
 			} else {
 				this.emit('warn', `File "${item.path}" is already tracked from a different source storage than "${flow.sourceId}".`)
 			}
 		}, () => {
 			this._trackedItems.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
-				this.emit(`An error happened when trying to create a copy workflow: ${e}`)
+				this.emit(`An error happened when trying to create a copy workflow`, e)
 			})
 		})
 	}
@@ -275,7 +275,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this.emit('debug', `Doing expected items storage check`)
 			this._storages.forEach((i) => this.expectedStorageCheck(i))
 		}).catch((e) => {
-			this.emit('error', `There was an error running the cron job: ${e}`)
+			this.emit('error', `There was an error running the cron job`, e)
 		})
 	}
 
@@ -291,7 +291,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		.then(() => {
 			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" complete.`)
 		}).catch((e) => {
-			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" failed: ${e}.`)
+			this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" failed.`, e)
 		})
 	}
 
@@ -365,7 +365,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this._trackedItems.bulkChange(newItems).then(() => {
 				return newItems.map(item => this.checkAndEmitCopyWorkflow(item))
 			}).catch((e) => {
-				this.emit('error', `There has been an error writing to tracked items database: ${e}`)
+				this.emit('error', `There has been an error writing to tracked items database`, e)
 			})
 		}).catch((_e) => {
 			this.emit('error')
@@ -472,7 +472,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 								}
 							}, (e) => {
 								// Properties could not be fetched
-								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked: ${e}. Attempting to write over.`)
+								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked. Attempting to write over.`, e)
 								this.emitCopyWorkflow(file, i)
 							})
 						}, (_err) => {
@@ -481,13 +481,13 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						})
 					})
 				}).catch((e) => {
-					this.emit('error', `Could not fetch file "${tmi.name}" properties from storage: ${e}`)
+					this.emit('error', `Could not fetch file "${tmi.name}" properties from storage`, e)
 				})
 			} else {
 				this.emit('debug', `File "${tmi.name}" not found in source storage "${tmi.sourceStorageId}".`)
 			}
 		}).catch((e) => {
-			this.emit('error', `File "${tmi.name}" failed to be checked in source storage "${tmi.sourceStorageId}": ${e}`)
+			this.emit('error', `File "${tmi.name}" failed to be checked in source storage "${tmi.sourceStorageId}"`, e)
 		})
 	}
 

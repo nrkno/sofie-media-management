@@ -42,7 +42,7 @@ export class Worker extends EventEmitter {
 	 */
 	async doWork (step: GeneralWorkStepDB): Promise<WorkResult> {
 		const progressReportFailed = (e) => {
-			this.emit('warn', `Worker could not report progress: ${e}`)
+			this.emit('warn', `Worker could not report progress`, e)
 		}
 
 		const unBusyAndFailStep = (p: Promise<WorkResult>) => {
@@ -181,7 +181,7 @@ export class Worker extends EventEmitter {
 					status: WorkStepStatus.DONE
 				})
 			} catch (e) {
-				this.emit('debug', `Failure updating TMI: ${e}`)
+				this.emit('debug', `Failure updating TMI`, e)
 				return this.failStep(e)
 			}
 		} catch (e1) {
