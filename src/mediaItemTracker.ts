@@ -50,7 +50,8 @@ export class TrackedMediaItems extends EventEmitter {
 		}))
 		.then(() => {
 			// Index created
-		}, () => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.'))
+		})
+		.catch((e) => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', e))
 	}
 
 	/**

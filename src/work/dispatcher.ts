@@ -116,14 +116,14 @@ export class Dispatcher extends EventEmitter {
 					}
 				}).then((value) => Promise.all(value.docs.map(i => this._workSteps.remove(i)))
 				.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)))
-				.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps: ${reason}`))
+				.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
 
 				this.pushWorkFlowToCore(change.id, null).catch(() => {})
 			} else if (change.doc) {
 				this.pushWorkFlowToCore(change.id, change.doc).catch(() => {})
 			}
 		}).on('error', (err) => {
-			this.emit('error', `An error happened in the workFlow changes stream: "${err}"`)
+			this.emit('error', `An error happened in the workFlow changes stream`, err)
 		})
 		this._workSteps.changes({
 			since: 'now',
@@ -156,7 +156,7 @@ export class Dispatcher extends EventEmitter {
 				})
 				.catch(e => this.emit('error', `Failed to remove stale workflows`, e))
 			}, (reason) => {
-				this.emit('error', `Could not get stale WorkFlows: ${reason}`)
+				this.emit('error', `Could not get stale WorkFlows`, reason)
 			})
 		}, config.cronJobTime || CRON_JOB_INTERVAL)
 
@@ -605,14 +605,22 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private pushWorkFlowToCore = throttleOnKey((id: string, wf: WorkFlowDB | null) => {
-		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlow, [ id, wf ]).catch(() => {
-			this.emit('error', `Could not update WorkFlow "${id}" in Core`)
+		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlow, [ id, wf ])
+		.then(() => {
+			this.emit('debug', `WorkFlow in core "${id}" updated`)
+		})
+		.catch((e) => {
+			this.emit('error', `Could not update WorkFlow "${id}" in Core`, e)
 		})
 	}, 1000, 'pushWorkFlowToCore')
 
 	private pushWorkStepToCore = throttleOnKey((id: string, ws: WorkStepDB | null) => {
-		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlowStep, [id, ws]).catch(() => {
-			this.emit('error', `Could not update WorkStep "${id}" in Core`)
+		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlowStep, [id, ws])
+		.then(() => {
+			this.emit('debug', `Step in core "${id}" updated`)
+		})
+		.catch((e) => {
+			this.emit('error', `Could not update WorkStep "${id}" in Core`, e)
 		})
 	}, 1000, 'pushWorkStepToCore')
 }
