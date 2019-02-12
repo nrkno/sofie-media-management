@@ -100,7 +100,10 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			atomic: true,
 			disableGlobbing: true,
 			alwaysStat: true,
-			usePolling: this._usePolling
+			usePolling: this._usePolling,
+			// following will only be effective if usePolling: true
+			interval: 3000,
+			binaryInterval: 3000
 		})
 		.on('error', this.onError)
 		.on('add', this.onAdd)
