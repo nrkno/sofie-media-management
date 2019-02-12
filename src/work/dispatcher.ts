@@ -46,6 +46,9 @@ export class Dispatcher extends EventEmitter {
 	private _bestEffort: NodeJS.Timer | undefined = undefined
 	private _workflowCleanUp: NodeJS.Timer | undefined = undefined
 
+	private _cronJobTime: number
+	private _workFlowLingerTime: number
+
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
 	}
@@ -67,6 +70,10 @@ export class Dispatcher extends EventEmitter {
 		this._coreHandler = coreHandler
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
+		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
+		this._workFlowLingerTime = workFlowLingerTime
+
+
 		fs.ensureDirSync('./db')
 		PouchDB.plugin(PouchDBFind)
 		const PrefixedPouchDB = PouchDB.defaults({
@@ -75,90 +82,6 @@ export class Dispatcher extends EventEmitter {
 
 		this._workFlows = new PrefixedPouchDB('workFlows')
 		this._workSteps = new PrefixedPouchDB('workSteps')
-
-		Promise.all([
-			this._workFlows.createIndex({ index: {
-				fields: ['priority']
-			}}).then(() => this._workFlows.createIndex({ index: {
-				fields: ['finished']
-			}})).then(() => {
-				this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
-			}).catch((e) => {
-				throw new Error(`Could not initialize "workFlows" database: ${e}`)
-			}),
-			this._workSteps.createIndex({ index: {
-				fields: ['workFlowId']
-			}}).then(() => this._workSteps.createIndex({ index: {
-				fields: ['status']
-			}})).then(() => {
-				this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
-			}).catch((e) => {
-				throw new Error(`Could not initialize "workSteps" database: ${e}`)
-			})
-		]).then(() => this.initialWorkFlowAndStepsSync())
-		.catch((e) => {
-			this.emit('error', `Failed to synchronize with core`, e)
-			process.exit(1)
-			throw e
-		})
-
-		// Maintain one-to-many relationship for the WorkFlows and WorkSteps
-		// Update WorkFlows and WorkSteps in Core
-		this._workFlows.changes({
-			since: 'now',
-			live: true,
-			include_docs: true
-		}).on('change', (change) => {
-			if (change.deleted) {
-				this._workSteps.find({
-					selector: {
-						workFlowId: change.id
-					}
-				}).then((value) => Promise.all(value.docs.map(i => this._workSteps.remove(i)))
-				.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)))
-				.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
-
-				this.pushWorkFlowToCore(change.id, null).catch(() => {})
-			} else if (change.doc) {
-				this.pushWorkFlowToCore(change.id, change.doc).catch(() => {})
-			}
-		}).on('error', (err) => {
-			this.emit('error', `An error happened in the workFlow changes stream`, err)
-		})
-		this._workSteps.changes({
-			since: 'now',
-			live: true,
-			include_docs: true
-		}).on('change', (change) => {
-			if (change.deleted) {
-				this.pushWorkStepToCore(change.id, null).catch(() => {})
-			} else if (change.doc) {
-				this.pushWorkStepToCore(change.id, change.doc).catch(() => {})
-			}
-		})
-
-		// clean up old work-flows every now and then
-		this._workflowCleanUp = setInterval(() => {
-			this._workFlows.find({
-				selector: {
-					created: { $lt: getCurrentTime() - workFlowLingerTime },
-					finished: true
-				}
-			}).then((value) => {
-				Promise.all(
-					value.docs.map(i => {
-						return this._workFlows.remove(i)
-						.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}"`, e))
-					})
-				)
-				.then(() => {
-					this.emit('debug', `Removed ${value.docs.length} stale WorkFlows`)
-				})
-				.catch(e => this.emit('error', `Failed to remove stale workflows`, e))
-			}, (reason) => {
-				this.emit('error', `Could not get stale WorkFlows`, reason)
-			})
-		}, config.cronJobTime || CRON_JOB_INTERVAL)
 
 		this._availableStorage = availableStorage
 
@@ -170,7 +93,102 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	async init (): Promise<void> {
-		return this.setScannerManualMode(true)
+		return Promise.all([
+			this._workFlows.createIndex({
+				index: {
+					fields: ['priority']
+				}
+			}).then(() => this._workFlows.createIndex({
+				index: {
+					fields: ['finished']
+				}
+			})).then(() => this._workFlows.createIndex({
+				index: {
+					fields: ['finished', 'created']
+				}
+			})).then(() => {
+				this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
+			}).catch((e) => {
+				throw new Error(`Could not initialize "workFlows" database: ${e}`)
+			}),
+			this._workSteps.createIndex({
+				index: {
+					fields: ['workFlowId']
+				}
+			}).then(() => this._workSteps.createIndex({
+				index: {
+					fields: ['status']
+				}
+			})).then(() => {
+				this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
+			}).catch((e) => {
+				throw new Error(`Could not initialize "workSteps" database: ${e}`)
+			})
+		]).then(() => this.initialWorkFlowAndStepsSync())
+		.catch((e) => {
+			this.emit('error', `Failed to synchronize with core`, e)
+			process.exit(1)
+			throw e
+		}).then(() => {
+			// Maintain one-to-many relationship for the WorkFlows and WorkSteps
+			// Update WorkFlows and WorkSteps in Core
+			this._workFlows.changes({
+				since: 'now',
+				live: true,
+				include_docs: true
+			}).on('change', (change) => {
+				if (change.deleted) {
+					this._workSteps.find({
+						selector: {
+							workFlowId: change.id
+						}
+					}).then((value) => Promise.all(value.docs.map(i => this._workSteps.remove(i)))
+						.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)))
+						.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
+	
+					this.pushWorkFlowToCore(change.id, null).catch(() => { })
+				} else if (change.doc) {
+					this.pushWorkFlowToCore(change.id, change.doc).catch(() => { })
+				}
+			}).on('error', (err) => {
+				this.emit('error', `An error happened in the workFlow changes stream`, err)
+			})
+			this._workSteps.changes({
+				since: 'now',
+				live: true,
+				include_docs: true
+			}).on('change', (change) => {
+				if (change.deleted) {
+					this.pushWorkStepToCore(change.id, null).catch(() => { })
+				} else if (change.doc) {
+					this.pushWorkStepToCore(change.id, change.doc).catch(() => { })
+				}
+			})
+	
+			// clean up old work-flows every now and then
+			this._workflowCleanUp = setInterval(() => {
+				this._workFlows.find({
+					selector: {
+						created: { $lt: getCurrentTime() - this._workFlowLingerTime },
+						finished: true
+					}
+				}).then((value) => {
+					Promise.all(
+						value.docs.map(i => {
+							return this._workFlows.remove(i)
+								.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}"`, e))
+						})
+					)
+						.then(() => {
+							this.emit('debug', `Removed ${value.docs.length} stale WorkFlows`)
+						})
+						.catch(e => this.emit('error', `Failed to remove stale workflows`, e))
+				}, (reason) => {
+					this.emit('error', `Could not get stale WorkFlows`, reason)
+				})
+			}, this._cronJobTime)
+		})
+		.then(() => this.setScannerManualMode(true))
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
 			this.emit('debug', `Could not place media scanner in manual mode`, e)
 			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${JSON.stringify(e)}`], P.StatusCode.WARNING_MAJOR)
