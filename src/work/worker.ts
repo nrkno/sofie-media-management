@@ -93,8 +93,19 @@ export class Worker extends EventEmitter {
 	private async reportProgress (step: WorkStepDB, progress: number): Promise<void> {
 		this.emit('debug', `${step._id}: Progress ${Math.round(progress * 100)}%`)
 		return this._db.get(step._id).then((obj) => {
-			(obj as WorkStep).progress = progress
-			return this._db.put(obj).then(() => { })
+			const currentProgress = (obj as WorkStep).progress || 0
+			if (currentProgress < progress) {
+				this.emit('debug', `${step._id}: Higher progress won: ${currentProgress}`),
+				(obj as WorkStep).progress = progress
+				return this._db.put(obj).then(() => { }).catch((e0) => {
+					const e = e0 as PouchDB.Core.Error
+					if (e.status !== 409) {
+						throw e0
+					}
+					return (new Promise(resolve => setTimeout(resolve, Math.random() * 100))).then(() => this.reportProgress(step, progress))
+				})
+			}
+			return Promise.resolve()
 		})
 	}
 
