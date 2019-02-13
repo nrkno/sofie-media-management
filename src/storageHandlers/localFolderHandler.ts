@@ -78,6 +78,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _usePolling: boolean = false
 
 	private _selectiveListen: boolean = false
+	private _listenedPaths: string[] = []
 
 	/**
 	 * Creates an instance of LocalFolderHandler.
@@ -145,13 +146,16 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	}
 
 	addMonitoredFile (name: string): void {
-		if (this._selectiveListen) {
+		if (this._selectiveListen && this._listenedPaths.indexOf(name) < 0) {
+			this._listenedPaths.push(name)
 			this._watcher.add(name)
 		}
 	}
 
 	removeMonitoredFile (name: string): void {
 		if (this._selectiveListen) {
+			const idx = this._listenedPaths.indexOf(name)
+			this._listenedPaths.splice(idx, 1)
 			this._watcher.unwatch(name)
 		}
 	}
