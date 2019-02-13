@@ -95,7 +95,6 @@ export class Worker extends EventEmitter {
 		return this._db.get(step._id).then((obj) => {
 			const currentProgress = (obj as WorkStep).progress || 0
 			if (currentProgress < progress) {
-				this.emit('debug', `${step._id}: Higher progress won: ${currentProgress}`),
 				(obj as WorkStep).progress = progress
 				return this._db.put(obj).then(() => { }).catch((e0) => {
 					const e = e0 as PouchDB.Core.Error
