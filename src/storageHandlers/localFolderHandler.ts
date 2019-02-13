@@ -77,6 +77,14 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 
 	private _usePolling: boolean = false
 
+	private _selectiveListen: boolean = false
+
+	/**
+	 * Creates an instance of LocalFolderHandler.
+	 * @param  {LocalFolderStorage} settings 
+	 * @param  {boolean} [selectiveListen] The underlying FS watcher will not listen for all file changes in the basePath, but instead will await a list of monitored file paths
+	 * @memberof LocalFolderHandler
+	 */
 	constructor (settings: LocalFolderStorage) {
 		super()
 
@@ -87,10 +95,11 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 
 		this._basePath = settings.options.basePath
 		this._usePolling = settings.options.usePolling || false
+		this._selectiveListen = settings.options.onlySelectedFiles || false
 	}
 
 	async init (): Promise<void> {
-		this._watcher = chokidar.watch('.', {
+		this._watcher = chokidar.watch(this._selectiveListen ? [] : '.', {
 			cwd: this._basePath,
 			ignoreInitial: true,
 			awaitWriteFinish: {
@@ -133,6 +142,18 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 
 	async getAllFiles (): Promise<File[]> {
 		return _.compact(_.flatten(await this.traverseFolder(this._basePath)))
+	}
+
+	addMonitoredFile (name: string): void {
+		if (this._selectiveListen) {
+			this._watcher.add(name)
+		}
+	}
+
+	removeMonitoredFile (name: string): void {
+		if (this._selectiveListen) {
+			this._watcher.unwatch(name)
+		}
 	}
 
 	getFile (name: string): Promise<File> {

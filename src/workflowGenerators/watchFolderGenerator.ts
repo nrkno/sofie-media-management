@@ -21,6 +21,10 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					const dstStorage = this._availableStorage.find(i => i.id === item.destinationId)
 
 					if (srcStorage && dstStorage) {
+						if (srcStorage.options.onlySelectedFiles) {
+							this.emit('error', `${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`)
+							return
+						}
 						this.registerStoragePair(srcStorage, dstStorage)
 					}
 				}

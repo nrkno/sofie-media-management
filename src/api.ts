@@ -83,7 +83,11 @@ export interface StorageSettings {
 		write: boolean
 	}
 	type: StorageType
-	options: any
+	options: {
+		/** Only subscribed files can be listened to for changes */
+		onlySelectedFiles?: boolean
+		[key: string]: any
+	}
 }
 export interface LocalFolderStorage extends StorageSettings {
 	type: StorageType.LOCAL_FOLDER
@@ -91,6 +95,7 @@ export interface LocalFolderStorage extends StorageSettings {
 		basePath: string
 		mediaPath?: string
 		usePolling?: boolean
+		onlySelectedFiles?: boolean
 	}
 }
 export interface FileShareStorage extends StorageSettings {
@@ -104,6 +109,7 @@ export interface FileShareStorage extends StorageSettings {
 		mappedNetworkedDriveTarget: string
 		username?: string // wip?
 		password?: string // wip?
+		onlySelectedFiles?: boolean
 	}
 }
 

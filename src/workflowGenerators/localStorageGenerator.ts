@@ -28,6 +28,10 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					const srcStorage = this._availableStorage.find(i => i.id === item.sourceId)
 
 					if (srcStorage) {
+						if (srcStorage.options.onlySelectedFiles) {
+							this.emit('error', `${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`)
+							return
+						}
 						this.registerStorage(srcStorage)
 					}
 				}

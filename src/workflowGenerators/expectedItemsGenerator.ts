@@ -221,9 +221,23 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 	/** Called when an item is removed (from Core) */
-	private onExpectedRemoved = (id: string, _oldValue: any) => {
-		// Don't have to do anything, the cronjob is responsible of handling stale (removed) items later
+	private onExpectedRemoved = (id: string, oldValue: any) => {
 		this.emit('debug', `${id} was removed from Core expectedMediaItems collection`)
+
+		let item: ExpectedMediaItem = oldValue || this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
+		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
+
+		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
+		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
+
+		const storage = this._storages.find(i => i.id === flow.sourceId)
+		if (!storage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
+
+		// add the file to the list of monitored files, if the storage is an 'onlySelectedFiles' storage
+		if (storage.options.onlySelectedFiles) {
+			storage.handler.removeMonitoredFile(storage.handler.parseUrl(item.url))
+		}
 	}
 
 	private getFile (fileName: string, sourceStorageId: string): Promise<File | undefined> {
@@ -451,6 +465,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
 		const storage = this._storages.find(i => i.id === tmi.sourceStorageId)
 		if (!storage) throw new Error(`Could not find storage "${tmi.sourceStorageId}"`)
+
+		// add the file to the list of monitored files, if the storage is an 'onlySelectedFiles' storage
+		if (storage.options.onlySelectedFiles) {
+			storage.handler.addMonitoredFile(tmi.name)
+		}
+
 		// get file from source storage
 		this.getFile(tmi.name, tmi.sourceStorageId)
 		.then((file) => {

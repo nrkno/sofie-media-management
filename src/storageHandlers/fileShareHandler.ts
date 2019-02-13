@@ -23,7 +23,8 @@ export class FileShareHandler extends LocalFolderHandler {
 			type: StorageType.LOCAL_FOLDER,
 			options: {
 				basePath: targetBasePath,
-				usePolling: true
+				usePolling: true,
+				onlySelectedFiles: settings.options.onlySelectedFiles
 			}
 		}
 
