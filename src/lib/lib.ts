@@ -15,7 +15,7 @@ export function randomId (): string {
 }
 
 export function getID (fileName: string): string {
-	return fileName.replace('\\', '/').replace(/\.[\w]+$/i, '').toUpperCase()
+	return fileName.replace(/\\/g, '/').replace(/\.[\w]+$/i, '').toUpperCase()
 }
 
 export function getHash (str: string): string {
