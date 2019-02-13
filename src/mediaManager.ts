@@ -133,13 +133,17 @@ export class MediaManager {
 		.on('warn', this._logger.warn)
 		.on('info', this._logger.info)
 		.on('debug', this._logger.debug)
-
-		await Promise.all(this._availableStorage.map((st) => {
-			st.handler.init().catch(reason => {
-				this.coreHandler.setProcessState(st.id, [`Could not set up storage handler "${st.id}": ${reason}`], P.StatusCode.BAD)
-				throw reason
-			})
-		}))
-		await this._dispatcher.init()
+		
+		try {
+			await Promise.all(this._availableStorage.map((st) => {
+				st.handler.init().catch(reason => {
+					this.coreHandler.setProcessState(st.id, [`Could not set up storage handler "${st.id}": ${reason}`], P.StatusCode.FATAL)
+					throw reason
+				})
+			}))
+			await this._dispatcher.init()
+		} catch (e) {
+			this.coreHandler.setProcessState('Dispatcher', [`Failure during setup: ${e}`], P.StatusCode.FATAL)
+		}
 	}
 }

@@ -124,12 +124,14 @@ export class Dispatcher extends EventEmitter {
 			}).catch((e) => {
 				throw new Error(`Could not initialize "workSteps" database: ${e}`)
 			})
-		]).then(() => this.initialWorkFlowAndStepsSync())
+		])
+		.then(() => this.initialWorkFlowAndStepsSync())
 		.catch((e) => {
 			this.emit('error', `Failed to synchronize with core`, e)
 			process.exit(1)
 			throw e
-		}).then(() => {
+		})
+		.then(() => {
 			// Maintain one-to-many relationship for the WorkFlows and WorkSteps
 			// Update WorkFlows and WorkSteps in Core
 			this._workFlows.changes({
@@ -191,19 +193,24 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.setScannerManualMode(true))
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
 			this.emit('debug', `Could not place media scanner in manual mode`, e)
-			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${JSON.stringify(e)}`], P.StatusCode.WARNING_MAJOR)
+			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${e}`], P.StatusCode.WARNING_MAJOR)
 			this.scannerManualModeBestEffort(true)
 		})
 		.then(() => Promise.all(this._availableStorage.map(st => this.attachLogEvents(st.id, st.handler))))
 		.then(() => Promise.all(this.generators.map(gen => this.attachLogEvents(gen.constructor.name, gen))))
-		.then(() => Promise.all(this.generators.map(gen => gen.init()))).then(() => {
+		.then(() => Promise.all(this.generators.map(gen => gen.init().catch(e => {
+			this._coreHandler.setProcessState(gen.constructor.name, [`Failure when setting up workFlowGenerator: ${e}`], P.StatusCode.FATAL)
+			throw e
+		})))).then(() => {
 			this.emit('debug', `Dispatcher initialized.`)
-		}).then(() => {
+		})
+		.then(() => {
 			this.generators.forEach((gen) => {
 				gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
 				this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
 			})
-		}).then(() => this.restartWorkSteps())
+		})
+		.then(() => this.restartWorkSteps())
 	}
 
 	async destroy (): Promise<void> {
@@ -535,7 +542,7 @@ export class Dispatcher extends EventEmitter {
 						})
 						.then(() => {
 							return new Promise(resolve => {
-								setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+								setTimeout(resolve, 20) // slow it down a bit, maybe remove this later
 							})
 						})
 					}
@@ -596,7 +603,7 @@ export class Dispatcher extends EventEmitter {
 						})
 						.then(() => {
 							return new Promise(resolve => {
-								setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+								setTimeout(resolve, 20) // slow it down a bit, maybe remove this later
 							})
 						})
 					}
