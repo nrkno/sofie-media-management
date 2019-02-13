@@ -172,14 +172,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	/** Called when an item is changed in Core */
-	private onExpectedChanged = (id: string, oldFields: any, clearedFields: any, newFields: any) => {
-		let item: ExpectedMediaItem
-		if (oldFields) {
-			item = _.extend(_.omit(oldFields, clearedFields), newFields) as ExpectedMediaItem
-		} else {
-			item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
-		}
+	private onExpectedChanged = (id: string, _oldFields: any, clearedFields: any, newFields: any) => {
+		let item: ExpectedMediaItem = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
+		item = _.extend(_.omit(item, clearedFields), newFields) as ExpectedMediaItem
 		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
