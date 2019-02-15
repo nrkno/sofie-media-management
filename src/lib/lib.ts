@@ -23,6 +23,11 @@ export function getHash (str: string): string {
 	return hash.update(str).digest('base64').replace(/[\+\/\=]/g, '_') // remove +/= from strings, because they cause troubles
 }
 
+export function getWorkFlowName (name: string): string {
+	const label = name.split(/[\\\/]/).pop()
+	return label || name
+}
+
 export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar?: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		test().then((res) => {

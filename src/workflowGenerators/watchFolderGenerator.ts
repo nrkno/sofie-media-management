@@ -1,5 +1,5 @@
 import * as _ from 'underscore'
-import { getCurrentTime, literal, randomId } from '../lib/lib'
+import { getCurrentTime, literal, randomId, getWorkFlowName } from '../lib/lib'
 import { WorkFlow, WorkFlowSource, WorkStep, WorkStepAction, MediaFlow, MediaFlowType, WorkStepStatus } from '../api'
 import { LocalStorageGenerator, WorkFlowGeneratorEventType } from './localStorageGenerator'
 import { File, StorageObject, StorageEvent, StorageEventType } from '../storageHandlers/storageHandler'
@@ -84,7 +84,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 					_id: workflowId,
-					name: localFile.name,
+					name: getWorkFlowName(localFile.name),
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
@@ -128,7 +128,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 							const workflowId = e.path + '_' + randomId()
 							this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 								_id: workflowId,
-								name: file.name,
+								name: getWorkFlowName(file.name),
 								finished: false,
 								priority: 1,
 								source: WorkFlowSource.SOURCE_STORAGE_REMOVE,

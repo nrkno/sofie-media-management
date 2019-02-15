@@ -2,7 +2,7 @@ import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlo
 import { File, StorageEvent, StorageObject, StorageEventType } from '../storageHandlers/storageHandler'
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 export * from './baseWorkFlowGenerator'
-import { getCurrentTime, literal, randomId } from '../lib/lib'
+import { getCurrentTime, literal, randomId, getWorkFlowName } from '../lib/lib'
 import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStep, MediaFlow, MediaFlowType, WorkStepStatus } from '../api'
 import { ScannerWorkStep } from '../work/workStep'
 
@@ -109,7 +109,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 					_id: workflowId,
-					name: localFile.name,
+					name: getWorkFlowName(localFile.name),
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,
@@ -132,7 +132,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				const workflowId = e.path + '_' + randomId()
 				this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 					_id: workflowId,
-					name: localFile.name,
+					name: getWorkFlowName(localFile.name),
 					finished: false,
 					priority: 1,
 					source: WorkFlowSource.LOCAL_MEDIA_ITEM,

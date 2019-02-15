@@ -8,7 +8,7 @@ import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAc
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection } from 'tv-automation-server-core-integration'
-import { randomId, literal, getCurrentTime } from '../lib/lib'
+import { randomId, literal, getCurrentTime, getWorkFlowName } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 
 /**
@@ -447,7 +447,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const workflowId = file.name + '_' + randomId()
 		this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 			_id: workflowId,
-			name: file.name,
+			name: getWorkFlowName(file.name),
 			finished: false,
 			priority: 1,
 			source: WorkFlowSource.EXPECTED_MEDIA_ITEM,
