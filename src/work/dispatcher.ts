@@ -141,9 +141,12 @@ export class Dispatcher extends EventEmitter {
 						selector: {
 							workFlowId: change.id
 						}
-					}).then((value) => Promise.all(value.docs.map(i => this._workSteps.remove(i)))
-						.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)))
-						.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
+					})
+					.then((value) => {
+						return Promise.all(value.docs.map(i => this._workSteps.remove(i)))
+							.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`))
+					})
+					.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
 
 					this.pushWorkFlowToCore(change.id, null).catch(() => { })
 				} else if (change.doc) {
@@ -428,18 +431,19 @@ export class Dispatcher extends EventEmitter {
 					workFlowId: wf._id
 				}}).then((result) => {
 					// Check if all WorkSteps are finished (not WORKING or IDLE)
-					const isFinished = result.docs.reduce<boolean>((pV, item) => {
+					const isFinished = result.docs.reduce<boolean>((pV, workStep) => {
 						return pV && (
-							(item.status !== WorkStepStatus.WORKING) &&
-							(item.status !== WorkStepStatus.IDLE)
+							workStep.status !== WorkStepStatus.WORKING &&
+							workStep.status !== WorkStepStatus.IDLE
 						)
 					}, true)
 
 					if (isFinished) {
 						// if they are finished, check if all are DONE (not CANCELLED, ERROR or BLOCKED)
-						const isSuccessful = result.docs.reduce<boolean>((pV, item) => {
+						const isSuccessful = result.docs.reduce<boolean>((pV, workStep) => {
 							return pV && (
-								(item.status === WorkStepStatus.DONE)
+								workStep.status === WorkStepStatus.DONE ||
+								workStep.status === WorkStepStatus.SKIPPED
 							)
 						}, true)
 

@@ -111,6 +111,12 @@ export class Worker extends EventEmitter {
 
 	private async doGenerateThumbnail (step: ScannerWorkStep): Promise<WorkResult> {
 		try {
+			if (!this._config.mediaScanner.host) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.SKIPPED,
+					messages: [ 'Media-scanner host not set' ]
+				})
+			}
 			let fileId = getID(step.file.name)
 			if (step.target.options && step.target.options.mediaPath) {
 				fileId = step.target.options.mediaPath + '/' + fileId
@@ -133,6 +139,13 @@ export class Worker extends EventEmitter {
 
 	private async doGeneratePreview (step: ScannerWorkStep): Promise<WorkResult> {
 		try {
+			if (!this._config.mediaScanner.host) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.SKIPPED,
+					messages: [ 'Media-scanner host not set' ]
+				})
+			}
+
 			let fileId = getID(step.file.name)
 			if (step.target.options && step.target.options.mediaPath) {
 				fileId = step.target.options.mediaPath + '/' + fileId
@@ -155,6 +168,12 @@ export class Worker extends EventEmitter {
 
 	private async doGenerateMetadata (step: ScannerWorkStep): Promise<WorkResult> {
 		try {
+			if (!this._config.mediaScanner.host) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.SKIPPED,
+					messages: [ 'Media-scanner host not set' ]
+				})
+			}
 			let fileName = step.file.name.replace('\\', '/')
 			if (step.target.options && step.target.options.mediaPath) {
 				fileName = step.target.options.mediaPath + '/' + fileName
