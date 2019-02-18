@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 export namespace robocopy {
-	export function copyFile(src: string, dst: string, progress?: (progress: number) => void): Promise<void> {
+	export function copyFile (src: string, dst: string, progress?: (progress: number) => void): Promise<void> {
 		if (process.platform !== 'win32') {
 			throw new Error('Only Win32 environment is supported for RoboCopy')
 		}
@@ -18,7 +18,7 @@ export namespace robocopy {
 			let output: string[] = []
 
 			rbcpy.stdout.on('data', (data) => {
-				const m = data.toString().trim().match(/(\d+)\.?(\d+)\%$/) // match the last reported number in the output 
+				const m = data.toString().trim().match(/(\d+)\.?(\d+)\%$/) // match the last reported number in the output
 				if (m) {
 					const number = (parseInt(m[1]) + (parseInt(m[2]) / Math.pow(10, m[2].length))) / 100
 					if (typeof progress === 'function') {

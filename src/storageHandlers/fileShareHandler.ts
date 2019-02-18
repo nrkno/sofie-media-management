@@ -45,7 +45,7 @@ export class FileShareHandler extends LocalFolderHandler {
 		const usedLetters = await networkDrive.list()
 		if (_.keys(usedLetters).indexOf(this._driveLetter) >= 0) {
 			throw new Error(`Drive letter ${this._driveLetter} is already used for another share: "${usedLetters[this._driveLetter]}"`)
-		} 
+		}
 		if (mounts.indexOf(this._driveLetter.toUpperCase()) < 0) {
 			await networkDrive.mount(this._uncPath, this._driveLetter, this._username, this._password)
 		}

@@ -73,7 +73,6 @@ export class Dispatcher extends EventEmitter {
 		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
 		this._workFlowLingerTime = workFlowLingerTime
 
-
 		fs.ensureDirSync('./db')
 		PouchDB.plugin(PouchDBFind)
 		const PrefixedPouchDB = PouchDB.defaults({
@@ -145,7 +144,7 @@ export class Dispatcher extends EventEmitter {
 					}).then((value) => Promise.all(value.docs.map(i => this._workSteps.remove(i)))
 						.then(() => this.emit('debug', `Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)))
 						.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
-	
+
 					this.pushWorkFlowToCore(change.id, null).catch(() => { })
 				} else if (change.doc) {
 					this.pushWorkFlowToCore(change.id, change.doc).catch(() => { })
@@ -164,7 +163,7 @@ export class Dispatcher extends EventEmitter {
 					this.pushWorkStepToCore(change.id, change.doc).catch(() => { })
 				}
 			})
-	
+
 			// clean up old work-flows every now and then
 			this._workflowCleanUp = setInterval(() => {
 				this._workFlows.find({
@@ -273,7 +272,7 @@ export class Dispatcher extends EventEmitter {
 		this._workFlows.allDocs({
 			include_docs: true
 		}).then((docs) => {
-			for (let i=0; i<docs.rows.length; i++) {
+			for (let i = 0; i < docs.rows.length; i++) {
 				const item: WorkFlowDB | undefined = docs.rows[i].doc
 				if (item === undefined) continue
 				if (!item.finished && item.hash === hash) {
@@ -329,7 +328,7 @@ export class Dispatcher extends EventEmitter {
 	/**
 	 * Restart unfinished worksteps (to be run after startup)
 	 * @private
-	 * @return Promise<void> 
+	 * @return Promise<void>
 	 * @memberof Dispatcher
 	 */
 	private async restartWorkSteps (): Promise<void> {
@@ -348,8 +347,8 @@ export class Dispatcher extends EventEmitter {
 	/**
 	 * Set a step as WORKING
 	 * @private
-	 * @param  {string} stepId 
-	 * @return Promise<void> 
+	 * @param  {string} stepId
+	 * @return Promise<void>
 	 * @memberof Dispatcher
 	 */
 	private async setStepWorking (stepId: string): Promise<void> {

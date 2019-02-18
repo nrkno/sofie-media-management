@@ -93,14 +93,14 @@ export abstract class StorageHandler extends EventEmitter {
 
 	/**
 	 * Hint to the storage handler to monitor a specific file. How & if this is implemented is up to the storage handler. It is acceptable to monitor all files within the storage scope and fire events on them, even if addMonitoredPath is used.
-	 * @param  {string} url 
+	 * @param  {string} url
 	 * @return {void}@memberof StorageHandler
 	 */
 	abstract addMonitoredFile (url: string): void
 
 	/**
 	 * Hint to the storage handler that a specific file can be not monitored.
-	 * @param  {string} url 
+	 * @param  {string} url
 	 * @return {void}@memberof StorageHandler
 	 */
 	abstract removeMonitoredFile (url: string): void

@@ -82,7 +82,7 @@ const keyThrottleHistory: {
 	}
 } = {}
 
-export function throttleOnKey<T extends ((key: string, ...args: any[]) => void | Promise<any>)>(fcn: T, wait: number, functionName?: string): T {
+export function throttleOnKey<T extends ((key: string, ...args: any[]) => void | Promise<any>)> (fcn: T, wait: number, functionName?: string): T {
 	return (function (key: string, ...args: any[]): void | Promise<any> {
 		const id = (fcn.name || functionName || randomId()) + '_' + key
 		if (!keyThrottleHistory[id] || (keyThrottleHistory[id].lastCalled + wait < Date.now())) {
@@ -163,7 +163,7 @@ export function atomic<T extends (finished: () => void, ...args: any[]) => void>
 		evaluateFunctions()
 	}) as T
 }
-function evaluateFunctions() {
+function evaluateFunctions () {
 
 	_.each(syncFunctionFcns, (o) => {
 		if (o.status === syncFunctionFcnStatus.WAITING) {

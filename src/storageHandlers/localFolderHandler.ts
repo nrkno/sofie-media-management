@@ -6,7 +6,7 @@ import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
-import { robocopy } from '../lib/robocopy';
+import { robocopy } from '../lib/robocopy'
 
 /**
  * A shared method to get the file properties from the underlying file system.
@@ -81,7 +81,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 
 	/**
 	 * Creates an instance of LocalFolderHandler.
-	 * @param  {LocalFolderStorage} settings 
+	 * @param  {LocalFolderStorage} settings
 	 * @param  {boolean} [selectiveListen] The underlying FS watcher will not listen for all file changes in the basePath, but instead will await a list of monitored file paths
 	 * @memberof LocalFolderHandler
 	 */
