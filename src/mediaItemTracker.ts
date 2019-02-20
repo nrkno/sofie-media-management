@@ -4,6 +4,7 @@ import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
 import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
+import { putToDB } from './lib/lib'
 
 export interface TrackedMediaItem {
 	_id: string
@@ -57,23 +58,19 @@ export class TrackedMediaItems extends EventEmitter {
 	/**
 	 * Find an item of a given ID (will return undefined if not found), transform it using the delta function and store it in the DB
 	 */
-	async upsert (id: string, delta: (tmi: TrackedMediaItemDB | undefined) => TrackedMediaItem): Promise<string> {
-		let original: TrackedMediaItemDB | undefined = undefined
-		try {
-			original = await this._db.get(id)
-		} catch (e0) {
-			const e = e0 as PouchDB.Core.Error
-			if (e.status !== 404) {
-				throw e
-			}
-		}
+	async upsert (id: string, delta: (tmi: TrackedMediaItem) => TrackedMediaItem): Promise<TrackedMediaItem> {
 
-		const modified = delta(original) as TrackedMediaItemDB
-		if (original) {
-			modified._id = original._id
-			modified._rev = original._rev
-		}
-		return this.tryAndPut(id, modified, delta)
+		return putToDB(this._db, id, (original) => {
+
+			const modified = delta(original)
+			if (original) {
+				modified._id = original._id
+				// @ts-ignore
+				modified._rev = original._rev
+			}
+
+			return modified
+		})
 	}
 
 	async put (tmi: TrackedMediaItem): Promise<string> {
@@ -101,21 +98,4 @@ export class TrackedMediaItems extends EventEmitter {
 	async bulkChange (tmis: TrackedMediaItem[]): Promise<void> {
 		return this._db.bulkDocs(tmis).then(({}) => { })
 	}
-
-	/**
-	 * Used internally by the upsert function, will fail if if error != 409, will re-upsert if 409 (revision mismatch)
-	 */
-	private async tryAndPut (id: string, doc: TrackedMediaItemDB, delta: (tmi: TrackedMediaItemDB | undefined) => TrackedMediaItem): Promise<string> {
-		try {
-			await this._db.put(doc)
-			return id
-		} catch (e0) {
-			const e = e0 as PouchDB.Core.Error
-			if (e.status !== 409) {
-				throw e0
-			}
-			return (new Promise(resolve => setTimeout(resolve, 100 * Math.random()))).then(() => this.upsert(id, delta))
-		}
-	}
-
 }

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { literal, LogEvents, getID } from '../lib/lib'
+import { literal, LogEvents, getID, putToDB } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction, DeviceSettings, WorkStep } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
@@ -91,21 +91,20 @@ export class Worker extends EventEmitter {
 	 * @param progress
 	 */
 	private async reportProgress (step: WorkStepDB, progress: number): Promise<void> {
-		this.emit('debug', `${step._id}: Progress ${Math.round(progress * 100)}%`)
-		return this._db.get(step._id).then((obj) => {
-			const currentProgress = (obj as WorkStep).progress || 0
+		// this.emit('debug', `${step._id}: Progress ${Math.round(progress * 100)}%`)
+
+		if (!this._busy) return // Don't report on progress unless we're busy
+
+		return putToDB(this._db, step._id, (obj) => {
+			const currentProgress = obj.progress || 0
 			if (currentProgress < progress) {
-				this.emit('debug', `${step._id}: Higher progress won: ${currentProgress}`),
-				(obj as WorkStep).progress = progress
-				return this._db.put(obj).then(() => { }).catch((e0) => {
-					const e = e0 as PouchDB.Core.Error
-					if (e.status !== 409) {
-						throw e0
-					}
-					return (new Promise(resolve => setTimeout(resolve, Math.random() * 100))).then(() => this.reportProgress(step, progress))
-				})
+				// this.emit('debug', `${step._id}: Higher progress won: ${currentProgress}`),
+				obj.progress = progress
 			}
-			return Promise.resolve()
+			return obj
+		})
+		.then(() => {
+			// nothing
 		})
 	}
 

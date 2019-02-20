@@ -355,9 +355,18 @@ export class Dispatcher extends EventEmitter {
 	 * @memberof Dispatcher
 	 */
 	private async setStepWorking (stepId: string): Promise<void> {
-		const job = await this._workSteps.get(stepId)
-		job.status = WorkStepStatus.WORKING
-		return this._workSteps.put(job).then(() => {})
+
+		return putToDB(this._workSteps, stepId, (step) => {
+			step.status = WorkStepStatus.WORKING
+			return step
+		})
+		.then((step) => {
+			// console.log('done update ' + step._id)
+		})
+		.catch((e) => {
+			// console.log('Error in setStepWorking', e)
+			throw e
+		})
 	}
 	/**
 	 * Get all of the highest priority steps for each WorkFlow
@@ -411,12 +420,14 @@ export class Dispatcher extends EventEmitter {
 				break
 		}
 
-		const workStep = await this._workSteps.get(job._id)
-		workStep.status = result.status
-		workStep.messages = (workStep.messages || []).concat(result.messages || [])
+		return putToDB(this._workSteps, job._id, (workStep) => {
+			workStep.status = result.status
+			workStep.messages = (workStep.messages || []).concat(result.messages || [])
 
-		this.emit('debug', `Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ': ' : '') + (result.messages || []).join(', '))
-		return this._workSteps.put(workStep).then(() => { })
+			this.emit('debug', `Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ', message: ' + result.messages.join(', ') : ''))
+			return workStep
+		})
+		.then(() => { })
 	}
 	/**
 	 * Update the status of all non-finished work-flows
