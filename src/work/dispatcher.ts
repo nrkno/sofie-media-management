@@ -427,7 +427,7 @@ export class Dispatcher extends EventEmitter {
 			step.status = WorkStepStatus.WORKING
 			return step
 		})
-		.then((step) => {
+		.then((_step) => {
 			// console.log('done update ' + step._id)
 		})
 		.catch((e) => {
