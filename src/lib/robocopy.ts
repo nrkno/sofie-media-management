@@ -20,9 +20,9 @@ export namespace robocopy {
 			rbcpy.stdout.on('data', (data) => {
 				const m = data.toString().trim().match(/(\d+)\.?(\d+)\%$/) // match the last reported number in the output
 				if (m) {
-					const number = (parseInt(m[1]) + (parseInt(m[2]) / Math.pow(10, m[2].length))) / 100
+					const num = (parseInt(m[1], 10) + (parseInt(m[2], 10) / Math.pow(10, m[2].length))) / 100
 					if (typeof progress === 'function') {
-						progress(number)
+						progress(num)
 					}
 				}
 				output.push(data.toString())
