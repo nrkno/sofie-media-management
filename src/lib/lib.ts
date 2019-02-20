@@ -207,3 +207,73 @@ function evaluateFunctions () {
 		}
 	}
 }
+export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>
+
+const atomicPromiseQueue: {[id: string]:
+	Array<{
+		resolve: Function
+		reject: Function
+		fcn: Function
+		running: boolean
+	}>
+} = {}
+/**
+ * Returns a promise that resolves when the provided function is run.
+ * Will make sure that there will never be more than one function running at a time (with provided id)
+ * @param id
+ * @param fcn
+ */
+export function atomicPromise <T> (id: string, fcn: (...args: any[]) => Promise<T>): Promise<T> {
+	if (!atomicPromiseQueue[id]) atomicPromiseQueue[id] = []
+	return new Promise((resolve, reject) => {
+
+		atomicPromiseQueue[id].push({
+			resolve,
+			reject,
+			fcn,
+			running: false
+		})
+
+		evaluateAtomicPromiseQueue()
+	})
+}
+function evaluateAtomicPromiseQueue () {
+	_.each(atomicPromiseQueue, (queue) => {
+
+		const first = _.first(queue)
+
+		if (first && !first.running) {
+			first.running = true
+
+			Promise.resolve(first.fcn())
+			.then((result) => {
+				queue.shift()
+				first.resolve(result)
+				evaluateAtomicPromiseQueue()
+			})
+			.catch((error) => {
+				queue.shift()
+				first.reject(error)
+				evaluateAtomicPromiseQueue()
+			})
+		}
+	})
+}
+/** Used to make sure that only ONE put is being performed at the same time */
+export function putToDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
+
+	return atomicPromise('put_' + objId, () => {
+		return db.get(objId)
+		.then((obj) => {
+			const updatedObj = cb(obj)
+			return db.put(updatedObj)
+			.then(() => {
+				return updatedObj
+			})
+		})
+		.catch(e => {
+			console.log('Error in putToDB ', objId)
+			throw e
+		})
+	})
+}
