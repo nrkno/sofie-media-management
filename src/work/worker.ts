@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events'
 import { literal, LogEvents, getID, putToDB } from '../lib/lib'
 
-import { WorkStepStatus, WorkStepAction, DeviceSettings, WorkStep } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
-import { TrackedMediaItems } from '../mediaItemTracker'
+import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
 
 const escapeUrlComponent = encodeURIComponent
@@ -19,6 +19,7 @@ export interface WorkResult {
  */
 export class Worker extends EventEmitter {
 	private _busy: boolean = false
+	private _warmingUp: boolean = false
 	private _db: PouchDB.Database<WorkStepDB>
 	private _trackedMediaItems: TrackedMediaItems
 	private _config: DeviceSettings
@@ -35,7 +36,20 @@ export class Worker extends EventEmitter {
 	}
 
 	get busy (): boolean {
-		return this._busy
+		return this._busy || this._warmingUp
+	}
+	/**
+	 * synchronous pre-step, to be called before doWork.
+	 * run as an intent to start a work (soon)
+	 */
+	warmup () {
+		if (this._warmingUp) throw new Error(`Worker is already warming up`)
+		this._warmingUp = true
+	}
+	cooldown () {
+		if (this._warmingUp) {
+			this._warmingUp = false
+		}
 	}
 	/**
 	 * Receive work from the Dispatcher
@@ -56,8 +70,12 @@ export class Worker extends EventEmitter {
 			})
 		}
 
+		if (!this._warmingUp) throw new Error(`Tried to start worker without warming up`)
+
 		if (this._busy) throw new Error(`Busy worker was assigned to do "${step._id}"`)
 		this._busy = true
+		this._warmingUp = false
+
 		switch (step.action) {
 			case WorkStepAction.COPY:
 				return unBusyAndFailStep(this.doCopy(step,
@@ -199,9 +217,11 @@ export class Worker extends EventEmitter {
 			this.emit('debug', `Starting updating TMI on "${step.file.name}"`)
 			try {
 				await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
-					if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
-					if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
-						tmi.targetStorageIds.push(step.target.id)
+					// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
+					if (tmi) {
+						if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
+							tmi.targetStorageIds.push(step.target.id)
+						}
 					}
 					return tmi
 				})
@@ -223,8 +243,8 @@ export class Worker extends EventEmitter {
 			await step.target.handler.deleteFile(step.file)
 			try {
 				try {
-					await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
-						if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
+					await this._trackedMediaItems.upsert(step.file.name, (tmi: TrackedMediaItem) => {
+						// if (!tmi) throw new Error(`Delete: Item not tracked: ${step.file.name}`)
 						const idx = tmi.targetStorageIds.indexOf(step.target.id)
 						if (idx >= 0) {
 							tmi.targetStorageIds.splice(idx, 1)
