@@ -42,7 +42,18 @@ export class FileShareHandler extends LocalFolderHandler {
 		} catch (e) {
 			mounts = []
 		}
-		const usedLetters = await networkDrive.list()
+
+		let usedLetters: networkDrive.Dictionary<string> = {}
+		try {
+			usedLetters = await networkDrive.list()
+		} catch (e) {
+			if (e.toString().match(/No Instance\(s\) Available/)) {
+				// this error comes when the list is empty
+				usedLetters = {}
+			} else {
+				throw e
+			}
+		}
 		if (_.keys(usedLetters).indexOf(this._driveLetter) >= 0) {
 			throw new Error(`Drive letter ${this._driveLetter} is already used for another share: "${usedLetters[this._driveLetter]}"`)
 		}
