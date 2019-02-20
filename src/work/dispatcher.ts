@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
-import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, throttleOnKey, atomic } from '../lib/lib'
+import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, throttleOnKey, atomic, Omit, putToDB } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
@@ -123,12 +123,15 @@ export class Dispatcher extends EventEmitter {
 			}).catch((e) => {
 				throw new Error(`Could not initialize "workSteps" database: ${e}`)
 			})
-		]).then(() => this.initialWorkFlowAndStepsSync())
+		])
+		.then(() => this.cleanupOldWorkflows())
+		.then(() => this.initialWorkFlowAndStepsSync())
 		.catch((e) => {
 			this.emit('error', `Failed to synchronize with core`, e)
 			process.exit(1)
 			throw e
-		}).then(() => {
+		})
+		.then(() => {
 			// Maintain one-to-many relationship for the WorkFlows and WorkSteps
 			// Update WorkFlows and WorkSteps in Core
 			this._workFlows.changes({
@@ -166,34 +169,22 @@ export class Dispatcher extends EventEmitter {
 					this.pushWorkStepToCore(change.id, change.doc).catch(() => { })
 				}
 			})
-
-			// clean up old work-flows every now and then
+			// clean up old work-flows every now and then:
 			this._workflowCleanUp = setInterval(() => {
-				this._workFlows.find({
-					selector: {
-						created: { $lt: getCurrentTime() - this._workFlowLingerTime },
-						finished: true
-					}
-				}).then((value) => {
-					Promise.all(
-						value.docs.map(i => {
-							return this._workFlows.remove(i)
-								.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}"`, e))
-						})
-					)
-						.then(() => {
-							this.emit('debug', `Removed ${value.docs.length} stale WorkFlows`)
-						})
-						.catch(e => this.emit('error', `Failed to remove stale workflows`, e))
-				}, (reason) => {
-					this.emit('error', `Could not get stale WorkFlows`, reason)
-				})
+				this.cleanupOldWorkflows().catch(e => this.emit('error', 'Unhandled error in cleanupOldWorkflows', e))
 			}, this._cronJobTime)
 		})
-		.then(() => this.setScannerManualMode(true))
+		.then(() => {
+			if (this.useScanner()) {
+				return this.setScannerManualMode(true)
+			} else return Promise.resolve()
+		})
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
 			this.emit('debug', `Could not place media scanner in manual mode`, e)
-			this._coreHandler.setProcessState('MediaScanner', [`Could not place media scanner in manual mode: ${JSON.stringify(e)}`], P.StatusCode.WARNING_MAJOR)
+			this._coreHandler.setProcessState('MediaScanner', [
+				`Could not place media scanner in manual mode: ${JSON.stringify(e)}`
+			], P.StatusCode.WARNING_MAJOR)
+
 			this.scannerManualModeBestEffort(true)
 		})
 		.then(() => Promise.all(this._availableStorage.map(st => this.attachLogEvents(st.id, st.handler))))
@@ -215,11 +206,80 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', 'WorkFlow clean up task destroyed'))
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
-		.then(() => this.setScannerManualMode(false))
+		.then(() => {
+			if (this.useScanner()) {
+				return this.setScannerManualMode(false)
+			} else return Promise.resolve()
+		})
 		.catch((e) => this.emit('error', `Error when disabling manual mode in scanner`, e))
 		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
+	}
+	private cleanupOldWorkflows (): Promise<void> {
+		return this._workFlows.find({
+			selector: {
+				created: { $lt: getCurrentTime() - this._workFlowLingerTime },
+				finished: true
+			}
+		})
+		.then((result) => {
+			return Promise.all(
+				result.docs.map(i => {
+					return this._workFlows.remove(i)
+						.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}"`, e))
+				})
+			)
+			.then(() => {
+				this.emit('debug', `Removed ${result.docs.length} stale WorkFlows`)
+			}, e => {
+				this.emit('error', `Failed to remove stale workflows`, e)
+			})
+		}, (reason) => {
+			this.emit('error', `Could not get stale WorkFlows`, reason)
+		})
+		.then(() => {
+			return Promise.all([
+				this._workFlows.allDocs({
+					include_docs: true,
+					attachments: false
+				}),
+				this._workSteps.allDocs({
+					include_docs: true,
+					attachments: false
+				})
+			])
+		})
+		.then((result) => {
+			// Remove orphaned steps
+
+			const workFlows = result[0].rows
+			const workSteps = result[1].rows
+
+			const map: {[id: string]: true} = {}
+			workFlows.forEach((workFlow) => {
+				map[workFlow.id] = true
+			})
+
+			const ps: Array<Promise<any>> = []
+			workSteps.forEach((step) => {
+				if (step.doc) {
+					if (!map[step.doc.workFlowId]) {
+						ps.push(this._workSteps.remove(step.doc))
+					}
+				}
+			})
+			this.emit('debug', `Removed ${ps.length} orphaned WorkSteps`)
+
+			return Promise.all(ps).catch(error => {
+				this.emit('error', `Error when removing WorkSteps`, error)
+			})
+
+			// nothing
+		})
+		.then(() => {
+			// nothing
+		})
 	}
 
 	private attachLogEvents = (prefix: string, ee: EventEmitter) => {
@@ -238,7 +298,11 @@ export class Dispatcher extends EventEmitter {
 	 */
 	private scannerManualModeBestEffort (manual: boolean) {
 		this._bestEffort = undefined
-		this.setScannerManualMode(manual).then(() => {
+		if (!this.useScanner()) {
+			return
+		}
+		this.setScannerManualMode(manual)
+		.then(() => {
 			this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
 			this.emit('debug', `Scanner placed in manual mode`)
 		}, () => {
@@ -248,11 +312,14 @@ export class Dispatcher extends EventEmitter {
 			}, 5000)
 		})
 	}
-
+	private useScanner (): boolean {
+		return !!(this._config.mediaScanner.host)
+	}
 	/**
 	 * Try to place media-scanner in manual mode and reject promise if fails
 	 */
-	private async setScannerManualMode (manual: boolean): Promise<object> {
+	private async setScannerManualMode (manual: boolean): Promise<void> {
+
 		if (this._bestEffort !== undefined) {
 			clearTimeout(this._bestEffort)
 			this._bestEffort = undefined
@@ -290,7 +357,7 @@ export class Dispatcher extends EventEmitter {
 				this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
 				// persist the workflow steps separately to db:
 				return Promise.all(wf.steps.map(step => {
-					const stepDb = extendMandadory<WorkStep, WorkStepDB>(step, {
+					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
 						_id: wfDb._id + '_' + randomId(),
 						workFlowId: wfDb._id
 					})
@@ -466,7 +533,7 @@ export class Dispatcher extends EventEmitter {
 							wf.success = isSuccessful
 							return this._workFlows.put(wf)
 						})
-						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfuly' : 'unsuccesfuly'}`))
+						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfully' : 'unsuccessfully'}`))
 						.catch((e) => {
 							this.emit('error', `Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}`, e)
 						})
@@ -494,6 +561,9 @@ export class Dispatcher extends EventEmitter {
 				if (!this._workers[i].busy) {
 					const nextJob = jobs.shift()
 					if (!nextJob) return // No work is left to be assigned at this moment
+
+					this._workers[i].warmup()
+
 					this.setStepWorking(nextJob._id)
 					.then(() => this._workers[i].doWork(nextJob as GeneralWorkStepDB))
 					.then((result) => this.processResult(nextJob, result))
@@ -501,6 +571,9 @@ export class Dispatcher extends EventEmitter {
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done
 					.catch(e => {
 						this.emit('error', `There was an unhandled error when handling job "${nextJob._id}"`, e)
+						console.error(e)
+
+						this._workers[i].cooldown()
 					})
 				}
 			}
@@ -529,36 +602,41 @@ export class Dispatcher extends EventEmitter {
 			_.each(coreObjects, (obj: any) => {
 				coreObjRevisions[obj._id] = obj.rev
 			})
-			tasks = tasks.concat(_.compact(_.map(allDocsResponse.rows.filter(i => i.doc && !((i.doc as any).views)), (doc) => {
-				const docId = doc.id
+			tasks = tasks.concat(
+				_.compact(
+					_.map(allDocsResponse.rows.filter(i => i.doc && !((i.doc as any).views)), (doc) => {
+						const docId = doc.id
 
-				if (doc.value.deleted) {
-					if (coreObjRevisions[docId]) {
-						// deleted
-					}
-					return null // handled later
-				} else if (
-					!coreObjRevisions[docId] ||				// created
-					coreObjRevisions[docId] !== doc.value.rev	// changed
-				) {
-					delete coreObjRevisions[docId]
+						if (doc.value.deleted) {
+							if (coreObjRevisions[docId]) {
+								// deleted
+							}
+							return null // handled later
+						} else if (
+							!coreObjRevisions[docId] ||				// created
+							coreObjRevisions[docId] !== doc.value.rev	// changed
+						) {
+							delete coreObjRevisions[docId]
 
-					return () => {
-						return this._workFlows.get(doc.id).then((doc) => {
-							return this.pushWorkFlowToCore(doc._id, doc)
-						})
-						.then(() => {
-							return new Promise(resolve => {
-								setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
-							})
-						})
-					}
-				} else {
-					delete coreObjRevisions[docId]
-					// identical
-					return null
-				}
-			})))
+							return () => {
+								return this._workFlows.get(doc.id)
+								.then((doc) => {
+									return this.pushWorkFlowToCore(doc._id, doc)
+								})
+								.then(() => {
+									return new Promise(resolve => {
+										setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+									})
+								})
+							}
+						} else {
+							delete coreObjRevisions[docId]
+							// identical
+							return null
+						}
+					})
+				)
+			)
 			// The ones left in coreObjRevisions have not been touched, ie they should be deleted
 			_.each(coreObjRevisions, (_rev, id) => {
 				// deleted
@@ -644,7 +722,7 @@ export class Dispatcher extends EventEmitter {
 		.catch((e) => {
 			this.emit('error', `Could not update WorkFlow "${id}" in Core`, e)
 		})
-	}, 1000, 'pushWorkFlowToCore')
+	}, 100, 'pushWorkFlowToCore')
 
 	private pushWorkStepToCore = throttleOnKey((id: string, ws: WorkStepDB | null) => {
 		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlowStep, [id, ws])
@@ -654,5 +732,5 @@ export class Dispatcher extends EventEmitter {
 		.catch((e) => {
 			this.emit('error', `Could not update WorkStep "${id}" in Core`, e)
 		})
-	}, 1000, 'pushWorkStepToCore')
+	}, 100, 'pushWorkStepToCore')
 }
