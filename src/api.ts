@@ -22,7 +22,7 @@ export interface DeviceSettings {
 
 	/** Connection details for the media scanner */
 	mediaScanner: {
-		host: string
+		host?: string
 		port: number
 	}
 }
@@ -134,6 +134,7 @@ export interface WorkFlow {
 export interface WorkFlowDB extends WorkFlow {
 	steps: never
 	hash: string
+	_rev: string
 }
 
 export enum WorkFlowSource {
