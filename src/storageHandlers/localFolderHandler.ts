@@ -171,15 +171,16 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	}
 
 	putFile (file: File, progressCallback?: (progress: number) => void): Promise<File> {
-		function progressMonitorFunc (localFile: File, sourceProperties: FileProperties): (() => void) {
-			return (() => {
-				localFile.getProperties().then((targetProperties) => {
-					if (typeof progressCallback === 'function') {
-						progressCallback(targetProperties.size / sourceProperties.size)
-					}
-				}, () => {
-					// this is just to report progress on the file
-				})
+		function monitorProgress (localFile: File, sourceProperties: FileProperties): void {
+
+			localFile.getProperties()
+			.then((targetProperties) => {
+				if (typeof progressCallback === 'function') {
+					progressCallback(targetProperties.size / sourceProperties.size)
+				}
+			}, (error) => {
+				// this is just to report progress on the file
+				console.log(error)
 			})
 		}
 
@@ -217,7 +218,9 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 								reject(e)
 							})
 						} else {
-							const progressMonitor = setInterval(progressMonitorFunc(localFile, sourceProperties), 500)
+							const progressMonitor = setInterval(() => {
+								monitorProgress(localFile, sourceProperties)
+							}, 1000)
 
 							fs.copyFile(file.url, localFile.url, (err) => {
 								clearInterval(progressMonitor)
@@ -242,7 +245,9 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 					file.getProperties().then((sourceProperties) => {
 						fs.ensureDir(path.dirname(localFile.url)).then(() => {
 							localFile.getWritableStream().then((wStream) => {
-								const progressMonitor = setInterval(progressMonitorFunc(localFile, sourceProperties), 500)
+								const progressMonitor = setInterval(() => {
+									monitorProgress(localFile, sourceProperties)
+								}, 1000)
 
 								function handleError (e) {
 									clearInterval(progressMonitor)
