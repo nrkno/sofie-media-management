@@ -36,12 +36,6 @@ export class FileShareHandler extends LocalFolderHandler {
 	}
 
 	async init (): Promise<void> {
-		let mounts
-		try {
-			mounts = await networkDrive.find(this._uncPath)
-		} catch (e) {
-			mounts = []
-		}
 
 		let usedLetters: networkDrive.Dictionary<string> = {}
 		try {
@@ -55,7 +49,15 @@ export class FileShareHandler extends LocalFolderHandler {
 			}
 		}
 		if (_.keys(usedLetters).indexOf(this._driveLetter) >= 0) {
-			throw new Error(`Drive letter ${this._driveLetter} is already used for another share: "${usedLetters[this._driveLetter]}"`)
+			// Unmount that share:
+			await networkDrive.unmount(this._driveLetter)
+			// throw new Error(`Drive letter ${this._driveLetter} is already used for another share: "${usedLetters[this._driveLetter]}"`)
+		}
+		let mounts
+		try {
+			mounts = await networkDrive.find(this._uncPath)
+		} catch (e) {
+			mounts = []
 		}
 		if (mounts.indexOf(this._driveLetter.toUpperCase()) < 0) {
 			await networkDrive.mount(this._uncPath, this._driveLetter, this._username, this._password)
