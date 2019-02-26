@@ -68,6 +68,9 @@ export class Dispatcher extends EventEmitter {
 		this._tmi = tmi
 		this._config = config
 		this._coreHandler = coreHandler
+
+		this._coreHandler.restartWorkflow = (workflowId) => this.actionRestartWorkflow(workflowId)
+		this._coreHandler.abortWorkflow = (workflowId) => this.actionAbortWorkflow(workflowId)
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
 		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
@@ -215,6 +218,66 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
+	}
+	private async actionRestartWorkflow (workflowId: string) {
+		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+
+		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+
+		// Step 1: Abort the workflow
+		await this.actionAbortWorkflow(wf._id)
+
+		// Step 2: Try to abort the workers and wait for them to finish
+
+		// Reset workers:
+		const ps: Array<Promise<any>> = []
+		this._workers.forEach((worker: Worker) => {
+			if (worker.busy && worker.step) {
+				if (worker.step.workFlowId === workflowId) {
+					worker.tryToAbort()
+
+					ps.push(worker.waitUntilFinished())
+				}
+			}
+		})
+		// Wait for all relevant workers to finish:
+		await Promise.all(ps)
+
+		// Step 3: Reset the workflow
+		const steps = await this._workSteps.find({
+			selector: {
+				workFlowId: workflowId
+			}
+		})
+		// Reset the workflow steps
+		await Promise.all(steps.docs.map((step: WorkStepDB) => {
+			return putToDB(this._workSteps, step._id, (step) => {
+				step.status = WorkStepStatus.IDLE
+				step.messages = ['Restarted, idle...']
+				step.progress = 0
+				step.expectedLeft = undefined
+				return step
+			})
+		}))
+		await putToDB(this._workFlows, wf._id, (wf) => {
+			wf.finished = false
+			wf.success = false
+			// wf.priority = 999
+			return wf
+		})
+
+		this.dispatchWork()
+	}
+	private async actionAbortWorkflow (workflowId: string) {
+		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+
+		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+
+		await this.blockStepsInWorkFlow(wf._id, 'Aborted')
+
+		wf.finished = true
+		wf.success = false
+
 	}
 	private cleanupOldWorkflows (): Promise<void> {
 		return this._workFlows.find({
@@ -454,7 +517,7 @@ export class Dispatcher extends EventEmitter {
 	 * Block all idle steps in a workflow
 	 * @param workFlowId
 	 */
-	private async blockStepsInWorkFlow (workFlowId: string): Promise<void> {
+	private async blockStepsInWorkFlow (workFlowId: string, stepMessage?: string): Promise<void> {
 		return this._workSteps.find({
 			selector: {
 				workFlowId: workFlowId
@@ -464,6 +527,7 @@ export class Dispatcher extends EventEmitter {
 			return Promise.all(result.docs.map(item => {
 				if (item.status === WorkStepStatus.IDLE) {
 					item.status = WorkStepStatus.BLOCKED
+					if (stepMessage) item.messages = [stepMessage]
 					return this._workSteps.put(item).then(() => { })
 				}
 				return Promise.resolve()

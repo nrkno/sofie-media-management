@@ -23,6 +23,8 @@ export class Worker extends EventEmitter {
 	private _db: PouchDB.Database<WorkStepDB>
 	private _trackedMediaItems: TrackedMediaItems
 	private _config: DeviceSettings
+	private _currentStep: GeneralWorkStepDB | undefined
+	private _finishPromises: Array<Function> = []
 
 	constructor (db: PouchDB.Database<WorkStepDB>, tmi: TrackedMediaItems, config: DeviceSettings) {
 		super()
@@ -37,6 +39,9 @@ export class Worker extends EventEmitter {
 
 	get busy (): boolean {
 		return this._busy || this._warmingUp
+	}
+	get step (): GeneralWorkStepDB | undefined {
+		return this._currentStep
 	}
 	/**
 	 * synchronous pre-step, to be called before doWork.
@@ -61,11 +66,11 @@ export class Worker extends EventEmitter {
 
 		const unBusyAndFailStep = (p: Promise<WorkResult>) => {
 			return p.then((result: WorkResult) => {
-				this._busy = false
+				this._notBusyAnymore()
 				return result
 			})
 			.catch((e) => {
-				this._busy = false
+				this._notBusyAnymore()
 				return this.failStep(e)
 			})
 		}
@@ -75,6 +80,7 @@ export class Worker extends EventEmitter {
 		if (this._busy) throw new Error(`Busy worker was assigned to do "${step._id}"`)
 		this._busy = true
 		this._warmingUp = false
+		this._currentStep = step
 
 		switch (step.action) {
 			case WorkStepAction.COPY:
@@ -89,6 +95,36 @@ export class Worker extends EventEmitter {
 			case WorkStepAction.GENERATE_THUMBNAIL:
 				return unBusyAndFailStep(this.doGenerateThumbnail(step))
 		}
+	}
+	/**
+	 * Try to abort current working step.
+	 * This method does not return any feedback on success or not,
+	 * Instead use this.waitUntilFinished to determine if worker is done or not.
+	 */
+	tryToAbort () {
+		if (this.busy && this.step) {
+			// Implement abort functions
+
+		}
+	}
+	/**
+	 * Return a promise which will resolve when the current job is done
+	 */
+	waitUntilFinished (): Promise<void> {
+		if (this._busy) {
+			return new Promise((resolve) => {
+				this._finishPromises.push(resolve)
+			})
+		} else {
+			return Promise.resolve()
+		}
+	}
+	private _notBusyAnymore () {
+		this._busy = false
+		this._finishPromises.forEach(fcn => {
+			fcn()
+		})
+		this._finishPromises = []
 	}
 	/**
 	 * Return a "failed" workResult

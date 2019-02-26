@@ -43,6 +43,12 @@ export class CoreHandler {
 	public deviceStatus: P.StatusCode = P.StatusCode.GOOD
 	public deviceMessages: Array<string> = []
 
+	/**
+	 * Can be called from Core, via this.executeFunction
+	 */
+	public restartWorkflow: ((workflowId: string) => void) | undefined = undefined
+	public abortWorkflow:	((workflowId: string) => void) | undefined = undefined
+
 	private _deviceOptions: DeviceConfig
 	private _onConnected?: () => any
 	private _onChanged?: () => any
