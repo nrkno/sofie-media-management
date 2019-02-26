@@ -282,7 +282,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this.emit('debug', `Purging old expected items`)
 		this.purgeOldExpectedItems()
 		.then(() => {
-			this.emit('debug', `Doing expected items storage check`)
+			// this.emit('debug', `Doing expected items storage check`)
 			this._storages.forEach((i) => this.expectedStorageCheck(i))
 		}).catch((e) => {
 			this.emit('error', `There was an error running the cron job`, e)
@@ -403,7 +403,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				.then(() => this._trackedItems.remove(i))
 				.then(() => this.emit('debug', `Stopped tracking file "${i.name}".`))
 			})).then((results) => {
-				this.emit('info', `Removed ${results.length} expired expected items.`)
+				if (results.length) this.emit('info', `Removed ${results.length} expired expected items.`)
 			})
 		})
 	}

@@ -294,7 +294,7 @@ export class Dispatcher extends EventEmitter {
 				})
 			)
 			.then(() => {
-				this.emit('debug', `Removed ${result.docs.length} stale WorkFlows`)
+				if (result.docs.length) this.emit('debug', `Removed ${result.docs.length} stale WorkFlows`)
 			}, e => {
 				this.emit('error', `Failed to remove stale workflows`, e)
 			})
@@ -332,7 +332,7 @@ export class Dispatcher extends EventEmitter {
 					}
 				}
 			})
-			this.emit('debug', `Removed ${ps.length} orphaned WorkSteps`)
+			if (ps.length) this.emit('debug', `Removed ${ps.length} orphaned WorkSteps`)
 
 			return Promise.all(ps).catch(error => {
 				this.emit('error', `Error when removing WorkSteps`, error)
