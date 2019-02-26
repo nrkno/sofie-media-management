@@ -44,7 +44,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				file: file,
 				target: st,
 				priority: 2,
-				keyStep: true,
+				criticalStep: true,
 				status: WorkStepStatus.IDLE
 			}) as WorkStep
 		].concat(super.generateNewFileWorkSteps(file, st))
@@ -57,7 +57,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				file: file,
 				target: st,
 				priority: 2,
-				keyStep: true,
+				criticalStep: true,
 				status: WorkStepStatus.IDLE
 			})
 		]
