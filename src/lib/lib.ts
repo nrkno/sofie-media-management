@@ -277,3 +277,33 @@ export function putToDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T
 		})
 	})
 }
+/** Like putToDB, but will insert the object if it doesnt exist */
+export function putToDBUpsert <T> (db: PouchDB.Database<T>, objId: string, cb: (obj?: T) => T | undefined): Promise<T | undefined> {
+
+	return atomicPromise('put_' + objId, () => {
+		return db.get(objId)
+		.then((obj: T) => {
+			const updatedObj = cb(obj)
+			if (updatedObj) {
+				return db.put(updatedObj)
+				.then(() => {
+					return updatedObj
+				})
+			} else return Promise.resolve(undefined)
+		}, (error) => {
+			if (error.status === 404) {
+				const updatedObj = cb(undefined)
+				if (updatedObj) {
+					return db.put(updatedObj)
+					.then(() => {
+						return updatedObj
+					})
+				} else return Promise.resolve(undefined)
+			} else throw error
+		})
+		.catch(e => {
+			console.log('Error in putToDBUpsert ', objId)
+			throw e
+		})
+	})
+}

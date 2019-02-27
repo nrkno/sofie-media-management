@@ -4,7 +4,7 @@ import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
 import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
-import { putToDB } from './lib/lib'
+import { putToDBUpsert } from './lib/lib'
 
 export interface TrackedMediaItem {
 	_id: string
@@ -56,14 +56,16 @@ export class TrackedMediaItems extends EventEmitter {
 	}
 
 	/**
-	 * Find an item of a given ID (will return undefined if not found), transform it using the delta function and store it in the DB
+	 * Find an item of a given ID, transform it using the delta function and store it in the DB
+	 * If the item is not found (to be inserted), undefined will be sent to delta-function
+	 * If undefined is returned from delta-function, no update will be made
 	 */
-	async upsert (id: string, delta: (tmi: TrackedMediaItem) => TrackedMediaItem): Promise<TrackedMediaItem> {
+	async upsert (id: string, delta: (tmi?: TrackedMediaItem) => TrackedMediaItem | undefined): Promise<TrackedMediaItem | undefined> {
 
-		return putToDB(this._db, id, (original) => {
+		return putToDBUpsert(this._db, id, (original?: TrackedMediaItem): TrackedMediaItem | undefined => {
 
 			const modified = delta(original)
-			if (original) {
+			if (original && modified) {
 				modified._id = original._id
 				// @ts-ignore
 				modified._rev = original._rev

@@ -252,14 +252,15 @@ export class Worker extends EventEmitter {
 			await step.target.handler.putFile(step.file, reportProgress)
 			this.emit('debug', `Starting updating TMI on "${step.file.name}"`)
 			try {
-				await this._trackedMediaItems.upsert(step.file.name, (tmi) => {
+				await this._trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItem) => {
 					// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 					if (tmi) {
 						if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
 							tmi.targetStorageIds.push(step.target.id)
 						}
+						return tmi
 					}
-					return tmi
+					return undefined
 				})
 				this.emit('debug', `Finish updating TMI on "${step.file.name}"`)
 				return literal<WorkResult>({
