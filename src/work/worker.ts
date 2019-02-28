@@ -322,13 +322,15 @@ export class Worker extends EventEmitter {
 			await step.target.handler.deleteFile(step.file)
 			try {
 				try {
-					await this._trackedMediaItems.upsert(step.file.name, (tmi: TrackedMediaItem) => {
+					await this._trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItem) => {
 						// if (!tmi) throw new Error(`Delete: Item not tracked: ${step.file.name}`)
-						const idx = tmi.targetStorageIds.indexOf(step.target.id)
-						if (idx >= 0) {
-							tmi.targetStorageIds.splice(idx, 1)
-						} else {
-							this.emit('warn', `Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
+						if (tmi) {
+							const idx = tmi.targetStorageIds.indexOf(step.target.id)
+							if (idx >= 0) {
+								tmi.targetStorageIds.splice(idx, 1)
+							} else {
+								this.emit('warn', `Asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`)
+							}
 						}
 						return tmi
 					})
