@@ -162,6 +162,42 @@ export class Worker extends EventEmitter {
 		})
 	}
 
+	private async metaLoopUntilDone(name, uri) {
+		// It was queued, we need to loop with a GET to see if it is done:
+		let notDone = true
+		let queryRes;
+		while (notDone) {
+			queryRes = await request({
+				method: 'GET',
+				uri: uri
+			}).promise()
+			let responseString = ((queryRes || '') as string)
+			if (responseString.startsWith(`202 ${name} OK`)) {
+				notDone = false
+				return literal<WorkResult>({
+					status: WorkStepStatus.DONE
+				})
+			}
+			if (responseString.startsWith('500') || responseString.startsWith('404')) {
+				notDone = false
+				return literal<WorkResult>({
+					status: WorkStepStatus.ERROR,
+					messages: [(queryRes + '')]
+				})
+			}
+			// wait a bit, then retry
+			if (responseString.startsWith(`203 ${name} IN PROGRESS`)) {
+				await new Promise(resolve => {
+					setTimeout(resolve, 1000)
+				})
+			}
+		}
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR,
+			messages: [(queryRes + '')]
+		})
+	}
+
 	private async doGenerateThumbnail (step: ScannerWorkStep): Promise<WorkResult> {
 		try {
 			if (!this._config.mediaScanner.host) {
@@ -174,11 +210,13 @@ export class Worker extends EventEmitter {
 			if (step.target.options && step.target.options.mediaPath) {
 				fileId = step.target.options.mediaPath + '/' + fileId
 			}
-			const res = await request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/thumbnail/generate/${escapeUrlComponent(fileId)}`).promise()
-			if (((res || '') as string).startsWith('202')) {
-				return literal<WorkResult>({
-					status: WorkStepStatus.DONE
-				})
+			const res = await request({
+				method: 'POST',
+				uri: `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
+			}).promise()
+			const resString = ((res || '') as string)
+			if (resString.startsWith('202') || resString.startsWith('203')) {
+				return this.metaLoopUntilDone('THUMBNAIL GENERATE', `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`)
 			} else {
 				return literal<WorkResult>({
 					status: WorkStepStatus.ERROR,
@@ -203,11 +241,13 @@ export class Worker extends EventEmitter {
 			if (step.target.options && step.target.options.mediaPath) {
 				fileId = step.target.options.mediaPath + '/' + fileId
 			}
-			const res = await request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/preview/generate/${escapeUrlComponent(fileId)}`).promise()
-			if (((res || '') as string).startsWith('202')) {
-				return literal<WorkResult>({
-					status: WorkStepStatus.DONE
-				})
+			const res = await request({
+				method: 'POST',
+				uri: `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/preview/generateAsync/${escapeUrlComponent(fileId)}`
+			}).promise()
+			const resString = ((res || '') as string)
+			if (resString.startsWith('202') || resString.startsWith('203')) {
+				return this.metaLoopUntilDone('PREVIEW GENERATE', `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/preview/generateAsync/${escapeUrlComponent(fileId)}`)
 			} else {
 				return literal<WorkResult>({
 					status: WorkStepStatus.ERROR,
@@ -231,11 +271,13 @@ export class Worker extends EventEmitter {
 			if (step.target.options && step.target.options.mediaPath) {
 				fileName = step.target.options.mediaPath + '/' + fileName
 			}
-			const res = await request(`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/media/scan/${escapeUrlComponent(fileName)}`).promise()
-			if (((res || '') as string).startsWith('202')) {
-				return literal<WorkResult>({
-					status: WorkStepStatus.DONE
-				})
+			const res = await request({
+				method: 'POST',
+				uri: `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/media/scanAsync/${escapeUrlComponent(fileName)}`
+			}).promise()
+			const resString = ((res || '') as string)
+			if (resString.startsWith('202') || resString.startsWith('203')) {
+				return this.metaLoopUntilDone('MEDIA INFO', `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/media/scanAsync/${escapeUrlComponent(fileName)}`)
 			} else {
 				return literal<WorkResult>({
 					status: WorkStepStatus.ERROR,
