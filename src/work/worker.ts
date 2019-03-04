@@ -162,10 +162,10 @@ export class Worker extends EventEmitter {
 		})
 	}
 
-	private async metaLoopUntilDone(name, uri) {
+	private async metaLoopUntilDone (name, uri) {
 		// It was queued, we need to loop with a GET to see if it is done:
 		let notDone = true
-		let queryRes;
+		let queryRes
 		while (notDone) {
 			queryRes = await request({
 				method: 'GET',

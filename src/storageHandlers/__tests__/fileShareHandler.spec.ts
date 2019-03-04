@@ -1,9 +1,6 @@
 import * as networkDrive from 'windows-network-drive'
-import * as fs from 'fs-extra'
 import { FileShareHandler } from '../../storageHandlers/fileShareHandler'
-import { StorageEventType, StorageEvent } from '../../storageHandlers/storageHandler'
 import { StorageType } from '../../api'
-import * as path from 'path'
 
 jest.mock('windows-network-drive')
 
