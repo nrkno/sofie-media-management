@@ -113,7 +113,7 @@ describe('LocalFolderHandler', () => {
 			})
 			await lfh1.init()
 			const file = await lfh1.getFile('test-copy.txt')
-			const fileCopy = await lfh0.putFile(file)
+			await lfh0.putFile(file)
 
 			if (fs.existsSync('./test/test-copy.txt')) {
 				done()
