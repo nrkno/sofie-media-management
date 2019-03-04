@@ -107,7 +107,7 @@
     "tslint": "^5.11.0",
     "tslint-config-standard": "^8.0.1",
     "typedoc": "^0.14.2",
-    "typescript": "^2.9.2"
+    "typescript": "^3.3.3333"
   },
   "keywords": [
     "broadcast",
