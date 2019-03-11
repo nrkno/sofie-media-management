@@ -1,6 +1,14 @@
 {
+  "compilerOptions": {
+    "experimentalDecorators": true
+  },
   "extends": "./config/tsconfig.base",
   "exclude": [
     "node_modules/**"
+  ],
+  "types": [
+    "node",
+    "reflect-metadata",
+    "jest"
   ]
 }

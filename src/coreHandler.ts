@@ -6,11 +6,14 @@ import { CoreConnection,
 import * as _ from 'underscore'
 import * as Winston from 'winston'
 import { DeviceConfig } from './mediaManager'
-import * as fs from 'fs'
+const depsVersions = require('./deps-metadata.json')
+import { Process } from './process'
+import { DDPConnectorOptions } from 'tv-automation-server-core-integration/dist/lib/ddpConnector'
 
 export interface CoreConfig {
 	host: string,
 	port: number,
+	ssl: boolean,
 	watchdog: boolean
 }
 export interface PeripheralDeviceCommand {
@@ -32,30 +35,49 @@ export interface PeripheralDeviceCommand {
 export class CoreHandler {
 	core: CoreConnection
 	logger: Winston.LoggerInstance
+
 	public _observers: Array<any> = []
 	public deviceSettings: {[key: string]: any} = {}
 
 	// Mediascanner statuses: temporary implementation, to be moved into casparcg device later:
-	public mediaScannerStatus: P.StatusCode = P.StatusCode.GOOD
-	public mediaScannerMessages: Array<string> = []
+	public deviceStatus: P.StatusCode = P.StatusCode.GOOD
+	public deviceMessages: Array<string> = []
+
+	/**
+	 * Can be called from Core, via this.executeFunction
+	 */
+	public restartWorkflow: ((workflowId: string) => void) | undefined = undefined
+	public abortWorkflow:	((workflowId: string) => void) | undefined = undefined
 
 	private _deviceOptions: DeviceConfig
 	private _onConnected?: () => any
+	private _onChanged?: () => any
 	private _executedFunctions: {[id: string]: boolean} = {}
 	private _coreConfig?: CoreConfig
+	private _process?: Process
 
 	private _statusInitialized: boolean = false
 	private _statusDestroyed: boolean = false
 
+	private _processState: {
+		[key: string]: {
+			comments: string[],
+			status: P.StatusCode
+		}
+	}
+
 	constructor (logger: Winston.LoggerInstance, deviceOptions: DeviceConfig) {
 		this.logger = logger
 		this._deviceOptions = deviceOptions
+		this._processState = {}
 	}
 
-	async init (config: CoreConfig): Promise<void> {
+	async init (config: CoreConfig, process: Process): Promise<void> {
 		// this.logger.info('========')
 		this._statusInitialized = false
 		this._coreConfig = config
+		this._process = process
+
 		this.core = new CoreConnection(this.getCoreConnectionOptions('Media Manager', 'MediaManager', true))
 
 		this.core.onConnected(() => {
@@ -73,7 +95,17 @@ export class CoreHandler {
 			this.logger.error('Core Error: ' + (err.message || err.toString() || err))
 		})
 
-		await this.core.init(config)
+		let ddpConfig: DDPConnectorOptions = {
+			host: config.host,
+			port: config.port,
+			ssl: config.ssl
+		}
+		if (this._process && this._process.certificates.length) {
+			ddpConfig.tlsOpts = {
+				ca: this._process.certificates
+			}
+		}
+		await this.core.init(ddpConfig)
 		this.logger.info('Core id: ' + this.core.deviceId)
 		await this.setupObserversAndSubscriptions()
 		this._statusInitialized = true
@@ -92,7 +124,7 @@ export class CoreHandler {
 		])
 		this.logger.info('Core: Subscriptions are set up!')
 		if (this._observers.length) {
-			this.logger.info('CoreMos: Clearing observers..')
+			this.logger.info('Core: Clearing observers..')
 			this._observers.forEach((obs) => {
 				obs.stop()
 			})
@@ -132,7 +164,7 @@ export class CoreHandler {
 			credentials = CoreConnection.getCredentials(subDeviceId)
 		}
 		let options: CoreOptions = _.extend(credentials, {
-			deviceType: P.DeviceType.OTHER,
+			deviceType: P.DeviceType.MEDIA_MANAGER,
 			deviceName: name,
 			watchDog: (this._coreConfig ? this._coreConfig.watchdog : true)
 		})
@@ -141,6 +173,9 @@ export class CoreHandler {
 	}
 	onConnected (fcn: () => any) {
 		this._onConnected = fcn
+	}
+	onChanged (fcn: () => any) {
+		this._onChanged = fcn
 	}
 	onDeviceChanged (id: string) {
 		if (id === this.core.deviceId) {
@@ -174,6 +209,8 @@ export class CoreHandler {
 
 				this.logger.debug('End test debug logging')
 			}
+
+			if (this._onChanged) this._onChanged()
 		}
 	}
 	get logDebug (): boolean {
@@ -287,10 +324,10 @@ export class CoreHandler {
 		let statusCode = P.StatusCode.GOOD
 		let messages: Array<string> = []
 
-		if (this.mediaScannerStatus !== P.StatusCode.GOOD) {
-			statusCode = this.mediaScannerStatus
-			if (this.mediaScannerMessages) {
-				_.each(this.mediaScannerMessages, (msg) => {
+		if (this.deviceStatus !== P.StatusCode.GOOD) {
+			statusCode = this.deviceStatus
+			if (this.deviceMessages) {
+				_.each(this.deviceMessages, (msg) => {
 					messages.push(msg)
 				})
 			}
@@ -309,36 +346,39 @@ export class CoreHandler {
 			messages: messages
 		})
 	}
+	setProcessState = (processName: string, comments: string[], status: P.StatusCode) => {
+		this._processState[processName] = {
+			comments,
+			status
+		}
+
+		const deviceState = _.reduce(this._processState, (memo, value) => {
+			let status = memo.status
+			let comments = memo.comments
+			if (value.status > status) {
+				status = value.status
+			}
+			if (value.comments) {
+				comments = comments.concat(value.comments)
+			}
+
+			return {
+				status,
+				comments
+			}
+		}, {
+			status: P.StatusCode.GOOD,
+			comments: [] as string[]
+		})
+
+		this.deviceStatus = deviceState.status
+		this.deviceMessages = deviceState.comments
+		this.updateCoreStatus().catch(() => {
+			this.logger.error('Could not update Media Manager status in Core')
+		})
+	}
 	private _getVersions () {
-		let versions: {[packageName: string]: string} = {}
-
-		if (process.env.npm_package_version) {
-			versions['_process'] = process.env.npm_package_version
-		}
-
-		let dirNames: Array<string> = [
-			// TODO: add any relevant sub-libraries here, to report to Core
-			'tv-automation-server-core-integration',
-			// 'timeline-state-resolver',
-		]
-		try {
-			let nodeModulesDirectories = fs.readdirSync('node_modules')
-			_.each(nodeModulesDirectories, (dir) => {
-				try {
-					if (dirNames.indexOf(dir) !== -1) {
-						let file = 'node_modules/' + dir + '/package.json'
-						file = fs.readFileSync(file, 'utf8')
-						let json = JSON.parse(file)
-						versions[dir] = json.version || 'N/A'
-					}
-				} catch (e) {
-					this.logger.error(e)
-				}
-			})
-		} catch (e) {
-			this.logger.error(e)
-		}
-		return versions
+		return depsVersions || {}
 	}
 
 }

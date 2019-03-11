@@ -9,6 +9,9 @@
     "semicolon": [
       true,
       "never"
-    ]
+    ],
+    "triple-equals": true,
+    "no-empty": false,
+    "quotemark": [true, "single"]
   }
 }
