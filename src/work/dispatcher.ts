@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
-import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, throttleOnKey, atomic, Omit, putToDB } from '../lib/lib'
+import { extendMandadory, randomId, LogEvents, getCurrentTime, getFlowHash, throttleOnKey, atomic, Omit, updateDB } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
@@ -251,7 +251,7 @@ export class Dispatcher extends EventEmitter {
 		})
 		// Reset the workflow steps
 		await Promise.all(steps.docs.map((step: WorkStepDB) => {
-			return putToDB(this._workSteps, step._id, (step) => {
+			return updateDB(this._workSteps, step._id, (step) => {
 				step.status = WorkStepStatus.IDLE
 				step.messages = ['Restarted, idle...']
 				step.progress = 0
@@ -259,7 +259,7 @@ export class Dispatcher extends EventEmitter {
 				return step
 			})
 		}))
-		await putToDB(this._workFlows, wf._id, (wf) => {
+		await updateDB(this._workFlows, wf._id, (wf) => {
 			wf.finished = false
 			wf.success = false
 			// wf.priority = 999
@@ -486,7 +486,7 @@ export class Dispatcher extends EventEmitter {
 	 */
 	private async setStepWorking (stepId: string): Promise<void> {
 
-		return putToDB(this._workSteps, stepId, (step) => {
+		return updateDB(this._workSteps, stepId, (step) => {
 			step.status = WorkStepStatus.WORKING
 			return step
 		})
@@ -551,7 +551,7 @@ export class Dispatcher extends EventEmitter {
 				break
 		}
 
-		return putToDB(this._workSteps, job._id, (workStep) => {
+		return updateDB(this._workSteps, job._id, (workStep) => {
 			workStep.status = result.status
 			workStep.messages = (workStep.messages || []).concat(result.messages || [])
 

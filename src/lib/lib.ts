@@ -260,7 +260,7 @@ function evaluateAtomicPromiseQueue () {
 	})
 }
 /** Used to make sure that only ONE put is being performed at the same time */
-export function putToDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
+export function updateDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
 
 	return atomicPromise('put_' + objId, () => {
 		return db.get(objId)
@@ -272,7 +272,7 @@ export function putToDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T
 			})
 		})
 		.catch(e => {
-			console.log('Error in putToDB ', objId)
+			console.log('Error in updateDB ', objId)
 			throw e
 		})
 	})

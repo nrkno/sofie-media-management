@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { literal, LogEvents, getID, putToDB } from '../lib/lib'
+import { literal, LogEvents, getID, updateDB } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction, DeviceSettings } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
@@ -149,7 +149,7 @@ export class Worker extends EventEmitter {
 
 		if (!this._busy) return // Don't report on progress unless we're busy
 
-		return putToDB(this._db, step._id, (obj) => {
+		return updateDB(this._db, step._id, (obj) => {
 			const currentProgress = obj.progress || 0
 			if (currentProgress < progress) {
 				// this.emit('debug', `${step._id}: Higher progress won: ${currentProgress}`),
