@@ -28,7 +28,7 @@ export function getWorkFlowName (name: string): string {
 	return label || name
 }
 
-export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar?: number): Promise<T> {
+export function retryNumber<T> (test: () => Promise<T>, count: number, timeout?: number, doneSoFar?: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		test().then((res) => {
 			resolve(res)
@@ -37,7 +37,13 @@ export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar
 			if (doneSoFar >= count) {
 				reject(reason)
 			} else {
-				retryNumber(test, count, doneSoFar).then(resolve, reject)
+				if (timeout !== undefined && timeout > 0) {
+					setTimeout(() => {
+						retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+					}, timeout)
+				} else {
+					retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+				}
 			}
 		})
 	})

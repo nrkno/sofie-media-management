@@ -8,7 +8,7 @@ import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAc
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection } from 'tv-automation-server-core-integration'
-import { randomId, literal, getCurrentTime, getWorkFlowName } from '../lib/lib'
+import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 
 /**
@@ -47,6 +47,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	/** The default linger time */
 	private LINGER_TIME = 3 * 24 * 60 * 60 * 1000 // 3 days (ms)
+
+	/** Time to retry failed operations */
+	private RETRY_COUNT = 5
+	/** Delay between retries */
+	private RETRY_TIMEOUT = 2000
 
 	constructor (
 		availableStorage: StorageObject[],
@@ -396,10 +401,23 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			})
 			return Promise.all(toBeDeleted.map((i: TrackedMediaItemDB) => {
 				return Promise.all(this._allStorages
-				// get only storages that contain the file as a target storage
-				.filter(j => (i.targetStorageIds.indexOf(j.id) >= 0))
-				// remove the file from all the storages that contain it as a target
-				.map((j) => j.handler.getFile(i.name).then((f) => j.handler.deleteFile(f))))
+					// get only storages that contain the file as a target storage
+					.filter(j => (i.targetStorageIds.indexOf(j.id) >= 0))
+					// remove the file from all the storages that contain it as a target
+					.map((j) => j.handler.getFile(i.name)
+						.then((f) => retryNumber(() => j.handler.deleteFile(f), this.RETRY_COUNT, this.RETRY_TIMEOUT)
+							.then(() => true)
+							.catch((e) => {
+								this.emit('warn', `File "${i.name}" could not be deleted from source storage "${j.id}" after ${this.RETRY_COUNT} retries`, e)
+								return false
+							}
+						))
+						.catch((e) => {
+							this.emit('warn', `File "${i.name}" could not be found on source storage "${j.id}"`, e)
+							return false
+						})
+					)
+				)
 				.then(() => this._trackedItems.remove(i))
 				.then(() => this.emit('debug', `Stopped tracking file "${i.name}".`))
 			})).then((results) => {
