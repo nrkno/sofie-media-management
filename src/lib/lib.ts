@@ -28,7 +28,7 @@ export function getWorkFlowName (name: string): string {
 	return label || name
 }
 
-export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar?: number): Promise<T> {
+export function retryNumber<T> (test: () => Promise<T>, count: number, timeout?: number, doneSoFar?: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		test().then((res) => {
 			resolve(res)
@@ -37,7 +37,13 @@ export function retryNumber<T> (test: () => Promise<T>, count: number, doneSoFar
 			if (doneSoFar >= count) {
 				reject(reason)
 			} else {
-				retryNumber(test, count, doneSoFar).then(resolve, reject)
+				if (timeout !== undefined && timeout > 0) {
+					setTimeout(() => {
+						retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+					}, timeout)
+				} else {
+					retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+				}
 			}
 		})
 	})
@@ -260,7 +266,7 @@ function evaluateAtomicPromiseQueue () {
 	})
 }
 /** Used to make sure that only ONE put is being performed at the same time */
-export function putToDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
+export function updateDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
 
 	return atomicPromise('put_' + objId, () => {
 		return db.get(objId)
@@ -272,7 +278,7 @@ export function putToDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T
 			})
 		})
 		.catch(e => {
-			console.log('Error in putToDB ', objId)
+			console.log('Error in updateDB ', objId)
 			throw e
 		})
 	})
