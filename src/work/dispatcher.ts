@@ -253,7 +253,7 @@ export class Dispatcher extends EventEmitter {
 		await Promise.all(steps.docs.map((step: WorkStepDB) => {
 			return updateDB(this._workSteps, step._id, (step) => {
 				step.status = WorkStepStatus.IDLE
-				step.messages = ['Restarted, idle...']
+				step.messages = [`Restarted at ${(new Date()).toTimeString()}`]
 				step.progress = 0
 				step.expectedLeft = undefined
 				return step

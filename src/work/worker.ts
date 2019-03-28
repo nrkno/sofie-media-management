@@ -84,12 +84,12 @@ export class Worker extends EventEmitter {
 
 		switch (step.action) {
 			case WorkStepAction.COPY:
-				return unBusyAndFailStep(this.doCopy(step,
+				return unBusyAndFailStep(this.doCompositeCopy(step,
 					(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed)))
 			case WorkStepAction.DELETE:
 				return unBusyAndFailStep(this.doDelete(step))
 			case WorkStepAction.GENERATE_METADATA:
-				return unBusyAndFailStep(this.doGenerateMetadata(step))
+				return unBusyAndFailStep(this.doGenerateAdvancedMetadata(step))
 			case WorkStepAction.GENERATE_PREVIEW:
 				return unBusyAndFailStep(this.doGeneratePreview(step))
 			case WorkStepAction.GENERATE_THUMBNAIL:
@@ -259,6 +259,36 @@ export class Worker extends EventEmitter {
 		}
 	}
 
+	private async doGenerateAdvancedMetadata (step: ScannerWorkStep): Promise<WorkResult> {
+		try {
+			if (!this._config.mediaScanner.host) {
+				return literal<WorkResult>({
+					status: WorkStepStatus.SKIPPED,
+					messages: ['Media-scanner host not set']
+				})
+			}
+			let fileName = step.file.name.replace('\\', '/')
+			if (step.target.options && step.target.options.mediaPath) {
+				fileName = step.target.options.mediaPath + '/' + fileName
+			}
+			const res = await request({
+				method: 'POST',
+				uri: `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/metadata/scanAsync/${escapeUrlComponent(fileName)}`
+			}).promise()
+			const resString = ((res || '') as string)
+			if (resString.startsWith('202') || resString.startsWith('203')) {
+				return this.metaLoopUntilDone('METADATA', `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/metadata/scanAsync/${escapeUrlComponent(fileName)}`)
+			} else {
+				return literal<WorkResult>({
+					status: WorkStepStatus.ERROR,
+					messages: [(res + '')]
+				})
+			}
+		} catch (e) {
+			return this.failStep(e)
+		}
+	}
+
 	private async doGenerateMetadata (step: ScannerWorkStep): Promise<WorkResult> {
 		try {
 			if (!this._config.mediaScanner.host) {
@@ -286,6 +316,25 @@ export class Worker extends EventEmitter {
 			}
 		} catch (e) {
 			return this.failStep(e)
+		}
+	}
+
+	private async doCompositeCopy (step: FileWorkStep, reportProgress?: (progress: number) => void): Promise<WorkResult> {
+		const copyResult = await this.doCopy(step, reportProgress)
+		if (copyResult.status === WorkStepStatus.DONE) {
+			const metadataResult = await this.doGenerateMetadata(literal<ScannerWorkStep>({
+				action: WorkStepAction.GENERATE_METADATA,
+				file: step.file,
+				target: step.target,
+				status: WorkStepStatus.IDLE,
+				priority: 1
+			}))
+			return literal<WorkResult>({
+				status: metadataResult.status,
+				messages: (copyResult.messages || []).concat(metadataResult.messages || [])
+			})
+		} else {
+			return copyResult
 		}
 	}
 
