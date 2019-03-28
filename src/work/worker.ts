@@ -267,17 +267,17 @@ export class Worker extends EventEmitter {
 					messages: ['Media-scanner host not set']
 				})
 			}
-			let fileName = step.file.name.replace('\\', '/')
+			let fileId = getID(step.file.name)
 			if (step.target.options && step.target.options.mediaPath) {
-				fileName = step.target.options.mediaPath + '/' + fileName
+				fileId = step.target.options.mediaPath + '/' + fileId
 			}
 			const res = await request({
 				method: 'POST',
-				uri: `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/metadata/scanAsync/${escapeUrlComponent(fileName)}`
+				uri: `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
 			}).promise()
 			const resString = ((res || '') as string)
 			if (resString.startsWith('202') || resString.startsWith('203')) {
-				return this.metaLoopUntilDone('METADATA', `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/metadata/scanAsync/${escapeUrlComponent(fileName)}`)
+				return this.metaLoopUntilDone('METADATA', `http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/metadata/generateAsync/${escapeUrlComponent(fileId)}`)
 			} else {
 				return literal<WorkResult>({
 					status: WorkStepStatus.ERROR,
