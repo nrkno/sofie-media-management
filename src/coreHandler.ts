@@ -119,7 +119,7 @@ export class CoreHandler {
 			this.core.autoSubscribe('peripheralDevices', {
 				_id: this.core.deviceId
 			}),
-			this.core.autoSubscribe('studioInstallationOfDevice', this.core.deviceId),
+			this.core.autoSubscribe('studioOfDevice', this.core.deviceId),
 			this.core.autoSubscribe('peripheralDeviceCommands', this.core.deviceId)
 		])
 		this.logger.info('Core: Subscriptions are set up!')
