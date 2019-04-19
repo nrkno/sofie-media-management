@@ -53,6 +53,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	/** Delay between retries */
 	private RETRY_TIMEOUT = 2000
 
+	private _cachedStudioId: string | undefined = undefined
+
 	constructor (
 		availableStorage: StorageObject[],
 		tracked: TrackedMediaItems,
@@ -110,7 +112,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this._expectedMediaItemsSubscription = await this._coreHandler.core.subscribe('expectedMediaItems', {
 			mediaFlowId: {
 				$in: this._handledFlows.map(i => i.id)
-			}
+			},
+			studioId: this._getStudioId()
 		})
 		this.emit('debug', 'Subscribed to expectedMediaItems.')
 
@@ -135,6 +138,31 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this.observer.stop()
 		})
 	}
+
+
+	private _getPeripheralDevice () {
+		let peripheralDevices = this._coreHandler.core.getCollection('peripheralDevices')
+		return peripheralDevices.findOne(this._coreHandler.core.deviceId)
+	}
+	private _getStudio (): any | null {
+		let peripheralDevice = this._getPeripheralDevice()
+		if (peripheralDevice) {
+			let studios = this._coreHandler.core.getCollection('studios')
+			return studios.findOne(peripheralDevice.studioId)
+		}
+		return null
+	}
+	private _getStudioId (): string | null {
+		if (this._cachedStudioId) return this._cachedStudioId
+
+		let studio = this._getStudio()
+		if (studio) {
+			this._cachedStudioId = studio._id
+			return studio._id
+		}
+		return null
+	}
+
 	/** Called when an item is added (from Core) */
 	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
 		let item: ExpectedMediaItem
