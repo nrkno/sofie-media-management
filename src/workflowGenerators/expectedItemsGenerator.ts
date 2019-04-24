@@ -269,7 +269,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		// add the file to the list of monitored files, if the storage is an 'onlySelectedFiles' storage
 		if (storage.options.onlySelectedFiles) {
-			storage.handler.removeMonitoredFile(storage.handler.parseUrl(item.url))
+			try {
+				storage.handler.removeMonitoredFile(storage.handler.parseUrl(item.url))
+			} catch (e) {
+				this.emit('error', `An exception occured when trying to remove monitoring for file "${item.url}": ${e}`)
+				return
+			}
 		}
 	}
 
