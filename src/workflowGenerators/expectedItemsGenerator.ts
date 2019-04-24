@@ -346,6 +346,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				return
 			}
 
+			if (i.lastSeen + (i.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
+				this.emit('warn', `Ignoring an expectedMediaItem "${i.url}" since it's expiration date was ${new Date(i.lastSeen + (i.lingerTime || this.LINGER_TIME))}`)
+				return
+			}
+
 			const expectedItem = literal<TrackedMediaItem>({
 				_id: fileName,
 				name: fileName,
