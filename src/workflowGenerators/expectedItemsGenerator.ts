@@ -298,7 +298,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			if (tracked.sourceStorageId !== st.id) throw new Error(`File "${e.path}" is already sourced from a different storage.`)
 
 			this._allStorages.filter(i => tracked.targetStorageIds.indexOf(i.id) >= 0)
-			.forEach(target => this.emitCopyWorkflow(e.file as File, target))
+			.forEach(target => this.emitCopyWorkflow(e.file as File, target, tracked.comment))
 		}).catch((e) => {
 			this.emit('debug', `File "${e.path}" has been added to a monitored filesystem, but is not expected yet.`)
 		})
@@ -387,6 +387,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			const expectedItem = literal<TrackedMediaItem>({
 				_id: fileName,
 				name: fileName,
+				comment: i.label,
 				lastSeen: i.lastSeen,
 				lingerTime: i.lingerTime || this.LINGER_TIME,
 				expectedMediaItemId: [ i._id ],
@@ -498,11 +499,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		]
 	}
 
-	protected emitCopyWorkflow (file: File, targetStorage: StorageObject) {
+	protected emitCopyWorkflow (file: File, targetStorage: StorageObject, comment?: string) {
 		const workflowId = file.name + '_' + randomId()
 		this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 			_id: workflowId,
 			name: getWorkFlowName(file.name),
+			comment: comment,
 			finished: false,
 			priority: 1,
 			source: WorkFlowSource.EXPECTED_MEDIA_ITEM,
@@ -539,16 +541,16 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							rFile.getProperties().then((rFileProps) => {
 								if (rFileProps.size !== sFileProps.size) {
 									// File size doesn't match
-									this.emitCopyWorkflow(file, i)
+									this.emitCopyWorkflow(file, i, tmi.comment)
 								}
 							}, (e) => {
 								// Properties could not be fetched
 								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked. Attempting to write over.`, e)
-								this.emitCopyWorkflow(file, i)
+								this.emitCopyWorkflow(file, i, tmi.comment)
 							})
 						}, (_err) => {
 							// the file not found
-							this.emitCopyWorkflow(file, i)
+							this.emitCopyWorkflow(file, i, tmi.comment)
 						})
 					})
 				}).catch((e) => {

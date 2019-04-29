@@ -15,6 +15,7 @@ export interface TrackedMediaItem {
 	targetStorageIds: string[]
 
 	name: string
+	comment?: string
 	lastSeen: Time
 	lingerTime: Duration
 }
