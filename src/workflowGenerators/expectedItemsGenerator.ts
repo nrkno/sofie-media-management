@@ -460,7 +460,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				.then(() => this._trackedItems.remove(i))
 				.then(() => this.emit('debug', `Stopped tracking file "${i.name}".`))
 			})).then((results) => {
-				if (results.length) this.emit('info', `Removed ${results.length} expired expected items.`)
+				this.emit('info', `Removed ${results.length} expired expected items.`)
 			})
 		})
 	}
