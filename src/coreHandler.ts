@@ -1,14 +1,14 @@
 
 import { CoreConnection,
 	CoreOptions,
-	PeripheralDeviceAPI as P
+	PeripheralDeviceAPI as P,
+	DDPConnectorOptions
 } from 'tv-automation-server-core-integration'
 import * as _ from 'underscore'
 import * as Winston from 'winston'
 import { DeviceConfig } from './mediaManager'
 const depsVersions = require('./deps-metadata.json')
 import { Process } from './process'
-import { DDPConnectorOptions } from 'tv-automation-server-core-integration/dist/lib/ddpConnector'
 
 export interface CoreConfig {
 	host: string,
@@ -78,7 +78,7 @@ export class CoreHandler {
 		this._coreConfig = config
 		this._process = process
 
-		this.core = new CoreConnection(this.getCoreConnectionOptions('Media Manager', 'MediaManager', true))
+		this.core = new CoreConnection(this.getCoreConnectionOptions('Media Manager', 'MediaManager'))
 
 		this.core.onConnected(() => {
 			this.logger.info('Core Connected!')
@@ -146,8 +146,11 @@ export class CoreHandler {
 		await this.updateCoreStatus()
 		await this.core.destroy()
 	}
-	getCoreConnectionOptions (name: string, subDeviceId: string, parentProcess: boolean): CoreOptions {
-		let credentials
+	getCoreConnectionOptions (name: string, subDeviceId: string): CoreOptions {
+		let credentials: {
+			deviceId: string
+			deviceToken: string
+		}
 
 		if (this._deviceOptions.deviceId && this._deviceOptions.deviceToken) {
 			credentials = {
@@ -163,12 +166,17 @@ export class CoreHandler {
 		} else {
 			credentials = CoreConnection.getCredentials(subDeviceId)
 		}
-		let options: CoreOptions = _.extend(credentials, {
+		let options: CoreOptions = {
+			...credentials,
+
+			deviceCategory: P.DeviceCategory.MEDIA_MANAGER,
 			deviceType: P.DeviceType.MEDIA_MANAGER,
+			deviceSubType: P.SUBTYPE_PROCESS,
+
 			deviceName: name,
 			watchDog: (this._coreConfig ? this._coreConfig.watchdog : true)
-		})
-		if (parentProcess) options.versions = this._getVersions()
+		}
+		options.versions = this._getVersions()
 		return options
 	}
 	onConnected (fcn: () => any) {
