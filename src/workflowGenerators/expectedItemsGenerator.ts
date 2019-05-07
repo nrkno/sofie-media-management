@@ -191,6 +191,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const baseObj: TrackedMediaItem = {
 			_id: fileName,
 			name: fileName,
+			comment: item.label,
 			expectedMediaItemId: [ item._id ],
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
@@ -228,6 +229,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		const baseObj: TrackedMediaItem = {
 			_id: fileName,
 			name: fileName,
+			comment: item.label,
 			expectedMediaItemId: [ item._id ],
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
