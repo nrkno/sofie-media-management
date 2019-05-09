@@ -183,9 +183,9 @@ export class Dispatcher extends EventEmitter {
 			} else return Promise.resolve()
 		})
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
-			this.emit('debug', `Could not place media scanner in manual mode`, e)
+			this.emit('debug', `Could not place Media Scanner in manual mode`, e)
 			this._coreHandler.setProcessState('MediaScanner', [
-				`Could not place media scanner in manual mode: ${JSON.stringify(e)}`
+				`Could not place Media Scanner in manual mode: ${this.convertMediaScannerExceptionToError(e)}`
 			], P.StatusCode.WARNING_MAJOR)
 
 			this.scannerManualModeBestEffort(true)
@@ -219,6 +219,22 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
 	}
+
+	private convertMediaScannerExceptionToError (e: Error) {
+		if (e.name) {
+			switch (e.name) {
+				case 'RequestError':
+					return `Could not connect to Media Scanner`
+				case 'StatusCodeError':
+					return `Invalid response from Media Scanner`
+				default:
+					return `Unknown error: ${e.name}`
+			}
+		} else {
+			return `Unknown issue. See Media Manager log for details.`
+		}
+	}
+
 	private async actionRestartWorkflow (workflowId: string) {
 		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
 
@@ -369,7 +385,7 @@ export class Dispatcher extends EventEmitter {
 			this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
 			this.emit('debug', `Scanner placed in manual mode`)
 		}, () => {
-			// this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
+			// this.emit('debug', `Could not place Media Scanner in manual mode: ${e}, will retry in 5s`)
 			this._bestEffort = setTimeout(() => {
 				this.scannerManualModeBestEffort(manual)
 			}, 5000)
