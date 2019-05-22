@@ -3,6 +3,8 @@ import { MediaManager } from './mediaManager'
 import { config, logPath, disableWatchdog } from './config'
 import * as Winston from 'winston'
 
+console.log('process started') // This is a message all Sofie processes log upon startup
+
 let manager: MediaManager
 // Setup logging --------------------------------------
 let logger = new (Winston.Logger)({
