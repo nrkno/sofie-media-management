@@ -20,6 +20,11 @@ export interface DeviceSettings {
 	/** WorkFlow cleanup time */
 	workFlowLingerTime?: number
 
+	/** When to warn that the Queue is too long */
+	warningWFQueueLength?: number
+	/** When to warn that a worker is working too long */
+	warningTaskWorkingTime?: number
+
 	/** Connection details for the media scanner */
 	mediaScanner: {
 		host?: string
@@ -135,6 +140,8 @@ export interface WorkFlow {
 
 	finished: boolean
 	success: boolean
+
+	modified?: Time
 }
 
 export interface WorkFlowDB extends WorkFlow {
@@ -154,6 +161,7 @@ export interface WorkStepInitial {
 	action: WorkStepAction
 	status: WorkStepStatus
 	messages?: Array<string>
+	modified?: Time
 
 	priority: number
 	/** 0-1 */
@@ -171,6 +179,7 @@ export abstract class WorkStep implements WorkStepInitial {
 	action: WorkStepAction
 	status: WorkStepStatus
 	messages?: Array<string>
+	modified?: Time
 
 	priority: number
 	/** 0-1 */
