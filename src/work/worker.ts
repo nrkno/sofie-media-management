@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
-import { literal, LogEvents, getID, updateDB } from '../lib/lib'
+import { literal, LogEvents, getID, updateDB, getCurrentTime } from '../lib/lib'
 
-import { WorkStepStatus, WorkStepAction, DeviceSettings } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings, Time } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
@@ -25,6 +25,7 @@ export class Worker extends EventEmitter {
 	private _config: DeviceSettings
 	private _currentStep: GeneralWorkStepDB | undefined
 	private _finishPromises: Array<Function> = []
+	private _lastBeginStep: Time | undefined
 
 	constructor (db: PouchDB.Database<WorkStepDB>, tmi: TrackedMediaItems, config: DeviceSettings) {
 		super()
@@ -43,6 +44,9 @@ export class Worker extends EventEmitter {
 	get step (): GeneralWorkStepDB | undefined {
 		return this._currentStep
 	}
+	get lastBeginStep (): Time | undefined {
+		return this._busy ? this._lastBeginStep : undefined
+	} 
 	/**
 	 * synchronous pre-step, to be called before doWork.
 	 * run as an intent to start a work (soon)
@@ -81,6 +85,7 @@ export class Worker extends EventEmitter {
 		this._busy = true
 		this._warmingUp = false
 		this._currentStep = step
+		this._lastBeginStep = getCurrentTime()
 
 		switch (step.action) {
 			case WorkStepAction.COPY:

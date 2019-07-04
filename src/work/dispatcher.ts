@@ -18,6 +18,8 @@ import { TrackedMediaItems } from '../mediaItemTracker'
 import { CoreHandler } from '../coreHandler'
 
 const CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000 // 10 hours (ms)
+const WARNING_WF_QUEUE_LENGTH = 10 // 10 items
+const WARNING_TASK_WORKING_TIME = 15 * 60 * 1000 // 15 minutes
 
 // TODO: Move this into server-core-integration
 enum MMPDMethods {
@@ -44,10 +46,15 @@ export class Dispatcher extends EventEmitter {
 	private _coreHandler: CoreHandler
 
 	private _bestEffort: NodeJS.Timer | undefined = undefined
-	private _workflowCleanUp: NodeJS.Timer | undefined = undefined
+	private _cronJobInterval: NodeJS.Timer | undefined = undefined
+	private _watchdogInterval: NodeJS.Timer | undefined = undefined
 
 	private _cronJobTime: number
+	private _watchdogTime: number = 5 * 60 * 1000
 	private _workFlowLingerTime: number
+
+	private _warningWFQueueLength: number
+	private _warningTaskWorkingTime: number
 
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
@@ -75,6 +82,8 @@ export class Dispatcher extends EventEmitter {
 
 		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
 		this._workFlowLingerTime = workFlowLingerTime
+		this._warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
+		this._warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
 
 		fs.ensureDirSync('./db')
 		PouchDB.plugin(PouchDBFind)
@@ -173,9 +182,42 @@ export class Dispatcher extends EventEmitter {
 				}
 			})
 			// clean up old work-flows every now and then:
-			this._workflowCleanUp = setInterval(() => {
+			this._cronJobInterval = setInterval(() => {
 				this.cleanupOldWorkflows().catch(e => this.emit('error', 'Unhandled error in cleanupOldWorkflows', e))
 			}, this._cronJobTime)
+			this._watchdogInterval = setInterval(() => {
+				this._workFlows.allDocs({
+					include_docs: true
+				}).then((workFlows) => {
+					const unfinishedWorkFlows = workFlows.rows.filter(i => i.doc && i.doc.finished === false)
+					const oldWorkFlows = unfinishedWorkFlows.filter(i => i.doc && i.doc.created < (getCurrentTime() - (3 * 60 * 60 * 1000)))
+					const recentlyFinished = workFlows.rows.filter(i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > (getCurrentTime() - (15 * 60 * 1000)))
+					if (unfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
+						this._coreHandler.setProcessState('Dispatcher', [
+							`No WorkFlow has finished in the last 15 minutes`
+						], P.StatusCode.BAD)
+						return
+					}
+					if (oldWorkFlows.length > 0) {
+						this._coreHandler.setProcessState('Dispatcher', [
+							`Some WorkFlows have been waiting more than 3hrs to be completed`
+						], P.StatusCode.BAD)
+						return
+					}
+					if (unfinishedWorkFlows.length > this._warningWFQueueLength) {
+						this._coreHandler.setProcessState('Dispatcher', [
+							`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`
+						], P.StatusCode.WARNING_MAJOR)
+						return
+					}
+					if (_.compact(this._workers.map(i => i.lastBeginStep && i.lastBeginStep < (getCurrentTime() - this._warningTaskWorkingTime))).length > 0) {
+						this._coreHandler.setProcessState('Dispatcher', [
+							`Some workers have been working for more than ${Math.floor(this._warningTaskWorkingTime / 60 * 1000)} minutes`
+						], P.StatusCode.BAD)
+						return
+					}
+				})
+			}, this._watchdogTime)
 		})
 		.then(() => {
 			if (this.useScanner()) {
@@ -205,7 +247,10 @@ export class Dispatcher extends EventEmitter {
 	async destroy (): Promise<void> {
 		return Promise.all(this.generators.map(gen => gen.destroy()))
 		.then(() => this.emit('debug', 'WorkFlow generators destroyed'))
-		.then(() => { if (this._workflowCleanUp) clearInterval(this._workflowCleanUp) })
+		.then(() => {
+			if (this._cronJobInterval) clearInterval(this._cronJobInterval)
+			if (this._watchdogInterval) clearInterval(this._watchdogInterval)
+		})
 		.then(() => this.emit('debug', 'WorkFlow clean up task destroyed'))
 		.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
 		.then(() => this.emit('debug', 'Storage handlers destroyed'))
@@ -256,12 +301,14 @@ export class Dispatcher extends EventEmitter {
 				step.messages = [`Restarted at ${(new Date()).toTimeString()}`]
 				step.progress = 0
 				step.expectedLeft = undefined
+				step.modified = getCurrentTime()
 				return step
 			})
 		}))
 		await updateDB(this._workFlows, wf._id, (wf) => {
 			wf.finished = false
 			wf.success = false
+			wf.modified = getCurrentTime()
 			// wf.priority = 999
 			return wf
 		})
@@ -397,6 +444,7 @@ export class Dispatcher extends EventEmitter {
 		const hash = getFlowHash(wf)
 		const wfDb: WorkFlowDB = _.omit(wf, 'steps')
 		wfDb.hash = hash
+		wfDb.modified = getCurrentTime()
 
 		console.log(`Current hash: ${hash}`)
 
@@ -425,6 +473,7 @@ export class Dispatcher extends EventEmitter {
 						workFlowId: wfDb._id
 					})
 					stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
+					stepDb.modified = getCurrentTime()
 					return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
 				})).then(() => {
 					finished()
@@ -470,6 +519,7 @@ export class Dispatcher extends EventEmitter {
 		}})
 		return Promise.all(brokenItems.docs.map(i => {
 			i.status = WorkStepStatus.IDLE
+			i.modified = getCurrentTime()
 			return this._workSteps.put(i)
 		})).then(() => {
 			this.dispatchWork()
@@ -488,6 +538,7 @@ export class Dispatcher extends EventEmitter {
 
 		return updateDB(this._workSteps, stepId, (step) => {
 			step.status = WorkStepStatus.WORKING
+			step.modified = getCurrentTime()
 			return step
 		})
 		.then((_step) => {
@@ -527,6 +578,7 @@ export class Dispatcher extends EventEmitter {
 			return Promise.all(result.docs.map(item => {
 				if (item.status === WorkStepStatus.IDLE) {
 					item.status = WorkStepStatus.BLOCKED
+					item.modified = getCurrentTime()
 					if (stepMessage) item.messages = [stepMessage]
 					return this._workSteps.put(item).then(() => { })
 				}
@@ -553,6 +605,7 @@ export class Dispatcher extends EventEmitter {
 
 		return updateDB(this._workSteps, job._id, (workStep) => {
 			workStep.status = result.status
+			workStep.modified = getCurrentTime()
 			workStep.messages = (workStep.messages || []).concat(result.messages || [])
 
 			this.emit('debug', `Setting WorkStep "${job._id}" result to "${result.status}"` + (result.messages ? ', message: ' + result.messages.join(', ') : ''))
@@ -595,6 +648,7 @@ export class Dispatcher extends EventEmitter {
 							const wf = obj as object as WorkFlowDB
 							wf.finished = isFinished
 							wf.success = isSuccessful
+							wf.modified = getCurrentTime()
 							return this._workFlows.put(wf)
 						})
 						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfully' : 'unsuccessfully'}`))
