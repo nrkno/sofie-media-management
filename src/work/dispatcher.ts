@@ -191,10 +191,10 @@ export class Dispatcher extends EventEmitter {
 				}).then((workFlows) => {
 					const unfinishedWorkFlows = workFlows.rows.filter(i => i.doc && i.doc.finished === false)
 					const oldWorkFlows = unfinishedWorkFlows.filter(i => i.doc && i.doc.created < (getCurrentTime() - (3 * 60 * 60 * 1000)))
-					const recentlyFinished = workFlows.rows.filter(i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > (getCurrentTime() - (15 * 60 * 1000)))
+					const recentlyFinished = workFlows.rows.filter(i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > (getCurrentTime() - this._warningTaskWorkingTime))
 					if (unfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
 						this._coreHandler.setProcessState('Dispatcher', [
-							`No WorkFlow has finished in the last 15 minutes`
+							`No WorkFlow has finished in the last ${Math.floor(this._warningTaskWorkingTime / (60 * 1000))} minutes`
 						], P.StatusCode.BAD)
 						return
 					}
@@ -212,7 +212,7 @@ export class Dispatcher extends EventEmitter {
 					}
 					if (_.compact(this._workers.map(i => i.lastBeginStep && i.lastBeginStep < (getCurrentTime() - this._warningTaskWorkingTime))).length > 0) {
 						this._coreHandler.setProcessState('Dispatcher', [
-							`Some workers have been working for more than ${Math.floor(this._warningTaskWorkingTime / 60 * 1000)} minutes`
+							`Some workers have been working for more than ${Math.floor(this._warningTaskWorkingTime / (60 * 1000))} minutes`
 						], P.StatusCode.BAD)
 						return
 					}
