@@ -78,6 +78,8 @@ export class Dispatcher extends EventEmitter {
 
 		this._coreHandler.restartWorkflow = (workflowId) => this.actionRestartWorkflow(workflowId)
 		this._coreHandler.abortWorkflow = (workflowId) => this.actionAbortWorkflow(workflowId)
+		this._coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
+		this._coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
 		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
@@ -241,7 +243,7 @@ export class Dispatcher extends EventEmitter {
 				gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
 				this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
 			})
-		}).then(() => this.restartWorkSteps())
+		}).then(() => this.cancelLeftoverWorkSteps())
 	}
 
 	async destroy (): Promise<void> {
@@ -278,6 +280,24 @@ export class Dispatcher extends EventEmitter {
 		} else {
 			return `Unknown issue. See Media Manager log for details.`
 		}
+	}
+
+	private async actionRestartAllWorkflows () {
+		const wfs = await this._workFlows.find({
+			selector: {
+				finished: false
+			}
+		})
+		await Promise.all(wfs.docs.map(i => this.actionRestartWorkflow(i._id)))
+	}
+
+	private async actionAbortAllWorkflows () {
+		const wfs = await this._workFlows.find({
+			selector: {
+				finished: false
+			}
+		})
+		await Promise.all(wfs.docs.map(i => this.actionAbortWorkflow(i._id)))
 	}
 
 	private async actionRestartWorkflow (workflowId: string) {
@@ -524,23 +544,24 @@ export class Dispatcher extends EventEmitter {
 		})
 	}
 	/**
-	 * Restart unfinished worksteps (to be run after startup)
+	 * Cancel unfinished worksteps (to be run after startup)
 	 * @private
 	 * @return Promise<void>
 	 * @memberof Dispatcher
 	 */
-	private async restartWorkSteps (): Promise<void> {
+	private async cancelLeftoverWorkSteps (): Promise<void> {
 		const brokenItems = await this._workSteps.find({ selector: {
 			status: WorkStepStatus.WORKING
 		}})
 		return Promise.all(brokenItems.docs.map(i => {
-			i.status = WorkStepStatus.IDLE
+			i.status = WorkStepStatus.ERROR
 			i.modified = getCurrentTime()
+			i.messages = _.union(i.messages || [], [ 'Working on shutdown, failed.' ])
 			return this._workSteps.put(i)
 		})).then(() => {
-			this.dispatchWork()
+			return Promise.all(brokenItems.docs.map(i => this.blockStepsInWorkFlow(i.workFlowId))).then(() => { })
 		}).catch((e) => {
-			this.emit('error', `Unable to restart old workSteps`, e)
+			this.emit('error', `Unable to cancel old workSteps`, e)
 		})
 	}
 	/**

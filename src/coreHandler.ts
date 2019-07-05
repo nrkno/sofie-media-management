@@ -47,7 +47,9 @@ export class CoreHandler {
 	 * Can be called from Core, via this.executeFunction
 	 */
 	public restartWorkflow: ((workflowId: string) => void) | undefined = undefined
-	public abortWorkflow:	((workflowId: string) => void) | undefined = undefined
+	public abortWorkflow: ((workflowId: string) => void) | undefined = undefined
+	public restartAllWorkflows: (() => void) | undefined = undefined
+	public abortAllWorkflows: (() => void) | undefined = undefined
 
 	private _deviceOptions: DeviceConfig
 	private _onConnected?: () => any
