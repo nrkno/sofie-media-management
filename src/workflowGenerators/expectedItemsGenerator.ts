@@ -171,6 +171,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		} else {
 			item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		}
+		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
+			this.emit('error', `An expected item was added called "${item.label || item.path}", but it expired on ${new Date(item.lastSeen + (item.lingerTime || this.LINGER_TIME))}. Ignoring.`)
+			return
+		}
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
 
@@ -207,7 +211,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			}
 			return baseObj
 		})
-		.then(() => this.checkAndEmitCopyWorkflow(baseObj))
+		.then(() => this.checkAndEmitCopyWorkflow(baseObj, 'onExpectedAdded'))
 		.catch((e) => {
 			this.emit('error', `An error happened when trying to create a copy workflow`, e)
 		})
@@ -218,6 +222,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		let item: ExpectedMediaItem = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 		item = _.extend(_.omit(item, clearedFields), newFields) as ExpectedMediaItem
+		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
+			this.emit('error', `An expected item was changed called "${item.label || item.path}", but it expired on ${new Date(item.lastSeen + (item.lingerTime || this.LINGER_TIME))}. Ignoring.`)
+			return
+		}
 		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
@@ -258,7 +266,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					}
 					return update
 				})
-				.then(() => this.checkAndEmitCopyWorkflow(update))
+				.then(() => this.checkAndEmitCopyWorkflow(update, 'onExpectedChanged, TMI existed'))
 				.catch((e) => {
 					this.emit(`An error happened when trying to create a copy workflow`, e)
 				})
@@ -266,7 +274,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				this.emit('warn', `File "${item.path}" is already tracked from a different source storage than "${flow.sourceId}".`)
 			}
 		}, () => {
-			this._trackedItems.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj)).catch((e) => {
+			this._trackedItems.put(baseObj).then(() => this.checkAndEmitCopyWorkflow(baseObj, 'onExpectedChanged, TMI did not exist')).catch((e) => {
 				this.emit(`An error happened when trying to create a copy workflow`, e)
 			})
 		})
@@ -316,7 +324,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			if (tracked.sourceStorageId !== st.id) throw new Error(`File "${e.path}" is already sourced from a different storage.`)
 
 			this._allStorages.filter(i => tracked.targetStorageIds.indexOf(i.id) >= 0)
-			.forEach(target => this.emitCopyWorkflow(e.file as File, target, tracked.comment))
+			.forEach(target => this.emitCopyWorkflow(e.file as File, target, tracked.comment, 'Monitored file was added to source storage'))
 		}).catch((e) => {
 			this.emit('debug', `File "${e.path}" has been added to a monitored filesystem, but is not expected yet.`)
 		})
@@ -335,10 +343,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	protected cronJob () {
 		this.emit('debug', `Starting cron job for ${this.constructor.name}`)
-		this.emit('debug', `Purging old expected items`)
 		this.purgeOldExpectedItems()
 		.then(() => {
-			// this.emit('debug', `Doing expected items storage check`)
+			this.emit('debug', `Doing expected items storage check`)
 			this._storages.forEach((i) => this.expectedStorageCheck(i))
 		}).catch((e) => {
 			this.emit('error', `There was an error running the cron job`, e)
@@ -367,7 +374,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	protected async expectedStorageCheck (st: StorageObject): Promise<void> {
 		const tmis = await this._trackedItems.getAllFromStorage(st.id)
-		tmis.forEach((item) => this.checkAndEmitCopyWorkflow(item))
+		tmis.forEach((item) => this.checkAndEmitCopyWorkflow(item, 'expectedStorageCheck'))
 	}
 	/**
 	 * Checks all expectedMediaItems, makes sure that we're tracking them, and starts any work that might be due
@@ -435,7 +442,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				return allTrackedFiles.find(j => j.expectedMediaItemId === i.expectedMediaItemId) ? null : i
 			}))
 			this._trackedItems.bulkChange(newItems).then(() => {
-				return newItems.map(item => this.checkAndEmitCopyWorkflow(item))
+				return newItems.map(item => this.checkAndEmitCopyWorkflow(item, 'initialExpectedCheck'))
 			}).catch((e) => {
 				this.emit('error', `There has been an error writing to tracked items database`, e)
 			})
@@ -447,6 +454,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 * Goes through the list of expected items and removes them if they are stale and too old (older than lingerTime)
 	 */
 	protected purgeOldExpectedItems (): Promise<void> {
+		this.emit('debug', `Purging old expected items`)
 		return Promise.all(this._storages.map((s) => this._trackedItems.getAllFromStorage(s.id)))
 		.then((result) => {
 			const allTrackedFiles = _.flatten(result) as TrackedMediaItemDB[]
@@ -517,7 +525,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		]
 	}
 
-	protected emitCopyWorkflow (file: File, targetStorage: StorageObject, comment?: string) {
+	protected emitCopyWorkflow (file: File, targetStorage: StorageObject, comment: string | undefined, ...reason: string[]) {
 		const workflowId = file.name + '_' + randomId()
 		this.emit(WorkFlowGeneratorEventType.NEW_WORKFLOW, literal<WorkFlow>({
 			_id: workflowId,
@@ -530,16 +538,20 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			created: getCurrentTime(),
 			success: false
 		}), this)
-		this.emit('debug', `New forkflow started for "${file.name}": "${workflowId}".`)
+		this.emit('debug', `New forkflow started for "${file.name}": "${workflowId}". ${reason.join(', ')}`)
 	}
 	/**
 	 * Checks if the item exists on the storage and issues workflows
 	 * @param tmi
 	 */
-	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItem) {
+	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItem, reason: string) {
 		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
 		const storage = this._storages.find(i => i.id === tmi.sourceStorageId)
 		if (!storage) throw new Error(`Could not find storage "${tmi.sourceStorageId}"`)
+		if ((tmi.lastSeen + tmi.lingerTime) < getCurrentTime()) {
+			this.emit('warn', `Ignoring new WorkFlow for file "${tmi.name}" since it's expiration date is ${new Date(tmi.lastSeen + tmi.lingerTime)}`)
+			return
+		}
 
 		// add the file to the list of monitored files, if the storage is an 'onlySelectedFiles' storage
 		if (storage.options.onlySelectedFiles) {
@@ -559,16 +571,16 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							rFile.getProperties().then((rFileProps) => {
 								if (rFileProps.size !== sFileProps.size) {
 									// File size doesn't match
-									this.emitCopyWorkflow(file, i, tmi.comment)
+									this.emitCopyWorkflow(file, i, tmi.comment, reason, `File size doesn't match on target storage`)
 								}
 							}, (e) => {
 								// Properties could not be fetched
 								this.emit('error', `File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked. Attempting to write over.`, e)
-								this.emitCopyWorkflow(file, i, tmi.comment)
+								this.emitCopyWorkflow(file, i, tmi.comment, reason, `Could not fetch target file properties`)
 							})
 						}, (_err) => {
 							// the file not found
-							this.emitCopyWorkflow(file, i, tmi.comment)
+							this.emitCopyWorkflow(file, i, tmi.comment, reason, `File not found on target storage`)
 						})
 					})
 				}).catch((e) => {

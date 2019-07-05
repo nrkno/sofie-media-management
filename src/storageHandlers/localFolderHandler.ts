@@ -144,13 +144,13 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return _.compact(_.flatten(await this.traverseFolder(this._basePath)))
 	}
 
-	addMonitoredFile (name: string): void {
+	addMonitoredFile = (name: string) => {
 		if (this._selectiveListen) {
 			this._watcher.add(name)
 		}
 	}
 
-	removeMonitoredFile (name: string): void {
+	removeMonitoredFile = (name: string) => {
 		if (this._selectiveListen) {
 			this._watcher.unwatch(name)
 		}
