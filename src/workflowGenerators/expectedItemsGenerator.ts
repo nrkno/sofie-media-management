@@ -196,9 +196,17 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
-			targetStorageIds: [flow.destinationId]
+			targetStorageIds: [ flow.destinationId ]
 		}
-		this._trackedItems.upsert(baseObj._id, () => baseObj)
+		this._trackedItems.upsert(baseObj._id, (tmi?: TrackedMediaItem) => {
+			if (tmi) {
+				baseObj.lastSeen = Math.max(baseObj.lastSeen, tmi.lastSeen)
+				baseObj.lingerTime = Math.max(baseObj.lingerTime, tmi.lingerTime)
+				baseObj.expectedMediaItemId = _.union(baseObj.expectedMediaItemId || [], tmi.expectedMediaItemId || [])
+				baseObj.targetStorageIds = _.union(baseObj.targetStorageIds || [], tmi.targetStorageIds || [])
+			}
+			return baseObj
+		})
 		.then(() => this.checkAndEmitCopyWorkflow(baseObj))
 		.catch((e) => {
 			this.emit('error', `An error happened when trying to create a copy workflow`, e)
@@ -234,14 +242,22 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
-			targetStorageIds: [flow.destinationId]
+			targetStorageIds: [ flow.destinationId ]
 		}
 
 		this._trackedItems.getById(item.path)
 		.then((tracked) => {
 			if (tracked.sourceStorageId === flow.sourceId) {
-				const update = _.extend(tracked, baseObj)
-				this._trackedItems.upsert(tracked._id, () => update)
+				const update = _.extend(tracked, baseObj) as TrackedMediaItemDB
+				this._trackedItems.upsert(tracked._id, (tmi?: TrackedMediaItem) => {
+					if (tmi) {
+						update.lastSeen = Math.max(update.lastSeen, tmi.lastSeen)
+						update.lingerTime = Math.max(update.lingerTime, tmi.lingerTime)
+						update.targetStorageIds = _.union(tmi.targetStorageIds, update.targetStorageIds)
+						update.expectedMediaItemId = _.union(tmi.expectedMediaItemId || [], update.expectedMediaItemId || [])
+					}
+					return update
+				})
 				.then(() => this.checkAndEmitCopyWorkflow(update))
 				.catch((e) => {
 					this.emit(`An error happened when trying to create a copy workflow`, e)
