@@ -66,8 +66,19 @@ export class MediaManager {
 			await this.initCore()
 			this._logger.info('Core initialized')
 
-			this._logger.info('Initializing MediaManager...')
 			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
+
+			// Stop here if studioId not set
+			if (!peripheralDevice.studioId) {
+				this._logger.warn('------------------------------------------------------')
+				this._logger.warn('Not setup yet, exiting process!')
+				this._logger.warn('To setup, go into Core and add this device to a Studio')
+				this._logger.warn('------------------------------------------------------')
+				process.exit(1)
+				return
+			}
+			this._logger.info('Initializing MediaManager...')
+
 			await this.initMediaManager(peripheralDevice.settings || {})
 			this._logger.info('MediaManager initialized')
 
