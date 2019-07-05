@@ -14,6 +14,7 @@ import { WatchFolderGenerator } from './workflowGenerators/watchFolderGenerator'
 import { LocalStorageGenerator } from './workflowGenerators/localStorageGenerator'
 import { ExpectedItemsGenerator } from './workflowGenerators/expectedItemsGenerator'
 import { Process } from './process'
+import { MonitorManager } from './monitors/manager'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -46,6 +47,8 @@ export class MediaManager {
 	private _dispatcher: Dispatcher
 	private _workFlowGenerators: BaseWorkFlowGenerator[]
 	private _process: Process
+
+	private _monitorManager: MonitorManager = new MonitorManager()
 
 	constructor (logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -141,5 +144,23 @@ export class MediaManager {
 			})
 		}))
 		await this._dispatcher.init()
+
+		this._monitorManager.init(this.coreHandler)
+
+		await this._monitorManager.onNewSettings(settings)
+
+		// Monitor for changes in settings:
+		this.coreHandler.onChanged(() => {
+			this.coreHandler.core.getPeripheralDevice()
+			.then((device) => {
+				if (device) {
+					const settings = device.settings
+					if (!_.isEqual(settings, this._monitorManager.settings)) {
+						this._monitorManager.onNewSettings(settings)
+						.catch(e => this._logger.error(e))
+					}
+				}
+			})
+		})
 	}
 }
