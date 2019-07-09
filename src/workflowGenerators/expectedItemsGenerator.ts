@@ -175,6 +175,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this.emit('error', `An expected item was added called "${item.label || item.path}", but it expired on ${new Date(item.lastSeen + (item.lingerTime || this.LINGER_TIME))}. Ignoring.`)
 			return
 		}
+		if (item.disabled) {
+			this.emit('warn', `An expected item was added called "${item.label || item.path}", but it was disabled.`)
+			return
+		}
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
 
@@ -224,6 +228,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		item = _.extend(_.omit(item, clearedFields), newFields) as ExpectedMediaItem
 		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
 			this.emit('error', `An expected item was changed called "${item.label || item.path}", but it expired on ${new Date(item.lastSeen + (item.lingerTime || this.LINGER_TIME))}. Ignoring.`)
+			return
+		}
+		if (item.disabled) {
+			this.emit('warn', `An expected item was added called "${item.label || item.path}", but it was disabled.`)
 			return
 		}
 		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)

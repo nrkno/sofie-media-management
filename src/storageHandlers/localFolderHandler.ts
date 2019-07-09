@@ -7,6 +7,7 @@ import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
 import { robocopy } from '../lib/robocopy'
+import { CancelablePromise } from '../lib/cancelablePromise'
 
 /**
  * A shared method to get the file properties from the underlying file system.
@@ -170,7 +171,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
-	putFile (file: File, progressCallback?: (progress: number) => void): Promise<File> {
+	putFile (file: File, progressCallback?: (progress: number) => void): CancelablePromise<File> {
 		function monitorProgress (localFile: File, sourceProperties: FileProperties): void {
 
 			localFile.getProperties()
@@ -187,7 +188,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		if (!this._writable) throw Error('This storage is not writable.')
 		if ((file.source === StorageType.LOCAL_FOLDER) || (file.source === StorageType.FILE_SHARE)) {
 			// Use fast copy if possible
-			return new Promise((resolve, reject) => {
+			return new CancelablePromise((resolve, reject, onCancel) => {
 				const localFile = this.createFile(file)
 				file.getProperties().then((sourceProperties) => {
 					fs.ensureDir(path.dirname(localFile.url)).then(async () => {
@@ -208,14 +209,19 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 						}
 
 						if (process.platform === 'win32') {
-							robocopy.copyFile(file.url, localFile.url, (progress) => {
+							const p = robocopy.copyFile(file.url, localFile.url, (progress) => {
 								if (typeof progressCallback === 'function') {
 									progressCallback(progress)
 								}
-							}).then(() => {
+							})
+							p.then(() => {
 								resolve()
 							}).catch((e) => {
 								reject(e)
+							})
+							onCancel(() => {
+								p.cancel()
+								reject('File write cancelled')
 							})
 						} else {
 							const progressMonitor = setInterval(() => {
@@ -239,7 +245,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			})
 		} else {
 			// Use streams if fast, system-level file system copy is not possible
-			return new Promise((resolve, reject) => {
+			return new CancelablePromise((resolve, reject, onCancel) => {
 				file.getReadableStream().then((rStream) => {
 					const localFile = this.createFile(file)
 					file.getProperties().then((sourceProperties) => {
@@ -262,6 +268,12 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 								wStream.on('error', handleError)
 
 								rStream.pipe(wStream)
+
+								onCancel(() => {
+									rStream.unpipe()
+									wStream.end()
+									reject('File write cancelled')
+								})
 							}, (reason) => {
 								reject(reason)
 							})
