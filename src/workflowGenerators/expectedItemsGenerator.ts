@@ -381,6 +381,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 */
 	protected async initialExpectedCheck (): Promise<void> {
 		const handledIds = this._handledFlows.map(i => i.id)
+		const d = this.expectedMediaItems.find(() => true)
+		console.log(d)
 		const currentExpectedContents = this.expectedMediaItems.find((item: ExpectedMediaItem) => {
 			return handledIds.indexOf(item.mediaFlowId) >= 0
 		}) as ExpectedMediaItem[]

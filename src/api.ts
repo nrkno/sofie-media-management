@@ -60,6 +60,9 @@ export interface ExpectedMediaItem {
 
 	/** Time to wait before removing file */
 	lingerTime?: Duration
+
+	/** Studio expecting the item */
+	studioId: string
 }
 
 export enum MediaFlowType {

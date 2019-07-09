@@ -4,7 +4,14 @@
 	"tasks": [
 		{
 			"label": "build",
-			"type": "shell"
+			"type": "shell",
+			"problemMatcher": [
+				"$tsc-watch"
+			],
+			"isBackground": true,
+			"args": [
+				"build"
+			]
 		}
 	]
 }

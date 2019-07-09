@@ -48,6 +48,7 @@ export class CoreHandler {
 	 */
 	public restartWorkflow: ((workflowId: string) => void) | undefined = undefined
 	public abortWorkflow: ((workflowId: string) => void) | undefined = undefined
+	public prioritizeWorkflow: ((workflowId: string) => void) | undefined = undefined
 	public restartAllWorkflows: (() => void) | undefined = undefined
 	public abortAllWorkflows: (() => void) | undefined = undefined
 

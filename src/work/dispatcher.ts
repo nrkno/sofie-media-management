@@ -78,6 +78,7 @@ export class Dispatcher extends EventEmitter {
 
 		this._coreHandler.restartWorkflow = (workflowId) => this.actionRestartWorkflow(workflowId)
 		this._coreHandler.abortWorkflow = (workflowId) => this.actionAbortWorkflow(workflowId)
+		this._coreHandler.prioritizeWorkflow = (workflowId) => this.prioritizeWorkflow(workflowId)
 		this._coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
 		this._coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
@@ -285,7 +286,7 @@ export class Dispatcher extends EventEmitter {
 	private async actionRestartAllWorkflows () {
 		const wfs = await this._workFlows.find({
 			selector: {
-				finished: false
+				finished: true
 			}
 		})
 		await Promise.all(wfs.docs.map(i => this.actionRestartWorkflow(i._id)))
@@ -351,6 +352,34 @@ export class Dispatcher extends EventEmitter {
 
 		this.dispatchWork()
 	}
+	private async prioritizeWorkflow (workflowId: string) {
+		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+
+		const prioritized = wf.priority > 1 ? true : false
+
+		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+
+		const result = await this._workSteps.find({
+			selector: {
+				workFlowId: workflowId
+			}
+		})
+		await Promise.all(result.docs.map(item => {
+			if (item.status === WorkStepStatus.IDLE) {
+				item.priority = prioritized ? item.priority / 10 : item.priority * 10
+				item.modified = getCurrentTime()
+				item.messages = _.union(item.messages || [], [`Priority changed to ${item.priority} at ${new Date(getCurrentTime())}`])
+				return this._workSteps.put(item).then(() => { })
+			}
+			return Promise.resolve()
+		}))
+
+		await updateDB(this._workFlows, wf._id, (wf) => {
+			wf.modified = getCurrentTime()
+			wf.priority = prioritized ? wf.priority / 2 : wf.priority * 2
+			return wf
+		})
+	}
 	private async actionAbortWorkflow (workflowId: string) {
 		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
 
@@ -358,9 +387,12 @@ export class Dispatcher extends EventEmitter {
 
 		await this.blockStepsInWorkFlow(wf._id, 'Aborted')
 
-		wf.finished = true
-		wf.success = false
-
+		await updateDB(this._workFlows, wf._id, (wf) => {
+			wf.finished = true
+			wf.success = false
+			wf.modified = getCurrentTime()
+			return wf
+		})
 	}
 	private cleanupOldWorkflows (): Promise<void> {
 		return this._workFlows.find({
