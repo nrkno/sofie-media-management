@@ -8,7 +8,7 @@
 			"problemMatcher": [
 				"$tsc-watch"
 			],
-			"isBackground": true,
+			"isBackground": false,
 			"args": [
 				"build"
 			]

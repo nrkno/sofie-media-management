@@ -505,13 +505,13 @@ export class CoreMonitorHandler {
 	// Methods callable by Core:
 	// -------------------------
 	killProcess (actually: number) {
-		if (actually === 1) {
-			this._coreParentHandler.logger.info('KillProcess command received, shutting down in 1000ms!')
-			setTimeout(() => {
-				process.exit(0)
-			}, 1000)
-			return true
-		}
+		// if (actually === 1) {
+		// 	this._coreParentHandler.logger.info('KillProcess command received, shutting down in 1000ms!')
+		// 	setTimeout(() => {
+		// 		process.exit(0)
+		// 	}, 1000)
+		// 	return true
+		// }
 		return 0
 	}
 }

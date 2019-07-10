@@ -69,10 +69,10 @@ export class MonitorManager {
 		}
 		const monitor: Monitor | null = (
 			settings.type === MonitorSettingsType.MEDIA_SCANNER ?
-			new MonitorMediaScanner(deviceId, settings, this._coreHandler.logger) :
+				new MonitorMediaScanner(deviceId, settings, this._coreHandler.logger) :
 			settings.type === MonitorSettingsType.QUANTEL ?
-			new MonitorQuantel(deviceId, settings, this._coreHandler.logger) :
-			null
+				new MonitorQuantel(deviceId, settings, this._coreHandler.logger) :
+				null
 		)
 		if (!monitor) throw new Error(`Monitor could not be created, type "${settings.type}" unknown`)
 
