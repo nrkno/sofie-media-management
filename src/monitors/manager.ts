@@ -92,7 +92,7 @@ export class MonitorManager {
 				messages: ['Error during init: ' + (e && e.message || e.stack || e.toString())]
 			})
 			this._coreHandler.logger.warn(e)
-			coreMonitorHandler.dispose(true)
+			await coreMonitorHandler.dispose(true)
 		}
 
 	}

@@ -43,6 +43,7 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	get deviceInfo (): MonitorDevice {
+		// @ts-ignore: todo: make stronger typed, via core-integration
 		return {
 			deviceName: `Quantel (${this._settings.gatewayUrl} ${this._quantel.zoneId}/${this._quantel.serverId})`,
 			deviceId: this.deviceId,
@@ -125,7 +126,7 @@ export class MonitorQuantel extends Monitor {
 		this._coreHandler.core.unsubscribe(this._expectedMediaItemsSubscription)
 		this.observer.stop()
 	}
-	private wrapError(fcn) {
+	private wrapError (fcn) {
 		return (...args) => {
 			try {
 				return fcn(...args)
@@ -268,21 +269,23 @@ export class MonitorQuantel extends Monitor {
 				// Go through the mediaobjects and send changes to core:
 				const p = Promise.resolve()
 				_.each(mediaObjects, (newMediaObject: MediaObject | null, objectId: string) => {
-
 					const oldMediaObject = this._cachedMediaObjects[objectId]
-
 					if (newMediaObject) {
 						if (
 							!oldMediaObject ||
 							newMediaObject._rev !== oldMediaObject._rev
-						) {
+							) {
 							// Added or changed
-							p.then(() => this._sendChanged(newMediaObject))
+							p.then(() => this._sendChanged(newMediaObject)).catch((e) => {
+								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
+							})
 						}
 					} else {
 						if (oldMediaObject) {
 							// Removed
-							p.then(() => this._sendRemoved(oldMediaObject._id))
+							p.then(() => this._sendRemoved(oldMediaObject._id)).catch((e) => {
+								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
+							})
 						}
 					}
 					if (newMediaObject) {

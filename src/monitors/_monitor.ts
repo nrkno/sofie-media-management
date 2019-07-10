@@ -31,7 +31,7 @@ export abstract class Monitor extends EventEmitter {
 	}
 	abstract init (): Promise<void>
 	async dispose (): Promise<void> {
-		this._coreHandler.dispose()
+		await this._coreHandler.dispose()
 	}
 	abstract get deviceInfo (): MonitorDevice
 

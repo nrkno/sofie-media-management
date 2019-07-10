@@ -5,7 +5,7 @@ import { WorkStepStatus, WorkStepAction, DeviceSettings, Time } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
-import { CancelHandler } from '../lib/cancelablePromise';
+import { CancelHandler } from '../lib/cancelablePromise'
 
 const escapeUrlComponent = encodeURIComponent
 
@@ -48,7 +48,7 @@ export class Worker extends EventEmitter {
 	}
 	get lastBeginStep (): Time | undefined {
 		return this._busy ? this._lastBeginStep : undefined
-	} 
+	}
 	/**
 	 * synchronous pre-step, to be called before doWork.
 	 * run as an intent to start a work (soon)

@@ -221,6 +221,9 @@ export class Dispatcher extends EventEmitter {
 						], P.StatusCode.BAD)
 						return
 					}
+				}).catch(() => {
+					this.emit('error', `Watchdog: Could not get list all WorkFlows, restarting.`)
+					this._coreHandler.killProcess(1)
 				})
 			}, this._watchdogTime)
 		})

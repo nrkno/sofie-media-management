@@ -329,7 +329,7 @@ export class QuantelGateway extends EventEmitter {
 	private async _ensureGoodResponse<T extends Promise<any>> (pResponse: T): Promise<T>
 	private async _ensureGoodResponse<T extends Promise<any>> (pResponse: T, if404ThenNull: true): Promise<T | null>
 	private async _ensureGoodResponse<T extends Promise<any>> (pResponse: T, if404ThenNull?: boolean): Promise<T | null> {
-		const response = await pResponse
+		const response = await (pResponse as Promise<any>)
 		if (
 			response &&
 			_.isObject(response) &&

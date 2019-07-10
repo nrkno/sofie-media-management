@@ -174,6 +174,9 @@ export class MediaManager {
 					}
 				}
 			})
+			.catch(() => {
+				this._logger.error(`coreHandler.onChanged: Could not get peripheral device`)
+			})
 		})
 	}
 }
