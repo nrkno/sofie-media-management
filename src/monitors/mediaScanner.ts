@@ -3,11 +3,12 @@ import * as PouchDB from 'pouchdb-node'
 import * as _ from 'underscore'
 import * as PromiseSequence from 'promise-sequence'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
-import axios from 'axios'
+import * as request from 'request-promise-native'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
 import { MonitorSettingsMediaScanner, MediaObject, DiskInfo } from '../api'
 import { LoggerInstance } from 'winston'
+import { FetchError } from 'node-fetch'
 
 export class MonitorMediaScanner extends Monitor {
 
@@ -41,17 +42,19 @@ export class MonitorMediaScanner extends Monitor {
 	constructor (deviceId: string, _settings: MonitorSettingsMediaScanner, logger: LoggerInstance) {
 		super(deviceId, _settings, logger)
 
+		this._settings.port = this._settings.port || 8000 // use default port if not set
+
 		this._updateStatus()
 	}
 
 	get deviceInfo (): MonitorDevice {
+		// @ts-ignore: todo: make stronger typed, via core-integration
 		return {
 			deviceName: `MediaScanner (${this._settings.host}:${this._settings.port})`,
 			deviceId: this.deviceId,
 
 			deviceCategory: PeripheralDeviceAPI.DeviceCategory.MEDIA_MANAGER,
 			deviceType: PeripheralDeviceAPI.DeviceType.MEDIA_MANAGER,
-
 			// @ts-ignore: todo: make stronger typed, via core-integration
 			deviceSubType: 'mediascanner'
 		}
@@ -67,7 +70,7 @@ export class MonitorMediaScanner extends Monitor {
 
 				this.logger.info('MediaScanner init')
 
-				const baseUrl = 'http://' + this._settings.host + ':' + this._settings.port
+				const baseUrl = 'http://' + this._settings.host + ':' + (this._settings.port)
 
 				if (this._doReplication) {
 					this._db = new PouchDB('local')
@@ -189,8 +192,12 @@ export class MonitorMediaScanner extends Monitor {
 
 		(async () => {
 
-			const response = await axios.get(`http://${this._settings.host}:${this._settings.port}/stat/fs`)
-			const disks: Array<DiskInfo> = response.data
+			const response = await request({
+				method: 'GET',
+				uri: `http://${this._settings.host}:${this._settings.port}/stat/fs`,
+				json: true
+			}).promise()
+			const disks: Array<DiskInfo> = response
 
 			// @todo: we temporarily report under playout-gateway, until we can handle multiple media-scanners
 			let messages: Array<string> = []
@@ -396,9 +403,10 @@ export class MonitorMediaScanner extends Monitor {
 		) {
 			// TODO: try to reconnect
 			this.logger.warn('MediaScanner: ' + err.code)
-		} else if (err instanceof SyntaxError) {
+		} else if (err instanceof SyntaxError || err instanceof FetchError) {
 			this.logger.warn('MediaScanner: Connection terminated (' + err.message + ')') // most likely
-			// TODO: try to reconnect
+			this._restartChangesStream(true)
+			return // restart silently, since PouchDB connections can drop from time to time and are not a very big issue
 		} else {
 			this.logger.error('MediaScanner: Error', err)
 		}

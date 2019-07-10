@@ -122,7 +122,6 @@
     "production"
   ],
   "dependencies": {
-    "axios": "^0.18.0",
     "chokidar": "^2.0.4",
     "class-transformer": "^0.2.0",
     "fs-extra": "^7.0.1",
