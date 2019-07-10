@@ -149,7 +149,9 @@ export class MediaManager {
 		.on('debug', this._logger.debug)
 
 		await Promise.all(this._availableStorage.map((st) => {
-			st.handler.init().catch(reason => {
+			st.handler.init().then(() => {
+				this._logger.info(`Storage handler for "${st.id}" initialized.`)
+			}).catch(reason => {
 				this.coreHandler.setProcessState(st.id, [`Could not set up storage handler "${st.id}": ${reason}`], P.StatusCode.BAD)
 				throw reason
 			})

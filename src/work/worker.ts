@@ -1,10 +1,11 @@
 import { EventEmitter } from 'events'
-import { literal, LogEvents, getID, updateDB } from '../lib/lib'
+import { literal, LogEvents, getID, updateDB, getCurrentTime } from '../lib/lib'
 
-import { WorkStepStatus, WorkStepAction, DeviceSettings } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings, Time } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
+import { CancelHandler } from '../lib/cancelablePromise';
 
 const escapeUrlComponent = encodeURIComponent
 
@@ -24,7 +25,9 @@ export class Worker extends EventEmitter {
 	private _trackedMediaItems: TrackedMediaItems
 	private _config: DeviceSettings
 	private _currentStep: GeneralWorkStepDB | undefined
+	private _currentAbortHandler: (() => void) | undefined
 	private _finishPromises: Array<Function> = []
+	private _lastBeginStep: Time | undefined
 
 	constructor (db: PouchDB.Database<WorkStepDB>, tmi: TrackedMediaItems, config: DeviceSettings) {
 		super()
@@ -43,6 +46,9 @@ export class Worker extends EventEmitter {
 	get step (): GeneralWorkStepDB | undefined {
 		return this._currentStep
 	}
+	get lastBeginStep (): Time | undefined {
+		return this._busy ? this._lastBeginStep : undefined
+	} 
 	/**
 	 * synchronous pre-step, to be called before doWork.
 	 * run as an intent to start a work (soon)
@@ -81,11 +87,14 @@ export class Worker extends EventEmitter {
 		this._busy = true
 		this._warmingUp = false
 		this._currentStep = step
+		this._lastBeginStep = getCurrentTime()
+		this._currentAbortHandler = undefined
 
 		switch (step.action) {
 			case WorkStepAction.COPY:
 				return unBusyAndFailStep(this.doCompositeCopy(step,
-					(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed)))
+					(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed),
+					(onCancel) => this._currentAbortHandler = onCancel))
 			case WorkStepAction.DELETE:
 				return unBusyAndFailStep(this.doDelete(step))
 			case WorkStepAction.GENERATE_METADATA:
@@ -102,9 +111,9 @@ export class Worker extends EventEmitter {
 	 * Instead use this.waitUntilFinished to determine if worker is done or not.
 	 */
 	tryToAbort () {
-		if (this.busy && this.step) {
+		if (this.busy && this.step && this._currentAbortHandler) {
 			// Implement abort functions
-
+			this._currentAbortHandler()
 		}
 	}
 	/**
@@ -319,8 +328,11 @@ export class Worker extends EventEmitter {
 		}
 	}
 
-	private async doCompositeCopy (step: FileWorkStep, reportProgress?: (progress: number) => void): Promise<WorkResult> {
-		const copyResult = await this.doCopy(step, reportProgress)
+	private async doCompositeCopy (step: FileWorkStep, reportProgress?: (progress: number) => void, onCancel?: CancelHandler): Promise<WorkResult> {
+		const copyResult = await this.doCopy(step, reportProgress, onCancel)
+		// this is a composite step that can be only cancelled (for now) at the copy stage
+		// so we need to unset the cancel handler ourselves
+		this._currentAbortHandler = undefined
 		if (copyResult.status === WorkStepStatus.DONE) {
 			const metadataResult = await this.doGenerateMetadata(literal<ScannerWorkStep>({
 				action: WorkStepAction.GENERATE_METADATA,
@@ -338,12 +350,12 @@ export class Worker extends EventEmitter {
 		}
 	}
 
-	private async doCopy (step: FileWorkStep, reportProgress?: (progress: number) => void): Promise<WorkResult> {
-		try {
-			await step.target.handler.putFile(step.file, reportProgress)
-			this.emit('debug', `Starting updating TMI on "${step.file.name}"`)
-			try {
-				await this._trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItem) => {
+	private doCopy (step: FileWorkStep, reportProgress?: (progress: number) => void, onCancel?: CancelHandler): Promise<WorkResult> {
+		return new Promise((resolve) => {
+			const p = step.target.handler.putFile(step.file, reportProgress)
+			p.then(() => {
+				this.emit('debug', `Starting updating TMI on "${step.file.name}"`)
+				this._trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItem) => {
 					// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 					if (tmi) {
 						if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
@@ -352,18 +364,26 @@ export class Worker extends EventEmitter {
 						return tmi
 					}
 					return undefined
+				}).then(() => {
+					this.emit('debug', `Finish updating TMI on "${step.file.name}"`)
+					resolve(literal<WorkResult>({
+						status: WorkStepStatus.DONE
+					}))
+				}).catch((e) => {
+					this.emit('debug', `Failure updating TMI`, e)
+					resolve(this.failStep(e))
 				})
-				this.emit('debug', `Finish updating TMI on "${step.file.name}"`)
-				return literal<WorkResult>({
-					status: WorkStepStatus.DONE
+			}).catch((e1) => {
+				resolve(this.failStep(e1))
+			})
+
+			if (onCancel) {
+				onCancel(() => {
+					p.cancel()
+					this.emit('warn', `Canceled copy operation on "${step.file.name}"`)
 				})
-			} catch (e) {
-				this.emit('debug', `Failure updating TMI`, e)
-				return this.failStep(e)
 			}
-		} catch (e1) {
-			return this.failStep(e1)
-		}
+		})
 	}
 
 	private async doDelete (step: FileWorkStep): Promise<WorkResult> {
