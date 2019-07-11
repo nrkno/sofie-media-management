@@ -36,3 +36,14 @@ yarn build-win32
 
 * jest
 	yarn global add jest
+
+## Quantel URL Scheme
+
+The Quantel Scanner connects to a Quantel Gateway and through it contacts the Quantel ISA to query it about Expected Media Items. The Expected Media Items use a `quantel:` url scheme to locate clips:
+
+`quantel:[Clip GUID|?Title]`
+
+| Argument | Description |
+| -------- | ----------- |
+| Clip GUID | The GUID of a clip to be monitored |
+| Title | A Title to be used to search the ISA database |
