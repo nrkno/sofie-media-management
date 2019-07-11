@@ -1,4 +1,5 @@
 import * as _ from 'underscore'
+import * as url from 'url'
 import {
 	PeripheralDeviceAPI,
 	Collection,
@@ -18,6 +19,12 @@ const BREATHING_ROOM = 300
 const CHECK_TIME_READY = 60 * 1000
 /** Minimum time between checks of missing files  */
 const CHECK_TIME_OTHER = 2 * 1000
+
+type QuantelClipSearchQuery = {
+	ClipGUID?: string,
+	Title?: string
+}
+const QUANTEL_URL_PROTOCOL = 'quantel:'
 
 export class MonitorQuantel extends Monitor {
 
@@ -135,6 +142,29 @@ export class MonitorQuantel extends Monitor {
 			}
 		}
 	}
+	private shouldHandleItem (obj: ExpectedMediaItem): boolean {
+		if (obj.url && obj.url.startsWith(QUANTEL_URL_PROTOCOL)) {
+			return true
+		}
+		return false
+	}
+	private parseUrlToQuery (queryUrl: string): QuantelClipSearchQuery {
+		const parsed = url.parse(queryUrl)
+		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`Unsupported URL format: ${queryUrl}`)
+		const guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
+																 // path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
+		const title = decodeURI(parsed.query || '')				 // query for quantel:?Clip title or quantel:?"Clip title"
+		if (guid) {
+			return {
+				ClipGUID: guid
+			}
+		} else if (title) {
+			return {
+				Title: title
+			}
+		}
+		throw new Error(`Unsupported URL format: ${queryUrl}`)
+	}
 	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
 		let item: ExpectedMediaItem
 		if (obj) {
@@ -146,11 +176,14 @@ export class MonitorQuantel extends Monitor {
 
 		// Note: The item.url will contain the clip GUID
 		if (item.url && !this.monitoredFiles[item.url]) {
-			this.monitoredFiles[item.url] = {
-				status: QuantelMonitorFileStatus.UNKNOWN,
-				title: '',
-				lastChecked: 0
-		   }
+			const url = this.shouldHandleItem(item)
+			if (url) {
+				this.monitoredFiles[item.url] = {
+					status: QuantelMonitorFileStatus.UNKNOWN,
+					title: '',
+					lastChecked: 0
+			   }
+			}
 		}
 	}
 	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
@@ -158,11 +191,14 @@ export class MonitorQuantel extends Monitor {
 		if (!item) throw new Error(`Could not find the changed item "${id}" in expectedMediaItems`)
 
 		if (item.url && !this.monitoredFiles[item.url]) {
-			this.monitoredFiles[item.url] = {
-				status: QuantelMonitorFileStatus.UNKNOWN,
-				title: '',
-				lastChecked: 0
-		   }
+			const url = this.shouldHandleItem(item)
+			if (url) {
+				this.monitoredFiles[item.url] = {
+					status: QuantelMonitorFileStatus.UNKNOWN,
+					title: '',
+					lastChecked: 0
+			   }
+			}
 		}
 	}
 	private onExpectedRemoved = (_id: string, oldValue: ExpectedMediaItem) => {
@@ -210,9 +246,7 @@ export class MonitorQuantel extends Monitor {
 						let mediaObject: MediaObject | null = null
 
 						if (url) {
-							const clipSummaries = await this._quantel.searchClip({
-								ClipGUID: url
-							})
+							const clipSummaries = await this._quantel.searchClip(this.parseUrlToQuery(url))
 							if (clipSummaries.length >= 1) {
 								const clipSummary = _.find(clipSummaries, (clipData) => {
 									return (
@@ -230,7 +264,7 @@ export class MonitorQuantel extends Monitor {
 									if (clipData) {
 										// Make our best effort to try to construct a mediaObject:
 										mediaObject = {
-											mediaId: clipData.Title,
+											mediaId: url,
 											mediaPath: clipData.ClipGUID,
 											mediaSize: 1,
 											mediaTime: 0,
