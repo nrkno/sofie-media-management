@@ -123,6 +123,7 @@ export class MonitorMediaScanner extends Monitor {
 							const doc2 = await this._db.get<MediaObject>(doc.id, {
 								attachments: true
 							})
+							doc2.mediaId = doc2._id
 							await this._sendChanged(doc2)
 
 							await new Promise(resolve => {
@@ -382,6 +383,7 @@ export class MonitorMediaScanner extends Monitor {
 			if (!(md._id + '').match(/watchdogIgnore/i)) { // Ignore watchdog file changes
 
 				this.logger.debug('MediaScanner: updateMediaObject', newSequenceNr, md._id, md.mediaId)
+				md.mediaId = md._id
 				this._sendChanged(md)
 				.catch((e) => {
 					this.logger.error('MediaScanner: Error sending changed doc', e)

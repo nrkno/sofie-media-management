@@ -11,6 +11,7 @@ import { LoggerInstance } from 'winston'
 import { MonitorSettingsQuantel, ExpectedMediaItem } from '../api'
 import { QuantelGateway } from './lib/quantelGateway'
 import { MediaObject } from '../api/mediaObject'
+import { getHash } from '../lib/lib';
 
 /** The minimum time to wait between polling status */
 const BREATHING_ROOM = 300
@@ -156,11 +157,11 @@ export class MonitorQuantel extends Monitor {
 		const title = decodeURI(parsed.query || '')				 // query for quantel:?Clip title or quantel:?"Clip title"
 		if (guid) {
 			return {
-				ClipGUID: guid
+				ClipGUID: `"${guid}"`
 			}
 		} else if (title) {
 			return {
-				Title: title
+				Title: `"${title}"`
 			}
 		}
 		throw new Error(`Unsupported URL format: ${queryUrl}`)
@@ -176,12 +177,14 @@ export class MonitorQuantel extends Monitor {
 
 		// Note: The item.url will contain the clip GUID
 		if (item.url && !this.monitoredFiles[item.url]) {
-			const url = this.shouldHandleItem(item)
-			if (url) {
+			const shouldHandle = this.shouldHandleItem(item)
+			this.logger.debug(`${item.url}`, JSON.stringify(item))
+			if (shouldHandle) {
 				this.monitoredFiles[item.url] = {
 					status: QuantelMonitorFileStatus.UNKNOWN,
 					title: '',
-					lastChecked: 0
+					lastChecked: 0,
+					url: item.url
 			   }
 			}
 		}
@@ -191,12 +194,14 @@ export class MonitorQuantel extends Monitor {
 		if (!item) throw new Error(`Could not find the changed item "${id}" in expectedMediaItems`)
 
 		if (item.url && !this.monitoredFiles[item.url]) {
-			const url = this.shouldHandleItem(item)
-			if (url) {
+			const shouldHandle = this.shouldHandleItem(item)
+			this.logger.debug(`${item.url}`, JSON.stringify(item))
+			if (shouldHandle) {
 				this.monitoredFiles[item.url] = {
 					status: QuantelMonitorFileStatus.UNKNOWN,
 					title: '',
-					lastChecked: 0
+					lastChecked: 0,
+					url: item.url
 			   }
 			}
 		}
@@ -264,7 +269,7 @@ export class MonitorQuantel extends Monitor {
 									if (clipData) {
 										// Make our best effort to try to construct a mediaObject:
 										mediaObject = {
-											mediaId: url,
+											mediaId: url.toUpperCase(),
 											mediaPath: clipData.ClipGUID,
 											mediaSize: 1,
 											mediaTime: 0,
@@ -280,7 +285,7 @@ export class MonitorQuantel extends Monitor {
 											tinf: '',
 
 											_attachments: {},
-											_id: clipData.ClipGUID,
+											_id: getHash(url + clipData.ClipGUID),
 											_rev: 'modified' + clipData.Modified
 										}
 									} else this.logger.warn(`Clip "${url}" summary found, but clip not found when asking for clipId`)
@@ -410,7 +415,7 @@ interface QuantelMonitorFile {
 	title: string | undefined
 	status: QuantelMonitorFileStatus
 	lastChecked: number
-
+	url: string
 }
 enum QuantelMonitorFileStatus {
 	UNKNOWN = 0,

@@ -63,7 +63,6 @@ export abstract class Monitor extends EventEmitter {
 		try {
 
 			let sendDoc = _.omit(doc, ['_attachments'])
-			sendDoc.mediaId = doc._id
 			// @ts-ignore
 			// this.logger.info('MediaScanner: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
 			await this._coreHandler.core.callMethodLowPrio(PeripheralDeviceAPI.methods.updateMediaObject, [

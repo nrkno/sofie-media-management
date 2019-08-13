@@ -20,11 +20,11 @@ export class QuantelGateway extends EventEmitter {
 	private _statusMessage: string | null = 'Initializing...' // null = all good
 	private _cachedServer?: Q.ServerInfo | null
 
-	constructor () {
+	constructor() {
 		super()
 	}
 
-	public async init (
+	public async init(
 		gatewayUrl: string,
 		ISAUrl: string,
 		zoneId: string | undefined,
@@ -32,7 +32,7 @@ export class QuantelGateway extends EventEmitter {
 	): Promise<void> {
 		this._gatewayUrl = (
 			gatewayUrl
-			.replace(/\/$/, '') // trim trailing slash
+				.replace(/\/$/, '') // trim trailing slash
 		)
 		if (!this._gatewayUrl.match(/http/)) this._gatewayUrl = 'http://' + this._gatewayUrl
 
@@ -51,14 +51,17 @@ export class QuantelGateway extends EventEmitter {
 
 		this._initialized = true
 	}
-	public async connectToISA (ISAUrl: string) {
-		this._ISAUrl = ISAUrl.replace(/^https?:\/\//, '') // trim any https://
-		return this._ensureGoodResponse(this.sendRaw('post', `connect/${encodeURIComponent(this._ISAUrl) }`))
+	public async connectToISA(ISAUrl?: string) {
+		if (ISAUrl) {
+			this._ISAUrl = ISAUrl.replace(/^https?:\/\//, '') // trim any https://
+		}
+		if (!this._ISAUrl) throw new Error('Quantel connectToIsa: ISAUrl not set!')
+		return this._ensureGoodResponse(this.sendRaw('post', `connect/${encodeURIComponent(this._ISAUrl)}`))
 	}
-	public dispose () {
+	public dispose() {
 		clearInterval(this._monitorInterval)
 	}
-	public monitorServerStatus (callbackOnStatusChange: (connected: boolean, errorMessage: string | null) => void) {
+	public monitorServerStatus(callbackOnStatusChange: (connected: boolean, errorMessage: string | null) => void) {
 
 		const getServerStatus = async (): Promise<string | null> => {
 			try {
@@ -81,49 +84,49 @@ export class QuantelGateway extends EventEmitter {
 		}
 		const checkServerStatus = () => {
 			getServerStatus()
-			.then((statusMessage) => {
-				if (statusMessage !== this._statusMessage) {
-					this._statusMessage = statusMessage
-					callbackOnStatusChange(statusMessage === null, statusMessage)
-				}
-			})
-			.catch((e) => this.emit('error', e))
+				.then((statusMessage) => {
+					if (statusMessage !== this._statusMessage) {
+						this._statusMessage = statusMessage
+						callbackOnStatusChange(statusMessage === null, statusMessage)
+					}
+				})
+				.catch((e) => this.emit('error', e))
 		}
 		this._monitorInterval = setInterval(() => {
 			checkServerStatus()
 		}, this.checkStatusInterval)
 		checkServerStatus() // also run one right away
 	}
-	public get connected (): boolean {
+	public get connected(): boolean {
 		return this._statusMessage === null
 	}
-	public get statusMessage (): string | null {
+	public get statusMessage(): string | null {
 		return this._statusMessage
 	}
-	public get initialized (): boolean {
+	public get initialized(): boolean {
 		return this._initialized
 	}
-	public get gatewayUrl (): string {
+	public get gatewayUrl(): string {
 		return this._gatewayUrl
 	}
-	public get ISAUrl (): string {
+	public get ISAUrl(): string {
 		return this._ISAUrl
 	}
-	public get zoneId (): string {
+	public get zoneId(): string {
 		return this._zoneId
 	}
-	public get serverId (): number {
+	public get serverId(): number {
 		return this._serverId
 	}
 
-	public async getZones (): Promise<Q.ZoneInfo[]> {
+	public async getZones(): Promise<Q.ZoneInfo[]> {
 		return this._ensureGoodResponse(this.sendRaw('get', ''))
 	}
-	public async getServers (zoneId: string): Promise<Q.ServerInfo[]> {
+	public async getServers(zoneId: string): Promise<Q.ServerInfo[]> {
 		return this._ensureGoodResponse(this.sendRaw('get', `${zoneId}/server`))
 	}
 	/** Return the (possibly cached) server */
-	public async getServer (): Promise<Q.ServerInfo | null> {
+	public async getServer(): Promise<Q.ServerInfo | null> {
 		if (this._cachedServer !== undefined) return this._cachedServer
 
 		const servers = await this.getServers(this._zoneId)
@@ -135,7 +138,7 @@ export class QuantelGateway extends EventEmitter {
 	}
 
 	/** Create a port and connect it to a channel */
-	public async getPort (portId: string): Promise<Q.PortStatus | null> {
+	public async getPort(portId: string): Promise<Q.PortStatus | null> {
 		try {
 			return await this.sendServer('get', `port/${portId}`)
 		} catch (e) {
@@ -143,15 +146,15 @@ export class QuantelGateway extends EventEmitter {
 			throw e
 		}
 	}
-	public async createPort (portId: string, channelId: number): Promise<Q.PortInfo> {
+	public async createPort(portId: string, channelId: number): Promise<Q.PortInfo> {
 		return this.sendServer('put', `port/${portId}/channel/${channelId}`)
 	}
-	public async releasePort (portId: string): Promise<Q.ReleaseStatus> {
+	public async releasePort(portId: string): Promise<Q.ReleaseStatus> {
 		return this.sendServer('delete', `port/${portId}`)
 	}
 
 	/** Get info about a clip */
-	public async getClip (clipId: number): Promise<Q.ClipData | null> {
+	public async getClip(clipId: number): Promise<Q.ClipData | null> {
 		try {
 			return await this.sendZone('get', `clip/${clipId}`) as Promise<Q.ClipData>
 		} catch (e) {
@@ -159,12 +162,12 @@ export class QuantelGateway extends EventEmitter {
 			throw e
 		}
 	}
-	public async searchClip (searchQuery: ClipSearchQuery): Promise<Q.ClipDataSummary[]> {
+	public async searchClip(searchQuery: ClipSearchQuery): Promise<Q.ClipDataSummary[]> {
 		return this.sendZone('get', `clip`, searchQuery)
 	}
-	public async getClipFragments (clipId: number): Promise<Q.ServerFragments>
-	public async getClipFragments (clipId: number, inPoint: number, outPoint: number): Promise<Q.ServerFragments> // Query fragments for a specific in-out range:
-	public async getClipFragments (clipId: number, inPoint?: number, outPoint?: number): Promise<Q.ServerFragments> {
+	public async getClipFragments(clipId: number): Promise<Q.ServerFragments>
+	public async getClipFragments(clipId: number, inPoint: number, outPoint: number): Promise<Q.ServerFragments> // Query fragments for a specific in-out range:
+	public async getClipFragments(clipId: number, inPoint?: number, outPoint?: number): Promise<Q.ServerFragments> {
 		if (inPoint !== undefined && outPoint !== undefined) {
 			return this.sendZone('get', `clip/${clipId}/fragments/${inPoint}-${outPoint}`)
 		} else {
@@ -172,13 +175,13 @@ export class QuantelGateway extends EventEmitter {
 		}
 	}
 	/** Load specified fragments onto a port */
-	public async loadFragmentsOntoPort (portId: string, fragments: Q.ServerFragmentTypes[], offset?: number): Promise<Q.PortStatus> {
+	public async loadFragmentsOntoPort(portId: string, fragments: Q.ServerFragmentTypes[], offset?: number): Promise<Q.PortLoadStatus> {
 		return this.sendServer('post', `port/${portId}/fragments`, {
 			offset: offset
 		}, fragments)
 	}
 	/** Query the port for which fragments are loaded. */
-	public async getFragmentsOnPort (portId: string, rangeStart?: number, rangeEnd?: number): Promise<Q.ServerFragments> {
+	public async getFragmentsOnPort(portId: string, rangeStart?: number, rangeEnd?: number): Promise<Q.ServerFragments> {
 		return this.sendServer('get', `port/${portId}/fragments`, {
 			start: rangeStart,
 			finish: rangeEnd
@@ -186,13 +189,13 @@ export class QuantelGateway extends EventEmitter {
 		// /:zoneID/server/:serverID/port/:portID/fragments(?start=:start&finish=:finish)
 	}
 	/** Start playing on a port */
-	public async portPlay (portId: string): Promise<Q.TriggerResult> {
+	public async portPlay(portId: string): Promise<Q.TriggerResult> {
 		const response = await this.sendServer('post', `port/${portId}/trigger/START`) as Q.TriggerResult
 		if (!response.success) throw Error(`Quantel trigger start: Server returned success=${response.success}`)
 		return response
 	}
 	/** Stop (pause) playback on a port. If stopAtFrame is provided, the playback will stop at the frame specified. */
-	public async portStop (portId: string, stopAtFrame?: number): Promise<Q.TriggerResult> {
+	public async portStop(portId: string, stopAtFrame?: number): Promise<Q.TriggerResult> {
 		const response = await this.sendServer('post', `port/${portId}/trigger/STOP`, {
 			offset: stopAtFrame
 		}) as Q.TriggerResult
@@ -200,7 +203,7 @@ export class QuantelGateway extends EventEmitter {
 		return response
 	}
 	/** Jump directly to a frame, note that this might cause flicker on the output, as the frames haven't been preloaded  */
-	public async portHardJump (portId: string, jumpToFrame?: number): Promise<Q.JumpResult> {
+	public async portHardJump(portId: string, jumpToFrame?: number): Promise<Q.JumpResult> {
 		const response = await this.sendServer('post', `port/${portId}/trigger/JUMP`, {
 			offset: jumpToFrame
 		}) as Q.JumpResult
@@ -208,7 +211,7 @@ export class QuantelGateway extends EventEmitter {
 		return response
 	}
 	/** Prepare a jump to a frame (so that those frames are preloaded into memory) */
-	public async portPrepareJump (portId: string, jumpToFrame?: number): Promise<Q.JumpResult> {
+	public async portPrepareJump(portId: string, jumpToFrame?: number): Promise<Q.JumpResult> {
 		const response = await this.sendServer('put', `port/${portId}/jump`, {
 			offset: jumpToFrame
 		}) as Q.JumpResult
@@ -216,7 +219,7 @@ export class QuantelGateway extends EventEmitter {
 		return response
 	}
 	/** After having preloading a jump, trigger the jump */
-	public async portTriggerJump (portId: string): Promise<Q.TriggerResult> {
+	public async portTriggerJump(portId: string): Promise<Q.TriggerResult> {
 		const response = await this.sendServer('post', `port/${portId}/trigger/JUMP`) as Q.TriggerResult
 		if (!response.success) throw Error(`Quantel trigger jump: Server returned success=${response.success}`)
 		return response
@@ -224,7 +227,7 @@ export class QuantelGateway extends EventEmitter {
 	/** Clear all fragments from a port.
 	 * If offsetIn and offsetOut is provided, will clear the fragments for that time range
 	 */
-	public async portClear (portId: string, rangeStart?: number, rangeEnd?: number): Promise<Q.WipeResult> {
+	public async portClear(portId: string, rangeStart?: number, rangeEnd?: number): Promise<Q.WipeResult> {
 		const response = await this.sendServer('delete', `port/${portId}/fragments`, {
 			start: rangeStart,
 			finish: rangeEnd
@@ -233,13 +236,13 @@ export class QuantelGateway extends EventEmitter {
 		return response
 	}
 
-	private async sendServer (method: Methods, resource: string, queryParameters?: QueryParameters, bodyData?: object) {
+	private async sendServer(method: Methods, resource: string, queryParameters?: QueryParameters, bodyData?: object) {
 		return this.sendZone(method, `server/${this._serverId}/${resource}`, queryParameters, bodyData)
 	}
-	private async sendZone (method: Methods, resource: string, queryParameters?: QueryParameters, bodyData?: object) {
+	private async sendZone(method: Methods, resource: string, queryParameters?: QueryParameters, bodyData?: object) {
 		return this.sendBase(method, `${this._zoneId}/${resource}`, queryParameters, bodyData)
 	}
-	private async sendBase (method: Methods, resource: string, queryParameters?: QueryParameters, bodyData?: object) {
+	private async sendBase(method: Methods, resource: string, queryParameters?: QueryParameters, bodyData?: object) {
 		if (!this._initialized) {
 			throw new Error('Quantel not initialized yet')
 		}
@@ -268,7 +271,37 @@ export class QuantelGateway extends EventEmitter {
 	// 		)
 	// 	})
 	// }
-	private sendRaw (
+	private async sendRaw(
+		method: Methods,
+		resource: string,
+		queryParameters?: QueryParameters,
+		bodyData?: object
+	): Promise<any> {
+
+		const response = await this.sendRawInner(
+			method,
+			resource,
+			queryParameters,
+			bodyData
+		)
+
+		if (
+			this._isAnErrorResponse(response) &&
+			response.status === 599 // toto: determine 5xx code need to call connect first
+		) {
+			await this.connectToISA()
+			// Then try again:
+			return this.sendRawInner(
+				method,
+				resource,
+				queryParameters,
+				bodyData
+			)
+		} else {
+			return response
+		}
+	}
+	private sendRawInner(
 		method: Methods,
 		resource: string,
 		queryParameters?: QueryParameters,
@@ -312,11 +345,11 @@ export class QuantelGateway extends EventEmitter {
 			return res
 		})
 	}
-	private urlQuery (url: string, params: QueryParameters = {}): string {
+	private urlQuery(url: string, params: QueryParameters = {}): string {
 		let queryString = _.compact(
 			_.map(params, (value, key: string) => {
 				if (value !== undefined) {
-					return `${key}=${encodeURIComponent(value + '')}`
+					return `${key}=${encodeURIComponent(value.toString())}`
 				}
 				return null
 			})
@@ -326,18 +359,12 @@ export class QuantelGateway extends EventEmitter {
 	/**
 	 * If the response is an error, instead throw the error instead of returning it
 	 */
-	private async _ensureGoodResponse<T extends Promise<any>> (pResponse: T): Promise<T>
-	private async _ensureGoodResponse<T extends Promise<any>> (pResponse: T, if404ThenNull: true): Promise<T | null>
-	private async _ensureGoodResponse<T extends Promise<any>> (pResponse: T, if404ThenNull?: boolean): Promise<T | null> {
-		const response = await (pResponse as Promise<any>)
+	private async _ensureGoodResponse<T extends Promise<any>>(pResponse: T): Promise<T>
+	private async _ensureGoodResponse<T extends Promise<any>>(pResponse: T, if404ThenNull: true): Promise<T | null>
+	private async _ensureGoodResponse<T extends Promise<any>>(pResponse: T, if404ThenNull?: boolean): Promise<T | null> {
+		const response = await Promise.resolve(pResponse) // Wrapped in Promise.resolve due to for some reason, tslint doen't understand that pResponse is a Promise
 		if (
-			response &&
-			_.isObject(response) &&
-			response.status &&
-			_.isNumber(response.status) &&
-			_.isString(response.message) &&
-			_.isString(response.stack) &&
-			response.status !== 200
+			this._isAnErrorResponse(response)
 		) {
 			if (response.status === 404) {
 				if (if404ThenNull) {
@@ -354,15 +381,26 @@ export class QuantelGateway extends EventEmitter {
 		}
 		return response
 	}
+	private _isAnErrorResponse(response: any): boolean {
+		return (
+			response &&
+			_.isObject(response) &&
+			response.status &&
+			_.isNumber(response.status) &&
+			_.isString(response.message) &&
+			_.isString(response.stack) &&
+			response.status !== 200
+		)
+	}
 }
-type QueryParameters = {[key: string]: string | number | undefined}
+type QueryParameters = { [key: string]: string | number | undefined }
 type Methods = 'post' | 'get' | 'put' | 'delete'
 
 export type Optional<T> = {
 	[K in keyof T]?: T[K]
 }
 export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>
-interface ClipSearchQuery {
+export interface ClipSearchQuery {
 	/** Limit the maximum number of clips returned */
 	limit?: number
 	// clip properties
@@ -412,7 +450,7 @@ interface ClipSearchQuery {
 }
 // Note: These typings are a copied from https://github.com/nrkno/tv-automation-quantel-gateway
 export namespace Q {
-	type DateString = string // it's a string with an ISO-date in it
+	export type DateString = string // it's a string with an ISO-date in it
 
 	export interface ZoneInfo {
 		type: 'ZonePortal'
@@ -479,12 +517,14 @@ export namespace Q {
 	}
 
 	export interface ClipPropertyList {
-		[ name: string ]: string
+		// Use property 'limit' of type number to set the maximum number of values to return
+		[name: string]: string
 	}
 
 	export interface ClipDataSummary {
 		type: 'ClipDataSummary' | 'ClipData'
 		ClipID: number
+		ClipGUID: string
 		CloneID: number | null
 		Completed: DateString | null
 		Created: DateString, // ISO-formatted date
@@ -501,7 +541,7 @@ export namespace Q {
 		CloneZone: number | null
 		Destination: number | null
 		Expiry: DateString | null, // ISO-formatted date
-	 	HasEditData: number | null
+		HasEditData: number | null
 		Inpoint: number | null
 		JobID: number | null
 		Modified: string | null
@@ -521,7 +561,6 @@ export namespace Q {
 		Division: string
 		AudioFormats: string
 		VideoFormats: string
-		ClipGUID: string
 		Protection: string
 		VDCPID: string
 		PublishCompleted: DateString | null, // ISO-formatted date
@@ -533,15 +572,23 @@ export namespace Q {
 		start: number
 		finish: number
 	}
+
 	export type ServerFragmentTypes =
 		VideoFragment |
 		AudioFragment |
 		AUXFragment |
-		CCFragment |
+		FlagsFragment |
 		TimecodeFragment |
+		AspectFragment |
+		CropFragment |
+		PanZoomFragment |
+		SpeedFragment |
+		MultiCamFragment |
+		CCFragment |
+		NoteFragment |
 		EffectFragment
 
-	interface PositionData extends ServerFragment {
+	export interface PositionData extends ServerFragment {
 		rushID: string
 		format: number
 		poolID: number
@@ -562,15 +609,9 @@ export namespace Q {
 		type: 'AUXFragment'
 	}
 
-	export interface CCFragment extends ServerFragment {
-		type: 'CCFragment'
-		ccID: string
-		ccType: number
-		effectID: number
-	}
-	export interface EffectFragment extends ServerFragment {
-		type: 'EffectFragment'
-		effectID: number
+	export interface FlagsFragment extends ServerFragment {
+		type: 'FlagsFragment'
+		flags: number
 	}
 
 	export interface TimecodeFragment extends ServerFragment {
@@ -578,7 +619,59 @@ export namespace Q {
 		userBits: number
 	}
 
-	// TODO extend with the different types
+	export interface AspectFragment extends ServerFragment {
+		type: 'AspectFragment'
+		width: number
+		height: number
+	}
+
+	export interface CropFragment extends ServerFragment {
+		type: 'CropFragment'
+		x: number
+		y: number
+		width: number
+		height: number
+	}
+
+	export interface PanZoomFragment extends ServerFragment {
+		type: 'PanZoomFragment'
+		x: number
+		y: number
+		hZoom: number
+		vZoon: number
+	}
+
+	export interface SpeedFragment extends ServerFragment {
+		type: 'SpeedFragment'
+		speed: number
+		profile: number
+	}
+
+	export interface MultiCamFragment extends ServerFragment {
+		type: 'MultiCamFragment'
+		stream: number
+	}
+
+	export interface CCFragment extends ServerFragment {
+		type: 'CCFragment'
+		ccID: string
+		ccType: number
+		effectID: number
+	}
+
+	export interface NoteFragment extends ServerFragment {
+		type: 'NoteFragment'
+		noteID: number
+		aux: number
+		mask: number
+		note: string | null
+	}
+
+	export interface EffectFragment extends ServerFragment {
+		type: 'EffectFragment'
+		effectID: number
+	}
+
 	export interface ServerFragments extends ClipRef {
 		type: 'ServerFragments'
 		fragments: ServerFragmentTypes[]
@@ -638,8 +731,10 @@ export namespace Q {
 
 	export interface ConnectionDetails {
 		type: string
-		isaIOR: string | null
+		isaIOR: string
 		href: string
+		refs: string[]
+		robin: number
 	}
 
 	export interface CloneRequest extends ClipRef {
@@ -655,5 +750,50 @@ export namespace Q {
 	export interface WipeResult extends WipeInfo {
 		type: 'WipeResult'
 		wiped: boolean
+	}
+
+	export interface FormatRef {
+		formatNumber: number
+	}
+
+	export interface FormatInfo extends FormatRef {
+		type: 'FormatInfo'
+		essenceType: 'VideoFragment' | 'AudioFragment' | 'AUXFragment' | 'FlagsFragment' |
+		'TimecodeFragment' | 'AspectFragment' | 'CropFragment' | 'PanZoomFragment' |
+		'MultiCamFragment' | 'CCFragment' | 'NoteFragment' | 'EffectFragment' | 'Unknown',
+		frameRate: number
+		height: number
+		width: number
+		samples: number
+		compressionFamily: number
+		protonsPerAtom: number
+		framesPerAtom: number
+		quark: number
+		formatName: string
+		layoutName: string
+		compressionName: string
+	}
+
+	export interface CloneInfo {
+		zoneID?: number // Source zone ID, omit for local zone
+		clipID: number // Source clip ID
+		poolID: number // Destination pool ID
+		priority?: number // Priority, between 0 (low) and 15 (high) - default is 8 (standard)
+		history?: boolean // Should an interzone clone link to historical provinance - default is true
+	}
+
+	export interface CloneResult extends CloneInfo {
+		type: 'CloneResult'
+		copyID: number
+		copyCreated: boolean
+	}
+
+	export interface CopyProgress extends ClipRef {
+		type: 'CopyProgress'
+		totalProtons: number
+		protonsLeft: number
+		secsLeft: number
+		priority: number
+		ticketed: boolean
 	}
 }
