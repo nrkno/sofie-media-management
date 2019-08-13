@@ -256,7 +256,9 @@ export class MonitorQuantel extends Monitor {
 								const clipSummary = _.find(clipSummaries, (clipData) => {
 									return (
 										clipData.PoolID &&
-										(server.pools || []).indexOf(clipData.PoolID) !== -1 // If present in any of the pools of the server
+										(server.pools || []).indexOf(clipData.PoolID) !== -1 && // If present in any of the pools of the server
+										parseInt(clipData.Frames, 10) > 0 &&
+										clipData.Completed // Nore from Richard: Completed might not necessarily mean that it's completed on the right server
 									)
 								})
 								if (clipSummary) {
