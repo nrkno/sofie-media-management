@@ -35,7 +35,7 @@ export namespace robocopy {
 
 			rbcpy.on('close', (code) => {
 				rbcpy = undefined
-				if (code === 1) { // Robocopy's code for succesfully copying files is 1: https://ss64.com/nt/robocopy-exit.html
+				if ((code & 1) === 1) { // Robocopy's code for succesfully copying files is 1 at LSB: https://ss64.com/nt/robocopy-exit.html
 					if (srcFileName !== dstFileName) {
 						fs.rename(path.join(dstFolder, srcFileName), path.join(dstFolder, dstFileName), (err) => {
 							if (err) {
