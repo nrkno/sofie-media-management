@@ -157,7 +157,7 @@ export class MonitorQuantel extends Monitor {
 		let title = decodeURI(parsed.query || '')				 // query for quantel:?Clip title or quantel:?"Clip title"
 
 		if (guid.startsWith("?")) {	// check if the title wasn't mistakenly matched as GUID
-			title = guid
+			title = guid.substr(1)
 			guid = ''
 		}
 
