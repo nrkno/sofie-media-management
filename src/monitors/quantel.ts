@@ -152,9 +152,15 @@ export class MonitorQuantel extends Monitor {
 	private parseUrlToQuery (queryUrl: string): QuantelClipSearchQuery {
 		const parsed = url.parse(queryUrl)
 		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`Unsupported URL format: ${queryUrl}`)
-		const guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
+		let guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
 																 // path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
-		const title = decodeURI(parsed.query || '')				 // query for quantel:?Clip title or quantel:?"Clip title"
+		let title = decodeURI(parsed.query || '')				 // query for quantel:?Clip title or quantel:?"Clip title"
+
+		if (guid.startsWith("?")) {	// check if the title wasn't mistakenly matched as GUID
+			title = guid
+			guid = ''
+		}
+
 		if (guid) {
 			return {
 				ClipGUID: `"${guid}"`
