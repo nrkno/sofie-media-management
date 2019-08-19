@@ -78,6 +78,9 @@ export class Dispatcher extends EventEmitter {
 
 		this._coreHandler.restartWorkflow = (workflowId) => this.actionRestartWorkflow(workflowId)
 		this._coreHandler.abortWorkflow = (workflowId) => this.actionAbortWorkflow(workflowId)
+		this._coreHandler.prioritizeWorkflow = (workflowId) => this.prioritizeWorkflow(workflowId)
+		this._coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
+		this._coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
 		this.attachLogEvents('TrackedMediaItems', this._tmi)
 
 		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
@@ -225,9 +228,9 @@ export class Dispatcher extends EventEmitter {
 			} else return Promise.resolve()
 		})
 		.then(() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD), (e) => {
-			this.emit('debug', `Could not place media scanner in manual mode`, e)
+			this.emit('debug', `Could not place Media Scanner in manual mode`, e)
 			this._coreHandler.setProcessState('MediaScanner', [
-				`Could not place media scanner in manual mode: ${JSON.stringify(e)}`
+				`Could not place Media Scanner in manual mode: ${this.convertMediaScannerExceptionToError(e)}`
 			], P.StatusCode.WARNING_MAJOR)
 
 			this.scannerManualModeBestEffort(true)
@@ -241,7 +244,7 @@ export class Dispatcher extends EventEmitter {
 				gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
 				this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
 			})
-		}).then(() => this.restartWorkSteps())
+		}).then(() => this.cancelLeftoverWorkSteps())
 	}
 
 	async destroy (): Promise<void> {
@@ -264,6 +267,40 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
 	}
+
+	private convertMediaScannerExceptionToError (e: Error) {
+		if (e.name) {
+			switch (e.name) {
+				case 'RequestError':
+					return `Could not connect to Media Scanner`
+				case 'StatusCodeError':
+					return `Invalid response from Media Scanner`
+				default:
+					return `Unknown error: ${e.name}`
+			}
+		} else {
+			return `Unknown issue. See Media Manager log for details.`
+		}
+	}
+
+	private async actionRestartAllWorkflows () {
+		const wfs = await this._workFlows.find({
+			selector: {
+				finished: true
+			}
+		})
+		await Promise.all(wfs.docs.map(i => this.actionRestartWorkflow(i._id)))
+	}
+
+	private async actionAbortAllWorkflows () {
+		const wfs = await this._workFlows.find({
+			selector: {
+				finished: false
+			}
+		})
+		await Promise.all(wfs.docs.map(i => this.actionAbortWorkflow(i._id)))
+	}
+
 	private async actionRestartWorkflow (workflowId: string) {
 		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
 
@@ -272,8 +309,69 @@ export class Dispatcher extends EventEmitter {
 		// Step 1: Abort the workflow
 		await this.actionAbortWorkflow(wf._id)
 
-		// Step 2: Try to abort the workers and wait for them to finish
+		// Step 2: Reset the workflow
+		const steps = await this._workSteps.find({
+			selector: {
+				workFlowId: workflowId
+			}
+		})
+		// Reset the workflow steps
+		await Promise.all(steps.docs.map((step: WorkStepDB) => updateDB(this._workSteps, step._id,
+			(step) => {
+				step.status = WorkStepStatus.IDLE
+				step.messages = [`Restarted at ${(new Date()).toTimeString()}`]
+				step.progress = 0
+				step.expectedLeft = undefined
+				step.modified = getCurrentTime()
+				return step
+			}
+		)))
+		await updateDB(this._workFlows, wf._id, (wf) => {
+			wf.finished = false
+			wf.success = false
+			wf.modified = getCurrentTime()
+			// wf.priority = 999
+			return wf
+		})
 
+		this.dispatchWork()
+	}
+	private async prioritizeWorkflow (workflowId: string) {
+		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+
+		const prioritized = wf.priority > 1 ? true : false
+
+		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+
+		const result = await this._workSteps.find({
+			selector: {
+				workFlowId: workflowId
+			}
+		})
+		await Promise.all(result.docs.map(item => updateDB(this._workSteps, item._id,
+			(item) => {
+				item.priority = prioritized ? item.priority / 10 : item.priority * 10
+				item.modified = getCurrentTime()
+				item.messages = _.union(item.messages || [], [`Priority changed to ${item.priority} at ${new Date(getCurrentTime())}`])
+				return item
+			}
+		)))
+
+		await updateDB(this._workFlows, wf._id, (wf) => {
+			wf.modified = getCurrentTime()
+			wf.priority = prioritized ? wf.priority / 2 : wf.priority * 2
+			return wf
+		})
+	}
+	private async actionAbortWorkflow (workflowId: string) {
+		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+
+		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+
+		// Step 1: Block all Idle steps
+		await this.blockStepsInWorkFlow(wf._id, 'Aborted')
+
+		// Step 2: Try to abort the workers and wait for them to finish
 		// Reset workers:
 		const ps: Array<Promise<any>> = []
 		this._workers.forEach((worker: Worker) => {
@@ -288,43 +386,12 @@ export class Dispatcher extends EventEmitter {
 		// Wait for all relevant workers to finish:
 		await Promise.all(ps)
 
-		// Step 3: Reset the workflow
-		const steps = await this._workSteps.find({
-			selector: {
-				workFlowId: workflowId
-			}
-		})
-		// Reset the workflow steps
-		await Promise.all(steps.docs.map((step: WorkStepDB) => {
-			return updateDB(this._workSteps, step._id, (step) => {
-				step.status = WorkStepStatus.IDLE
-				step.messages = [`Restarted at ${(new Date()).toTimeString()}`]
-				step.progress = 0
-				step.expectedLeft = undefined
-				step.modified = getCurrentTime()
-				return step
-			})
-		}))
 		await updateDB(this._workFlows, wf._id, (wf) => {
-			wf.finished = false
+			wf.finished = true
 			wf.success = false
 			wf.modified = getCurrentTime()
-			// wf.priority = 999
 			return wf
 		})
-
-		this.dispatchWork()
-	}
-	private async actionAbortWorkflow (workflowId: string) {
-		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
-
-		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
-
-		await this.blockStepsInWorkFlow(wf._id, 'Aborted')
-
-		wf.finished = true
-		wf.success = false
-
 	}
 	private cleanupOldWorkflows (): Promise<void> {
 		return this._workFlows.find({
@@ -416,7 +483,7 @@ export class Dispatcher extends EventEmitter {
 			this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
 			this.emit('debug', `Scanner placed in manual mode`)
 		}, () => {
-			// this.emit('debug', `Could not place media scanner in manual mode: ${e}, will retry in 5s`)
+			// this.emit('debug', `Could not place Media Scanner in manual mode: ${e}, will retry in 5s`)
 			this._bestEffort = setTimeout(() => {
 				this.scannerManualModeBestEffort(manual)
 			}, 5000)
@@ -508,23 +575,36 @@ export class Dispatcher extends EventEmitter {
 		})
 	}
 	/**
-	 * Restart unfinished worksteps (to be run after startup)
+	 * Cancel unfinished worksteps (to be run after startup)
 	 * @private
 	 * @return Promise<void>
 	 * @memberof Dispatcher
 	 */
-	private async restartWorkSteps (): Promise<void> {
+	private async cancelLeftoverWorkSteps (): Promise<void> {
+		const wfs: string[] = []
 		const brokenItems = await this._workSteps.find({ selector: {
 			status: WorkStepStatus.WORKING
 		}})
-		return Promise.all(brokenItems.docs.map(i => {
-			i.status = WorkStepStatus.IDLE
-			i.modified = getCurrentTime()
-			return this._workSteps.put(i)
-		})).then(() => {
-			this.dispatchWork()
+		return Promise.all(brokenItems.docs.map(i => updateDB(this._workSteps, i._id,
+			(i) => {
+				i.status = WorkStepStatus.ERROR
+				i.modified = getCurrentTime()
+				i.messages = _.union(i.messages || [], [ 'Working on shutdown, failed.' ])
+				if (wfs.indexOf(i._id) < 0) {
+					wfs.push(i._id)
+				}
+				return i
+			}
+		))).then(() => {
+			return Promise.all(brokenItems.docs.map(i => this.blockStepsInWorkFlow(i.workFlowId))).then(() => { })
+		}).then(() => {
+			return Promise.all(wfs.map(i => updateDB(this._workFlows, i, (wf) => {
+				wf.finished = true
+				wf.success = false
+				return wf
+			}))).then(() => { })
 		}).catch((e) => {
-			this.emit('error', `Unable to restart old workSteps`, e)
+			this.emit('error', `Unable to cancel old workSteps`, e)
 		})
 	}
 	/**
@@ -535,7 +615,6 @@ export class Dispatcher extends EventEmitter {
 	 * @memberof Dispatcher
 	 */
 	private async setStepWorking (stepId: string): Promise<void> {
-
 		return updateDB(this._workSteps, stepId, (step) => {
 			step.status = WorkStepStatus.WORKING
 			step.modified = getCurrentTime()
@@ -577,10 +656,12 @@ export class Dispatcher extends EventEmitter {
 		.then((result) => {
 			return Promise.all(result.docs.map(item => {
 				if (item.status === WorkStepStatus.IDLE) {
-					item.status = WorkStepStatus.BLOCKED
-					item.modified = getCurrentTime()
-					if (stepMessage) item.messages = [stepMessage]
-					return this._workSteps.put(item).then(() => { })
+					return updateDB(this._workSteps, item._id, (item) => {
+						item.status = WorkStepStatus.BLOCKED
+						item.modified = getCurrentTime()
+						if (stepMessage) item.messages = [stepMessage]
+						return item
+					}).then(() => { })
 				}
 				return Promise.resolve()
 			}))
@@ -644,13 +725,12 @@ export class Dispatcher extends EventEmitter {
 
 						// update WorkFlow in DB
 						return this._workFlows.get(wf._id)
-						.then((obj) => {
-							const wf = obj as object as WorkFlowDB
+						.then((wf) => updateDB(this._workFlows, wf._id, (wf) => {
 							wf.finished = isFinished
 							wf.success = isSuccessful
 							wf.modified = getCurrentTime()
-							return this._workFlows.put(wf)
-						})
+							return wf
+						}))
 						.then(() => this.emit('info', `WorkFlow ${wf._id} is now finished ${isSuccessful ? 'successfully' : 'unsuccessfully'}`))
 						.catch((e) => {
 							this.emit('error', `Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}`, e)

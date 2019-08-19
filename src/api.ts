@@ -39,6 +39,10 @@ export type Duration = number // Duration, in ms
  */
 export interface ExpectedMediaItem {
 	_id: string
+
+	/** Label on the source Piece */
+	label?: string
+
 	/** Local path to the media object */
 	path: string
 
@@ -56,6 +60,9 @@ export interface ExpectedMediaItem {
 
 	/** Time to wait before removing file */
 	lingerTime?: Duration
+
+	/** Studio expecting the item */
+	studioId: string
 }
 
 export enum MediaFlowType {
@@ -122,6 +129,8 @@ export interface WorkFlow {
 	_id: string
 
 	name?: string
+	/** A secondary name, some kind of a comment about the workFlow */
+	comment?: string
 
 	source: WorkFlowSource
 	/** Id of the expectedMedia Item */
