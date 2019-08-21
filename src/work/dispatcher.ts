@@ -189,37 +189,7 @@ export class Dispatcher extends EventEmitter {
 				this.cleanupOldWorkflows().catch(e => this.emit('error', 'Unhandled error in cleanupOldWorkflows', e))
 			}, this._cronJobTime)
 			this._watchdogInterval = setInterval(() => {
-				this._workFlows.allDocs({
-					include_docs: true
-				}).then((workFlows) => {
-					const unfinishedWorkFlows = workFlows.rows.filter(i => i.doc && i.doc.finished === false)
-					const oldWorkFlows = unfinishedWorkFlows.filter(i => i.doc && i.doc.created < (getCurrentTime() - (3 * 60 * 60 * 1000)))
-					const recentlyFinished = workFlows.rows.filter(i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > (getCurrentTime() - this._warningTaskWorkingTime))
-					if (unfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
-						this._coreHandler.setProcessState('Dispatcher', [
-							`No WorkFlow has finished in the last ${Math.floor(this._warningTaskWorkingTime / (60 * 1000))} minutes`
-						], P.StatusCode.BAD)
-						return
-					}
-					if (oldWorkFlows.length > 0) {
-						this._coreHandler.setProcessState('Dispatcher', [
-							`Some WorkFlows have been waiting more than 3hrs to be completed`
-						], P.StatusCode.BAD)
-						return
-					}
-					if (unfinishedWorkFlows.length > this._warningWFQueueLength) {
-						this._coreHandler.setProcessState('Dispatcher', [
-							`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`
-						], P.StatusCode.WARNING_MAJOR)
-						return
-					}
-					if (_.compact(this._workers.map(i => i.lastBeginStep && i.lastBeginStep < (getCurrentTime() - this._warningTaskWorkingTime))).length > 0) {
-						this._coreHandler.setProcessState('Dispatcher', [
-							`Some workers have been working for more than ${Math.floor(this._warningTaskWorkingTime / (60 * 1000))} minutes`
-						], P.StatusCode.BAD)
-						return
-					}
-				})
+				this.watchdog()
 			}, this._watchdogTime)
 		})
 		.then(() => {
@@ -266,6 +236,43 @@ export class Dispatcher extends EventEmitter {
 		.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
 		.then(() => this.emit('debug', `Dispatcher destroyed.`))
 		.then(() => { })
+	}
+
+	private watchdog () {
+		this._workFlows.allDocs({
+			include_docs: true
+		}).then((workFlows) => {
+			const unfinishedWorkFlows = workFlows.rows.filter(i => i.doc && i.doc.finished === false)
+			const oldWorkFlows = unfinishedWorkFlows.filter(i => i.doc && i.doc.created < (getCurrentTime() - (3 * 60 * 60 * 1000)))
+			const recentlyFinished = workFlows.rows.filter(i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > (getCurrentTime() - (15 * 60 * 1000)))
+			if (unfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
+				this._coreHandler.setProcessState('Dispatcher', [
+					`No WorkFlow has finished in the last 15 minutes`
+				], P.StatusCode.BAD)
+				return
+			}
+			if (oldWorkFlows.length > 0) {
+				this._coreHandler.setProcessState('Dispatcher', [
+					`Some WorkFlows have been waiting more than 3hrs to be completed`
+				], P.StatusCode.BAD)
+				return
+			}
+			if (unfinishedWorkFlows.length > this._warningWFQueueLength) {
+				this._coreHandler.setProcessState('Dispatcher', [
+					`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`
+				], P.StatusCode.WARNING_MAJOR)
+				return
+			}
+			if (_.compact(this._workers.map(i => i.lastBeginStep && i.lastBeginStep < (getCurrentTime() - this._warningTaskWorkingTime))).length > 0) {
+				this._coreHandler.setProcessState('Dispatcher', [
+					`Some workers have been working for more than ${Math.floor(this._warningTaskWorkingTime / (60 * 1000))} minutes`
+				], P.StatusCode.BAD)
+				return
+			}
+		}).catch(() => {
+			this.emit('error', `Watchdog: Could not list all WorkFlows, restarting.`)
+			this._coreHandler.killProcess(1)
+		})
 	}
 
 	private convertMediaScannerExceptionToError (e: Error) {
