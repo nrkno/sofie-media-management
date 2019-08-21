@@ -29,6 +29,8 @@ enum MMPDMethods {
 	'updateMediaWorkFlowStep' = 'peripheralDevice.mediaManager.updateMediaWorkFlowStep'
 }
 
+const PROCESS_NAME = 'Dispatcher'
+
 /**
  * The dispatcher connects the storages to the workflow generators
  * And then dispathes the work to the workers
@@ -246,29 +248,31 @@ export class Dispatcher extends EventEmitter {
 			const oldWorkFlows = unfinishedWorkFlows.filter(i => i.doc && i.doc.created < (getCurrentTime() - (3 * 60 * 60 * 1000)))
 			const recentlyFinished = workFlows.rows.filter(i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > (getCurrentTime() - (15 * 60 * 1000)))
 			if (unfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
-				this._coreHandler.setProcessState('Dispatcher', [
+				this._coreHandler.setProcessState(PROCESS_NAME, [
 					`No WorkFlow has finished in the last 15 minutes`
 				], P.StatusCode.BAD)
 				return
 			}
 			if (oldWorkFlows.length > 0) {
-				this._coreHandler.setProcessState('Dispatcher', [
+				this._coreHandler.setProcessState(PROCESS_NAME, [
 					`Some WorkFlows have been waiting more than 3hrs to be completed`
 				], P.StatusCode.BAD)
 				return
 			}
 			if (unfinishedWorkFlows.length > this._warningWFQueueLength) {
-				this._coreHandler.setProcessState('Dispatcher', [
+				this._coreHandler.setProcessState(PROCESS_NAME, [
 					`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`
 				], P.StatusCode.WARNING_MAJOR)
 				return
 			}
 			if (_.compact(this._workers.map(i => i.lastBeginStep && i.lastBeginStep < (getCurrentTime() - this._warningTaskWorkingTime))).length > 0) {
-				this._coreHandler.setProcessState('Dispatcher', [
+				this._coreHandler.setProcessState(PROCESS_NAME, [
 					`Some workers have been working for more than ${Math.floor(this._warningTaskWorkingTime / (60 * 1000))} minutes`
 				], P.StatusCode.BAD)
 				return
 			}
+			// no problems found, set status to GOOD
+			this._coreHandler.setProcessState(PROCESS_NAME, [], P.StatusCode.GOOD)
 		}).catch(() => {
 			this.emit('error', `Watchdog: Could not list all WorkFlows, restarting.`)
 			this._coreHandler.killProcess(1)
