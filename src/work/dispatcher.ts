@@ -54,9 +54,11 @@ export class Dispatcher extends EventEmitter {
 	private _cronJobTime: number
 	private _watchdogTime: number = 5 * 60 * 1000
 	private _workFlowLingerTime: number
+	private _watchdogRunning: boolean = false
 
 	private _warningWFQueueLength: number
 	private _warningTaskWorkingTime: number
+
 
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
@@ -243,6 +245,10 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private watchdog () {
+		if (this._watchdogRunning) return
+
+		this._watchdogRunning = true
+
 		this._workFlows.allDocs({
 			include_docs: true
 		}).then((workFlows) => {
@@ -278,6 +284,8 @@ export class Dispatcher extends EventEmitter {
 		}).catch(() => {
 			this.emit('error', `Watchdog: Could not list all WorkFlows, restarting.`)
 			this._coreHandler.killProcess(1)
+		}).then(() => {
+			this._watchdogRunning = false
 		})
 	}
 
@@ -779,6 +787,13 @@ export class Dispatcher extends EventEmitter {
 					.then(() => this._workers[i].doWork(nextJob as GeneralWorkStepDB))
 					.then((result) => this.processResult(nextJob, result))
 					.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
+					.then(() => {
+						try {
+							this.watchdog()
+						} catch (e) {
+							this.emit('error', `Unhandled exception in watchdog`, e)
+						}
+					})
 					.then(() => this.dispatchWork()) // dispatch more work once this job is done
 					.catch(e => {
 						this.emit('error', `There was an unhandled error when handling job "${nextJob._id}"`, e)
