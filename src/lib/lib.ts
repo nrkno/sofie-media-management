@@ -67,7 +67,7 @@ export type LogEvents = 'debug' | 'info' | 'warn' | 'error'
 export function getFlowHash (wf: WorkFlow): string {
 	const stringified = (wf.name || 'UNNAMED') + ';' +
 		wf.steps.map(i => _.values(
-			_.omit(i, ['expectedLeft', 'messages', 'priority', 'progress', 'status'])
+			_.omit(i, ['_id', '_rev', 'status', 'messages', 'modified', 'priority', 'progress', 'expectedLeft'])
 			).map(j => {
 				if (typeof j === 'object') {
 					return _.compact(_.values(j).map(k => typeof k === 'object' ? null : k)).join(':')
