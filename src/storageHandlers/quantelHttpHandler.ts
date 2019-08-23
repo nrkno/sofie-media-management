@@ -68,14 +68,14 @@ export class QuantelHTTPFile implements File {
 	private transformerUrl: string
 	private query: QuantelHTTPQuery
 
-	constructor(gateway: QuantelGateway, transformerUrl: string, url: string, read: boolean,  name?: string)
-	constructor(gateway: QuantelGateway, transformerUrl: string, url?: string, read?: boolean, name?: string) {
+	constructor(gateway: QuantelGateway, transformerUrl: string, url: string, read: boolean,  _name?: string)
+	constructor(gateway: QuantelGateway, transformerUrl: string, url?: string, read?: boolean, _name?: string) {
 		this.gateway = gateway
 		this.transformerUrl = transformerUrl
 		if (url) {
 			this._url = decodeURIComponent(url)
 			this.query = parseQuantelUrl(this._url)
-			this._name = name || this.query.Title || this.query.ClipGUID || url
+			this._name = url
 			this._read = !!read
 		}
 	}
@@ -102,7 +102,7 @@ export class QuantelHTTPFile implements File {
 					if (parseInt(clip.Frames, 10) > 0) {
 						console.log(`Non 0-length clip found: ${clip.ClipID}. Requesting over HTTP`)
 						atomicPromise('quantelTransformer', (): Promise<http.IncomingMessage> => {
-							return new Promise<http.IncomingMessage>((resolve, reject) => {
+							return new Promise<http.IncomingMessage>((resolveAtomic, rejectAtomic) => {
 								http.get(`${this.transformerUrl}/quantel/homezone/clips/ports/${clip.ClipID}/essence.mxf`)
 									.on('response', (data: http.IncomingMessage) => {
 										if (data.statusCode === 200) {
@@ -113,11 +113,15 @@ export class QuantelHTTPFile implements File {
 										}
 									}).on('error', (err) => {
 										reject(err)
+										rejectAtomic()
+									}).on('close', () => {
+										console.log(`Connection closed on ${clip.ClipID}. Begin cooldown.`)
+										setTimeout(function () {
+											resolveAtomic()
+										}, 3000)
 									})
 							})
 						})
-						.then((data) => resolve(data))
-						.catch((err) => reject(err))
 					} else {
 						throw Error(`Clip found, but 0-length`)
 					}
@@ -130,6 +134,7 @@ export class QuantelHTTPFile implements File {
 
 	async getProperties(): Promise<FileProperties> {
 		return getHTTPProperties(this.gateway, this._url).then((props) => {
+			if (props.size === 0) throw Error(`Reserved clip: ${this._url}`)
 			props.size = undefined
 			return props
 		})

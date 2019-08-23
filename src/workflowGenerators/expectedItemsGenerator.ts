@@ -207,7 +207,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			targetStorageIds: [flow.destinationId]
 		}
 
-		this._trackedItems.getById(item.path)
+		this._trackedItems.getById(fileName)
 		.then((tracked) => {
 			if (tracked.sourceStorageId === flow.sourceId) {
 				const update = _.extend(tracked, baseObj)
@@ -511,7 +511,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							rFile.getProperties().then((rFileProps) => {
 								if (rFileProps.size !== sFileProps.size && rFileProps.size !== undefined && sFileProps.size !== undefined) {
 									this.emit('debug', 'File sizes: ', rFileProps.size, sFileProps.size)
-									// File size doesn't match, and both 
+									// File size doesn't match, and both are defined
 									this.emitCopyWorkflow(file, i)
 								}
 							}, (e) => {
@@ -521,6 +521,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							})
 						}, (_err) => {
 							// the file not found
+							this.emit('debug', `File not found: "${tmi.name}"`)
 							this.emitCopyWorkflow(file, i)
 						})
 					})
