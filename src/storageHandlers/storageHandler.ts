@@ -55,9 +55,9 @@ export abstract class File {
 }
 
 export interface FileProperties {
-	size: number
-	created: Time
-	modified: Time
+	size: number | undefined
+	created: Time | undefined
+	modified: Time | undefined
 }
 
 export enum StorageEventType {

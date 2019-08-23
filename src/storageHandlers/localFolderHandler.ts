@@ -176,7 +176,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			localFile.getProperties()
 			.then((targetProperties) => {
 				if (typeof progressCallback === 'function') {
-					progressCallback(targetProperties.size / sourceProperties.size)
+					progressCallback((targetProperties.size || 0) / (sourceProperties.size || 1))
 				}
 			}, (error) => {
 				// this is just to report progress on the file

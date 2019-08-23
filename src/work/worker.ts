@@ -153,6 +153,7 @@ export class Worker extends EventEmitter {
 		// this.emit('debug', `${step._id}: Progress ${Math.round(progress * 100)}%`)
 
 		if (!this._busy) return // Don't report on progress unless we're busy
+		progress = Math.max(0, Math.min(1, progress)) // sanitize progress value
 
 		return updateDB(this._db, step._id, (obj) => {
 			const currentProgress = obj.progress || 0

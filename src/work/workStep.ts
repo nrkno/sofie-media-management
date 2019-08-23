@@ -2,6 +2,7 @@ import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
 import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
+import { QuantelHTTPFile } from '../storageHandlers/quantelHttpHandler';
 
 export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
 
@@ -34,7 +35,8 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 		discriminator: {
 			property: '__type',
 			subTypes: [
-				{ value: LocalFolderFile, name: 'localFolderFile' }
+				{ value: LocalFolderFile, name: 'localFolderFile' },
+				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' }
 			]
 		}
 	})
@@ -68,7 +70,8 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 		discriminator: {
 			property: '__type',
 			subTypes: [
-				{ value: LocalFolderFile, name: 'localFolderFile' }
+				{ value: LocalFolderFile, name: 'localFolderFile' },
+				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' }
 			]
 		}
 	})

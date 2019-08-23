@@ -509,8 +509,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						i.handler.getFile(tmi.name).then((rFile) => {
 							// the file exists on target storage
 							rFile.getProperties().then((rFileProps) => {
-								if (rFileProps.size !== sFileProps.size) {
-									// File size doesn't match
+								if (rFileProps.size !== sFileProps.size && rFileProps.size !== undefined && sFileProps.size !== undefined) {
+									this.emit('debug', 'File sizes: ', rFileProps.size, sFileProps.size)
+									// File size doesn't match, and both 
 									this.emitCopyWorkflow(file, i)
 								}
 							}, (e) => {
