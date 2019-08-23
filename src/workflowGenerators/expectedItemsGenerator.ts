@@ -368,7 +368,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		this.purgeOldExpectedItems()
 		.then(() => {
 			this.emit('debug', `Doing expected items storage check`)
-			this._storages.forEach((i) => this.expectedStorageCheck(i))
+			this._storages.forEach((i) => this.expectedStorageCheck(i, true))
 		}).catch((e) => {
 			this.emit('error', `There was an error running the cron job`, e)
 		})
@@ -394,9 +394,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		return this.expectedStorageCheck(st)
 	}
 
-	protected async expectedStorageCheck (st: StorageObject): Promise<void> {
+	protected async expectedStorageCheck (st: StorageObject, withDelay?: boolean): Promise<void> {
 		const tmis = await this._trackedItems.getAllFromStorage(st.id)
-		tmis.forEach((item) => this.checkAndEmitCopyWorkflow(item, 'expectedStorageCheck'))
+		tmis.forEach((item) => this.checkAndEmitCopyWorkflow(item, 'expectedStorageCheck', withDelay))
 	}
 	/**
 	 * Checks all expectedMediaItems, makes sure that we're tracking them, and starts any work that might be due
@@ -566,7 +566,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 * Checks if the item exists on the storage and issues workflows
 	 * @param tmi
 	 */
-	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItem, reason: string) {
+	protected checkAndEmitCopyWorkflow (tmi: TrackedMediaItem, reason: string, withRetry?: boolean) {
 		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
 		const storage = this._storages.find(i => i.id === tmi.sourceStorageId)
 		if (!storage) throw new Error(`Could not find storage "${tmi.sourceStorageId}"`)
@@ -602,7 +602,14 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							})
 						}, (_err) => {
 							// the file not found
-							this.emitCopyWorkflow(file, i, tmi.comment, reason, `File not found on target storage`)
+							if (withRetry) {
+								setTimeout(() => {
+									this.emit('debug', `Retrying a check for a "${tmi.name}" file that wasn't found on target storage "${i.id}"`)
+									this.checkAndEmitCopyWorkflow(tmi, reason)
+								}, 60 * 1000)
+							} else {
+								this.emitCopyWorkflow(file, i, tmi.comment, reason, `File not found on target storage`)
+							}
 						})
 					})
 				}).catch((e) => {
