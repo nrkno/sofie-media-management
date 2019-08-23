@@ -272,7 +272,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			targetStorageIds: [ flow.destinationId ]
 		}
 
-		this._trackedItems.getById(item.path)
+		this._trackedItems.getById(fileName)
 		.then((tracked) => {
 			if (tracked.sourceStorageId === flow.sourceId) {
 				const update = _.extend(tracked, baseObj) as TrackedMediaItemDB

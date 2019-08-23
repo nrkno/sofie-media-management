@@ -1,11 +1,12 @@
-import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage } from '../api'
+import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage, QuantelHTTPStorage } from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
 import { LocalFolderHandler } from './localFolderHandler'
 import { FileShareHandler } from './fileShareHandler'
+import { QuantelHTTPHandler } from './quantelHttpHandler'
 import { CancelablePromise } from '../lib/cancelablePromise'
 
-export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage
+export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage
 
 export interface StorageObject extends StorageSettings {
 	handler: StorageHandler
@@ -55,9 +56,9 @@ export abstract class File {
 }
 
 export interface FileProperties {
-	size: number
-	created: Time
-	modified: Time
+	size: number | undefined
+	created: Time | undefined
+	modified: Time | undefined
 }
 
 export enum StorageEventType {
@@ -167,5 +168,7 @@ export function buildStorageHandler (storage: GeneralStorageSettings): StorageHa
 			return new LocalFolderHandler(storage)
 		case StorageType.FILE_SHARE:
 			return new FileShareHandler(storage)
+		case StorageType.QUANTEL_HTTP:
+			return new QuantelHTTPHandler(storage)
 	}
 }

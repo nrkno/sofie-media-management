@@ -9,9 +9,9 @@ import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
 import { LoggerInstance } from 'winston'
 import { MonitorSettingsQuantel, ExpectedMediaItem } from '../api'
-import { QuantelGateway } from './lib/quantelGateway'
+import { QuantelGateway } from '../lib/quantelGateway'
 import { MediaObject } from '../api/mediaObject'
-import { getHash } from '../lib/lib';
+import { getHash } from '../lib/lib'
 
 /** The minimum time to wait between polling status */
 const BREATHING_ROOM = 300
