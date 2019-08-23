@@ -80,6 +80,8 @@ export class Dispatcher extends EventEmitter {
 		this._config = config
 		this._coreHandler = coreHandler
 
+		if (!this._config.mediaScanner) this._config.mediaScanner = { port: 80 } // tmp fix
+
 		this._coreHandler.restartWorkflow = (workflowId) => this.actionRestartWorkflow(workflowId)
 		this._coreHandler.abortWorkflow = (workflowId) => this.actionAbortWorkflow(workflowId)
 		this._coreHandler.prioritizeWorkflow = (workflowId) => this.prioritizeWorkflow(workflowId)

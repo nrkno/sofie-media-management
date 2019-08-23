@@ -2,13 +2,15 @@
 import { CoreConnection,
 	CoreOptions,
 	PeripheralDeviceAPI as P,
-	DDPConnectorOptions
+	DDPConnectorOptions,
+	PeripheralDeviceAPI
 } from 'tv-automation-server-core-integration'
 import * as _ from 'underscore'
 import * as Winston from 'winston'
 import { DeviceConfig } from './mediaManager'
 const depsVersions = require('./deps-metadata.json')
 import { Process } from './process'
+import { Monitor } from './monitors/_monitor'
 
 export interface CoreConfig {
 	host: string,
@@ -30,7 +32,7 @@ export interface PeripheralDeviceCommand {
 	time: number // time
 }
 /**
- * Represents a connection to the Core
+ * Represents a connection between the Core and the media-manager
  */
 export class CoreHandler {
 	core: CoreConnection
@@ -149,7 +151,7 @@ export class CoreHandler {
 		await this.updateCoreStatus()
 		await this.core.destroy()
 	}
-	getCoreConnectionOptions (name: string, subDeviceId: string): CoreOptions {
+	getCoreConnectionOptions (name: string, subDeviceId: string, subType?: P.DeviceSubType): CoreOptions {
 		let credentials: {
 			deviceId: string
 			deviceToken: string
@@ -174,7 +176,7 @@ export class CoreHandler {
 
 			deviceCategory: P.DeviceCategory.MEDIA_MANAGER,
 			deviceType: P.DeviceType.MEDIA_MANAGER,
-			deviceSubType: P.SUBTYPE_PROCESS,
+			deviceSubType: subType || P.SUBTYPE_PROCESS,
 
 			deviceName: name,
 			watchDog: (this._coreConfig ? this._coreConfig.watchdog : true)
@@ -267,7 +269,7 @@ export class CoreHandler {
 	retireExecuteFunction (cmdId: string) {
 		delete this._executedFunctions[cmdId]
 	}
-	setupObserverForPeripheralDeviceCommands (functionObject: CoreHandler) {
+	setupObserverForPeripheralDeviceCommands (functionObject: CoreHandler | CoreMonitorHandler) {
 		let observer = functionObject.core.observe('peripheralDeviceCommands')
 		functionObject.killProcess(0)
 		functionObject._observers.push(observer)
@@ -392,4 +394,132 @@ export class CoreHandler {
 		return depsVersions || {}
 	}
 
+}
+
+/**
+ * Represents a connection between the Core and a Monitor
+ */
+export class CoreMonitorHandler {
+	core: CoreConnection
+	public _observers: Array<any> = []
+	// public _device: MonitorDevice
+	private _coreParentHandler: CoreHandler
+	private monitor: Monitor
+	private _subscriptions: Array<string> = []
+	private _hasGottenStatusChange: boolean = false
+
+	constructor (parent: CoreHandler, monitor: Monitor) {
+		this._coreParentHandler = parent
+		// this._device = device
+		this.monitor = monitor
+
+		this._coreParentHandler.logger.info('new CoreMonitorHandler ' + monitor.deviceInfo.deviceName)
+
+	}
+	async init (): Promise<void> {
+		let deviceName = this.monitor.deviceInfo.deviceName
+		let deviceId = this.monitor.deviceInfo.deviceId
+
+		this.core = new CoreConnection(
+			this._coreParentHandler.getCoreConnectionOptions(
+				deviceName,
+				'Monitor' + deviceId,
+				this.monitor.deviceType as P.DeviceSubType // tmp, this should be a proper subType
+			)
+		)
+		this.core.onError((err) => {
+			this._coreParentHandler.logger.error('Core Error: ' + ((_.isObject(err) && err.message) || err.toString() || err))
+		})
+		this.core.onInfo((message) => {
+			this._coreParentHandler.logger.info('Core Info: ' + ((_.isObject(message) && message.message) || message.toString() || message))
+		})
+		await this.core.init(this._coreParentHandler.core)
+
+		if (!this._hasGottenStatusChange) {
+			await this.core.setStatus(this.monitor.status)
+		}
+		await this.setupSubscriptionsAndObservers()
+	}
+	async setupSubscriptionsAndObservers (): Promise<void> {
+
+		if (this._observers.length) {
+			this._coreParentHandler.logger.info('CoreMonitorHandler: Clearing observers..')
+			this._observers.forEach((obs) => {
+				obs.stop()
+			})
+			this._observers = []
+		}
+		let deviceId = this.monitor.deviceInfo.deviceId
+
+		this._coreParentHandler.logger.info('CoreMonitorHandler: Setting up subscriptions for ' + this.core.deviceId + ' for device ' + deviceId + ' ..')
+		this._subscriptions = []
+		try {
+			let sub = await this.core.autoSubscribe('peripheralDeviceCommands', this.core.deviceId)
+			this._subscriptions.push(sub)
+		} catch (e) {
+			this._coreParentHandler.logger.error(e)
+		}
+
+		this._coreParentHandler.logger.info('CoreMonitorHandler: Setting up observers..')
+
+		// setup observers
+		this._coreParentHandler.setupObserverForPeripheralDeviceCommands(this)
+	}
+	onConnectionChanged (deviceStatus: P.StatusObject) {
+		this._hasGottenStatusChange = true
+
+		this.core.setStatus(deviceStatus)
+		.catch(e => this._coreParentHandler.logger.error('Error when setting status: ' + e, e.stack))
+	}
+	onCommandError (
+		errorMessage: string,
+		ref: {
+			rundownId?: string,
+			partId?: string,
+			pieceId?: string,
+			context: string,
+			timelineObjId: string
+		}) {
+		this.core.callMethodLowPrio(PeripheralDeviceAPI.methods.reportCommandError, [
+			errorMessage,
+			ref
+		])
+		.catch(e => this._coreParentHandler.logger.error('Error when setting status: ' + e, e.stack))
+	}
+
+	async dispose (dontUpdateStatus?: boolean): Promise<void> {
+		this._observers.forEach((obs) => {
+			obs.stop()
+		})
+
+		if (!dontUpdateStatus) {
+			await this.core.setStatus({
+				statusCode: P.StatusCode.BAD,
+				messages: ['Uninitialized']
+			})
+		}
+	}
+	async getParentDevice () {
+		return this._coreParentHandler.core.getPeripheralDevice()
+	}
+	// Methods callable by Core:
+	// -------------------------
+	killProcess (actually: number) {
+		// if (actually === 1) {
+		// 	this._coreParentHandler.logger.info('KillProcess command received, shutting down in 1000ms!')
+		// 	setTimeout(() => {
+		// 		process.exit(0)
+		// 	}, 1000)
+		// 	return true
+		// }
+		return actually
+	}
+}
+export interface MonitorDevice {
+	deviceName: string
+	deviceId: string
+
+	deviceType: PeripheralDeviceAPI.DeviceType
+	deviceSubType: PeripheralDeviceAPI.DeviceSubType
+	deviceCategory: PeripheralDeviceAPI.DeviceCategory
 }

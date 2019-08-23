@@ -42,7 +42,6 @@ if (logPath) {
 		level: 'debug',
 		stringify: (obj) => {
 			obj.localTimestamp = getCurrentTime()
-			obj.randomId = Math.round(Math.random() * 10000)
 			return JSON.stringify(obj) // make single line
 		}
 	})

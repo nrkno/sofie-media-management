@@ -30,6 +30,10 @@ export interface DeviceSettings {
 		host?: string
 		port: number
 	}
+	/** A list of Monitors, which will monitor media statuses */
+	monitors?: {
+		[monitorId: string]: MonitorSettings
+	}
 }
 
 export type Time = number // Timestamp, unix time in ms
@@ -40,7 +44,7 @@ export type Duration = number // Duration, in ms
 export interface ExpectedMediaItem {
 	_id: string
 
-	/** Label on the source Piece */
+	/** Source label that can be used to identify the EMI */
 	label?: string
 
 	/** Local path to the media object */
@@ -48,6 +52,15 @@ export interface ExpectedMediaItem {
 
 	/** Global path to the media object */
 	url: string
+
+	/** The rundown id that is the source of this MediaItem */
+	rundownId: string
+
+	/** The part id that is the source of this Media Item */
+	partId: string
+
+	/** The studio installation this ExpectedMediaItem was generated in */
+	studioId: string
 
 	/** True if the media item has been marked as possibly unavailable */
 	disabled: boolean
@@ -60,9 +73,6 @@ export interface ExpectedMediaItem {
 
 	/** Time to wait before removing file */
 	lingerTime?: Duration
-
-	/** Studio expecting the item */
-	studioId: string
 }
 
 export enum MediaFlowType {
@@ -213,4 +223,41 @@ export enum WorkStepAction {
 	GENERATE_PREVIEW = 'generate_preview',
 	GENERATE_THUMBNAIL = 'generate_thumbnail',
 	GENERATE_METADATA = 'generate_metadata'
+}
+
+export type MonitorSettings = MonitorSettingsNull | MonitorSettingsMediaScanner | MonitorSettingsQuantel
+export interface MonitorSettingsBase {
+	type: MonitorSettingsType
+
+	/** The storageId is defining the storage/server on which the media is on.
+	 * (in the media-scanner, this is equivalent to the collectionId)
+	 */
+	storageId: string
+	disable?: boolean
+}
+export enum MonitorSettingsType {
+	NULL = '',
+	MEDIA_SCANNER = 'mediascanner',
+	QUANTEL = 'quantel'
+}
+export interface MonitorSettingsNull extends MonitorSettingsBase {
+	type: MonitorSettingsType.NULL
+}
+export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
+	type: MonitorSettingsType.MEDIA_SCANNER
+	/** Host of the media-scanner PouchDB server */
+	host: string
+	port: number
+}
+export interface MonitorSettingsQuantel extends MonitorSettingsBase {
+	type: MonitorSettingsType.QUANTEL
+
+	/** Url to the quantel gateway  */
+	gatewayUrl: string
+	/** Address to the ISA, for the gateway to connect to */
+	ISAUrl: string
+	/** The ID of the zone to use. If omitted, will be using "default" */
+	zoneId?: string
+	/** The id of the server to control. An Ingeter */
+	serverId: number
 }

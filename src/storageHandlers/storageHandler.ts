@@ -120,7 +120,7 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @param  progressCallback? An optional callback to be called when the progress of the operation changes
 	 * @returns The file created on the storage
 	 */
-	abstract putFile(file: File, progressCallback?: (progress: number) => void): CancelablePromise<File>
+	abstract putFile (file: File, progressCallback?: (progress: number) => void): CancelablePromise<File>
 	/**
 	 *
 	 * @abstract Delete a file from storage

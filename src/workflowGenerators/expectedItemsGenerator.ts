@@ -7,7 +7,7 @@ import { CoreHandler } from '../coreHandler'
 import { ExpectedMediaItem, MediaFlow, MediaFlowType, WorkFlowSource, WorkStepAction, WorkStep, WorkFlow, WorkStepStatus } from '../api'
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
-import { Collection } from 'tv-automation-server-core-integration'
+import { Collection, Observer } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 
@@ -31,12 +31,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	/** ALL flows from dispatcher, not just ours */
 	private _allFlows: MediaFlow[] = []
 	/** Our flows */
-	private _handledFlows: MediaFlow[] = []
+	private _handledFlows: {[flowId: string]: MediaFlow} = {}
 
 	logger: Winston.LoggerInstance
 
 	private expectedMediaItems: Collection
-	private observer: any
+	private observer: Observer
 
 	private _cronJob: NodeJS.Timer
 
@@ -83,7 +83,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				}
 
 				// register handled flows
-				this._handledFlows.push(item)
+				this._handledFlows[item.id] = item
 				// register used storage
 				this.registerSourceStorage(storage)
 			}
@@ -111,7 +111,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		this._expectedMediaItemsSubscription = await this._coreHandler.core.subscribe('expectedMediaItems', {
 			mediaFlowId: {
-				$in: this._handledFlows.map(i => i.id)
+				$in: _.keys(this._handledFlows)
 			},
 			studioId: this._getStudioId()
 		})
@@ -139,7 +139,6 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-
 	private _getPeripheralDevice () {
 		let peripheralDevices = this._coreHandler.core.getCollection('peripheralDevices')
 		return peripheralDevices.findOne(this._coreHandler.core.deviceId)
@@ -162,6 +161,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		return null
 	}
+	private shouldHandleItem (item: ExpectedMediaItem): boolean {
+		return (
+			this._handledFlows[item.mediaFlowId] && // if the item is in the list of handled flows
+			item.studioId === this._getStudioId() // if the item is in the right studio
+		)
+	}
 
 	/** Called when an item is added (from Core) */
 	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
@@ -180,7 +185,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			return
 		}
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
-		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
+
+		if (!this.shouldHandleItem(item)) return
+
+		const flow = this._handledFlows[item.mediaFlowId]
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
@@ -225,6 +233,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private onExpectedChanged = (id: string, _oldFields: any, clearedFields: any, newFields: any) => {
 		let item: ExpectedMediaItem = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
+
+		if (!this.shouldHandleItem(item)) return
+
 		item = _.extend(_.omit(item, clearedFields), newFields) as ExpectedMediaItem
 		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
 			this.emit('error', `An expected item was changed called "${item.label || item.path}", but it expired on ${new Date(item.lastSeen + (item.lingerTime || this.LINGER_TIME))}. Ignoring.`)
@@ -234,7 +245,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this.emit('warn', `An expected item was added called "${item.label || item.path}", but it was disabled.`)
 			return
 		}
-		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
+		const flow = this._handledFlows[item.mediaFlowId]
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
@@ -293,6 +304,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		let item: ExpectedMediaItem = oldValue || this.expectedMediaItems.findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
+
+		if (!this.shouldHandleItem(item)) return
+
 		const flow = this._allFlows.find((f) => f.id === item.mediaFlowId)
 
 		if (!flow) throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
@@ -388,15 +402,13 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 * Checks all expectedMediaItems, makes sure that we're tracking them, and starts any work that might be due
 	 */
 	protected async initialExpectedCheck (): Promise<void> {
-		const handledIds = this._handledFlows.map(i => i.id)
-		const d = this.expectedMediaItems.find(() => true)
-		console.log(d)
+		const handledIds = _.keys(this._handledFlows)
 		const currentExpectedContents = this.expectedMediaItems.find((item: ExpectedMediaItem) => {
 			return handledIds.indexOf(item.mediaFlowId) >= 0
 		}) as ExpectedMediaItem[]
 		const expectedItems: TrackedMediaItem[] = []
 		currentExpectedContents.forEach((i) => {
-			const flow = this._handledFlows.find((j) => j.id === i.mediaFlowId)
+			const flow = this._handledFlows[i.mediaFlowId]
 			if (!flow) return
 			if (!flow.destinationId) {
 				this.emit('error', `Media flow "${flow.id}" does not have a destinationId`)

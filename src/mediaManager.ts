@@ -14,6 +14,7 @@ import { WatchFolderGenerator } from './workflowGenerators/watchFolderGenerator'
 import { LocalStorageGenerator } from './workflowGenerators/localStorageGenerator'
 import { ExpectedItemsGenerator } from './workflowGenerators/expectedItemsGenerator'
 import { Process } from './process'
+import { MonitorManager } from './monitors/manager'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -47,6 +48,8 @@ export class MediaManager {
 	private _workFlowGenerators: BaseWorkFlowGenerator[]
 	private _process: Process
 
+	private _monitorManager: MonitorManager = new MonitorManager()
+
 	constructor (logger: Winston.LoggerInstance) {
 		this._logger = logger
 	}
@@ -63,8 +66,19 @@ export class MediaManager {
 			await this.initCore()
 			this._logger.info('Core initialized')
 
-			this._logger.info('Initializing MediaManager...')
 			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
+
+			// Stop here if studioId not set
+			if (!peripheralDevice.studioId) {
+				this._logger.warn('------------------------------------------------------')
+				this._logger.warn('Not setup yet, exiting process!')
+				this._logger.warn('To setup, go into Core and add this device to a Studio')
+				this._logger.warn('------------------------------------------------------')
+				process.exit(1)
+				return
+			}
+			this._logger.info('Initializing MediaManager...')
+
 			await this.initMediaManager(peripheralDevice.settings || {})
 			this._logger.info('MediaManager initialized')
 
@@ -143,5 +157,26 @@ export class MediaManager {
 			})
 		}))
 		await this._dispatcher.init()
+
+		this._monitorManager.init(this.coreHandler)
+
+		await this._monitorManager.onNewSettings(settings)
+
+		// Monitor for changes in settings:
+		this.coreHandler.onChanged(() => {
+			this.coreHandler.core.getPeripheralDevice()
+			.then((device) => {
+				if (device) {
+					const settings = device.settings
+					if (!_.isEqual(settings, this._monitorManager.settings)) {
+						this._monitorManager.onNewSettings(settings)
+						.catch(e => this._logger.error(e))
+					}
+				}
+			})
+			.catch(() => {
+				this._logger.error(`coreHandler.onChanged: Could not get peripheral device`)
+			})
+		})
 	}
 }
