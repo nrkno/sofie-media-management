@@ -1,5 +1,4 @@
 import * as _ from 'underscore'
-import * as Winston from 'winston'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 export * from './baseWorkFlowGenerator'
 
@@ -33,9 +32,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	/** Our flows */
 	private _handledFlows: {[flowId: string]: MediaFlow} = {}
 
-	logger: Winston.LoggerInstance
-
-	private expectedMediaItems: Collection
+	private expectedMediaItems: () => Collection
 	private observer: Observer
 
 	private _cronJob: NodeJS.Timer
@@ -117,18 +114,28 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 		this.emit('debug', 'Subscribed to expectedMediaItems.')
 
-		this.expectedMediaItems = this._coreHandler.core.getCollection('expectedMediaItems')
+		this.expectedMediaItems = () => this._coreHandler.core.getCollection('expectedMediaItems')
 
 		const observer = this._coreHandler.core.observe('expectedMediaItems')
-		observer.added = this.onExpectedAdded
-		observer.changed = this.onExpectedChanged
-		observer.removed = this.onExpectedRemoved
+		observer.added = this.wrapError(this.onExpectedAdded)
+		observer.changed = this.wrapError(this.onExpectedChanged)
+		observer.removed = this.wrapError(this.onExpectedRemoved)
 
 		this.observer = observer
 
 		this.emit('debug', 'Observer set up')
 
 		return this.initialExpectedCheck()
+	}
+
+	private wrapError = (fcn: Function) => {
+		return (...args) => {
+			try {
+				return fcn(...args)
+			} catch (e) {
+				this.emit('error', e)
+			}
+		}
 	}
 
 	async destroy (): Promise<void> {
@@ -174,7 +181,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		if (obj) {
 			item = obj
 		} else {
-			item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+			item = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		}
 		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
 			this.emit('error', `An expected item was added called "${item.label || item.path}", but it expired on ${new Date(item.lastSeen + (item.lingerTime || this.LINGER_TIME))}. Ignoring.`)
@@ -231,9 +238,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	/** Called when an item is changed in Core */
 	private onExpectedChanged = (id: string, _oldFields: any, clearedFields: any, newFields: any) => {
-		let item: ExpectedMediaItem = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
-		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
-
+		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
+		if (!item) throw new Error(`Could not find the updated item "${id}" in expectedMediaItems`)
 		if (!this.shouldHandleItem(item)) return
 
 		item = _.extend(_.omit(item, clearedFields), newFields) as ExpectedMediaItem
@@ -302,7 +308,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	private onExpectedRemoved = (id: string, oldValue: any) => {
 		this.emit('debug', `${id} was removed from Core expectedMediaItems collection`)
 
-		let item: ExpectedMediaItem = oldValue || this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+		let item: ExpectedMediaItem = oldValue || this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 
 		if (!this.shouldHandleItem(item)) return
@@ -403,7 +409,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 */
 	protected async initialExpectedCheck (): Promise<void> {
 		const handledIds = _.keys(this._handledFlows)
-		const currentExpectedContents = this.expectedMediaItems.find((item: ExpectedMediaItem) => {
+		const currentExpectedContents = this.expectedMediaItems().find((item: ExpectedMediaItem) => {
 			return handledIds.indexOf(item.mediaFlowId) >= 0
 		}) as ExpectedMediaItem[]
 		const expectedItems: TrackedMediaItem[] = []
