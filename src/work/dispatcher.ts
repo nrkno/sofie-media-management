@@ -59,6 +59,7 @@ export class Dispatcher extends EventEmitter {
 	private _warningWFQueueLength: number
 	private _warningTaskWorkingTime: number
 
+
 	on (type: LogEvents, listener: (e: string) => void): this {
 		return super.on(type, listener)
 	}

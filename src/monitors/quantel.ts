@@ -32,7 +32,7 @@ export class MonitorQuantel extends Monitor {
 	logger: LoggerInstance
 	protected _settings: MonitorSettingsQuantel
 
-	private expectedMediaItems: Collection
+	private expectedMediaItems: () => Collection
 	private observer: Observer
 	private _expectedMediaItemsSubscription: string
 
@@ -76,7 +76,7 @@ export class MonitorQuantel extends Monitor {
 
 		if (!this._studioId) throw new Error('Quantel: Device .studioId not set!')
 
-		this.expectedMediaItems = this._coreHandler.core.getCollection('expectedMediaItems')
+		this.expectedMediaItems = () => this._coreHandler.core.getCollection('expectedMediaItems')
 
 		// Observe the data:
 		const observer = this._coreHandler.core.observe('expectedMediaItems')
@@ -91,7 +91,7 @@ export class MonitorQuantel extends Monitor {
 		this._expectedMediaItemsSubscription = await this._coreHandler.core.subscribe('expectedMediaItems', {
 			studioId: this._studioId
 		})
-		_.each(this.expectedMediaItems.find({
+		_.each(this.expectedMediaItems().find({
 			studioId: this._studioId
 		}), doc => {
 			this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
@@ -177,7 +177,7 @@ export class MonitorQuantel extends Monitor {
 		if (obj) {
 			item = obj
 		} else {
-			item = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+			item = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		}
 		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 
@@ -196,7 +196,7 @@ export class MonitorQuantel extends Monitor {
 		}
 	}
 	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
-		let item: ExpectedMediaItem = this.expectedMediaItems.findOne(id) as ExpectedMediaItem
+		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the changed item "${id}" in expectedMediaItems`)
 
 		if (item.url && !this.monitoredFiles[item.url]) {
