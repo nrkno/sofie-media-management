@@ -209,6 +209,9 @@ export class MonitorQuantel extends Monitor {
 					lastChecked: 0,
 					url: item.url
 			   }
+			} else {
+				// if the item shouldn't be handled, treat it as if it was removed
+				this.onExpectedRemoved(id, item)
 			}
 		}
 	}
