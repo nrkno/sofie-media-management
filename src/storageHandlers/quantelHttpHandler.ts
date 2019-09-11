@@ -7,6 +7,7 @@ import * as http from 'http'
 import * as _ from 'underscore'
 import { literal, atomicPromise } from '../lib/lib'
 import { QuantelGateway } from '../lib/quantelGateway'
+import { CancelablePromise } from '../lib/cancelablePromise'
 
 function getHTTPProperties (gateway: QuantelGateway, url: string): Promise<FileProperties> {
 	if (!gateway.initialized) throw Error(`Quantel Gateway not initialized`)
@@ -186,7 +187,7 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 		if (!this._readable) throw Error('This storage is not readable.')
 		return Promise.resolve(new QuantelHTTPFile(this.gateway, this.transformerUrl, name, this._readable))
 	}
-	putFile (_file: File, _progressCallback?: ((progress: number) => void) | undefined): Promise<File> {
+	putFile (_file: File, _progressCallback?: ((progress: number) => void) | undefined): CancelablePromise<File> {
 		throw Error('This storage is not writable.')
 		// return new Promise<File>((resolve, reject) => {
 		// 	file.getReadableStream().then((rStream) => {
