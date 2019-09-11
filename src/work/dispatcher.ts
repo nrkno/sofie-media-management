@@ -941,7 +941,7 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private pushWorkFlowToCore = throttleOnKey((id: string, wf: WorkFlowDB | null) => {
-		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlow, [ id, wf ])
+		return this._coreHandler.core.callMethod(MMPDMethods.updateMediaWorkFlow, [ id, wf ])
 		.then(() => {
 			this.emit('debug', `WorkFlow in core "${id}" updated`)
 		})
@@ -951,7 +951,7 @@ export class Dispatcher extends EventEmitter {
 	}, 100, 'pushWorkFlowToCore')
 
 	private pushWorkStepToCore = throttleOnKey((id: string, ws: WorkStepDB | null) => {
-		return this._coreHandler.core.callMethodLowPrio(MMPDMethods.updateMediaWorkFlowStep, [id, ws])
+		return this._coreHandler.core.callMethod(MMPDMethods.updateMediaWorkFlowStep, [id, ws])
 		.then(() => {
 			this.emit('debug', `Step in core "${id}" updated`)
 		})
