@@ -65,7 +65,7 @@ export abstract class Monitor extends EventEmitter {
 			let sendDoc = _.omit(doc, ['_attachments'])
 			// @ts-ignore
 			// this.logger.info('MediaScanner: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
-			await this._coreHandler.core.callMethodLowPrio(PeripheralDeviceAPI.methods.updateMediaObject, [
+			await this._coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
 				this._settings.storageId,
 				this.hashId(doc._id),
 				sendDoc
@@ -79,7 +79,7 @@ export abstract class Monitor extends EventEmitter {
 	/** To be triggered whenever a MediaObject is removed */
 	protected async _sendRemoved (docId: string): Promise<void> {
 		try {
-			await this._coreHandler.core.callMethodLowPrio(PeripheralDeviceAPI.methods.updateMediaObject, [
+			await this._coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
 				this._settings.storageId,
 				this.hashId(docId),
 				null

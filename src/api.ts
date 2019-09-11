@@ -234,6 +234,7 @@ export enum WorkStepStatus {
 export enum WorkStepAction {
 	COPY = 'copy',
 	DELETE = 'delete',
+	SCAN = 'scan',
 	GENERATE_PREVIEW = 'generate_preview',
 	GENERATE_THUMBNAIL = 'generate_thumbnail',
 	GENERATE_METADATA = 'generate_metadata'

@@ -63,10 +63,17 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	protected generateNewFileWorkSteps (file: File, st: StorageObject): WorkStep[] {
 		return [
 			new ScannerWorkStep({
-				action: WorkStepAction.GENERATE_METADATA,
+				action: WorkStepAction.SCAN,
 				file,
 				target: st,
 				priority: 1,
+				status: WorkStepStatus.IDLE
+			}),
+			new ScannerWorkStep({
+				action: WorkStepAction.GENERATE_METADATA,
+				file,
+				target: st,
+				priority: 0.75,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({

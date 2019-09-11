@@ -97,6 +97,8 @@ export class Worker extends EventEmitter {
 					(onCancel) => this._currentAbortHandler = onCancel))
 			case WorkStepAction.DELETE:
 				return unBusyAndFailStep(this.doDelete(step))
+			case WorkStepAction.SCAN:
+				return unBusyAndFailStep(this.doGenerateMetadata(step))
 			case WorkStepAction.GENERATE_METADATA:
 				return unBusyAndFailStep(this.doGenerateAdvancedMetadata(step))
 			case WorkStepAction.GENERATE_PREVIEW:

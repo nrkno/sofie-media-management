@@ -51,7 +51,7 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 	}
 }
 export interface ScannerWorkStepInitial extends WorkStepInitial {
-	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL | WorkStepAction.SCAN
 	file: File
 	target: StorageObject
 }
@@ -62,7 +62,7 @@ export interface ScannerWorkStepInitialConstr extends ScannerWorkStepInitial {
  */
 
 export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial {
-	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL | WorkStepAction.SCAN
 	priority = this.priority === undefined ? 1 : this.priority
 
 	// code annotations for class-transformer to automate serialization and deserialization
@@ -98,6 +98,7 @@ export function plainToWorkStep (obj: object, availableStorage: StorageObject[])
 		case WorkStepAction.GENERATE_METADATA:
 		case WorkStepAction.GENERATE_THUMBNAIL:
 		case WorkStepAction.GENERATE_PREVIEW:
+		case WorkStepAction.SCAN:
 			try {
 				const cls = plainToClass(FileWorkStep, obj)
 				const storageId = cls.target as any as string
