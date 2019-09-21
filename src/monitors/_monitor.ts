@@ -4,10 +4,7 @@ import * as crypto from 'crypto'
 import { LoggerInstance } from 'winston'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { MonitorSettings, MediaObject } from '../api'
-import {
-	MonitorDevice,
-	CoreMonitorHandler
-} from '../coreHandler'
+import { MonitorDevice, CoreMonitorHandler } from '../coreHandler'
 
 export abstract class Monitor extends EventEmitter {
 	public deviceType: string
@@ -17,51 +14,46 @@ export abstract class Monitor extends EventEmitter {
 		statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 		messages: ['Initializing...']
 	}
-	constructor (
-		private _deviceId: string,
-		protected _settings: MonitorSettings,
-		protected logger: LoggerInstance
-	) {
+	constructor(private _deviceId: string, protected _settings: MonitorSettings, protected logger: LoggerInstance) {
 		super()
 		this.deviceType = this._settings.type
 	}
 
-	setCoreHandler (coreHandler: CoreMonitorHandler) {
+	setCoreHandler(coreHandler: CoreMonitorHandler) {
 		this._coreHandler = coreHandler
 	}
-	abstract init (): Promise<void>
-	async dispose (): Promise<void> {
+	abstract init(): Promise<void>
+	async dispose(): Promise<void> {
 		await this._coreHandler.dispose()
 	}
-	abstract get deviceInfo (): MonitorDevice
+	abstract get deviceInfo(): MonitorDevice
 
-	public get settings () {
+	public get settings() {
 		return this._settings
 	}
-	public get deviceId () {
+	public get deviceId() {
 		return this._deviceId
 	}
-	public get status (): PeripheralDeviceAPI.StatusObject {
+	public get status(): PeripheralDeviceAPI.StatusObject {
 		return this._status
 	}
 	/** Restart the monitoring, do a full re-sync  */
-	abstract restart (): Promise<void>
+	abstract restart(): Promise<void>
 
 	// Overide EventEmitter.on() for stronger typings:
 	/** The connection status has changed */
-	on (event: 'connectionChanged', listener: (status: PeripheralDeviceAPI.StatusObject) => void): this
-	on (event: string | symbol, listener: (...args: any[]) => void): this {
+	on(event: 'connectionChanged', listener: (status: PeripheralDeviceAPI.StatusObject) => void): this
+	on(event: string | symbol, listener: (...args: any[]) => void): this {
 		return super.on(event, listener)
 	}
 	// Overide EventEmitter.emit() for stronger typings:
-	emit (event: 'connectionChanged', status: PeripheralDeviceAPI.StatusObject): boolean
-	emit (event: string, ...args: any[]): boolean {
+	emit(event: 'connectionChanged', status: PeripheralDeviceAPI.StatusObject): boolean
+	emit(event: string, ...args: any[]): boolean {
 		return super.emit(event, ...args)
 	}
 	/** To be triggered whenever a MediaObject is added or changed */
-	protected async _sendChanged (doc: MediaObject): Promise<void> {
+	protected async _sendChanged(doc: MediaObject): Promise<void> {
 		try {
-
 			let sendDoc = _.omit(doc, ['_attachments'])
 			// @ts-ignore
 			// this.logger.info('MediaScanner: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
@@ -77,7 +69,7 @@ export abstract class Monitor extends EventEmitter {
 		}
 	}
 	/** To be triggered whenever a MediaObject is removed */
-	protected async _sendRemoved (docId: string): Promise<void> {
+	protected async _sendRemoved(docId: string): Promise<void> {
 		try {
 			await this._coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
 				this._settings.storageId,
@@ -88,13 +80,17 @@ export abstract class Monitor extends EventEmitter {
 			this.logger.error('MediaScanner: Error while updating deleted Media object', e)
 		}
 	}
-	protected hashId (id: string): string {
-		return crypto.createHash('md5').update(id).digest('hex')
+	protected hashId(id: string): string {
+		return crypto
+			.createHash('md5')
+			.update(id)
+			.digest('hex')
 	}
-	protected async getAllCoreObjRevisions (): Promise<CoreObjRevisions> {
-		const coreObjects = await this._coreHandler.core.callMethodLowPrio(PeripheralDeviceAPI.methods.getMediaObjectRevisions, [
-			this._settings.storageId
-		])
+	protected async getAllCoreObjRevisions(): Promise<CoreObjRevisions> {
+		const coreObjects = await this._coreHandler.core.callMethodLowPrio(
+			PeripheralDeviceAPI.methods.getMediaObjectRevisions,
+			[this._settings.storageId]
+		)
 
 		let coreObjRevisions: CoreObjRevisions = {}
 		_.each(coreObjects, (obj: any) => {

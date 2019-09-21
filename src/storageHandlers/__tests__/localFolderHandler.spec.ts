@@ -8,7 +8,7 @@ describe('LocalFolderHandler', () => {
 	let lfh0: LocalFolderHandler
 
 	// set up the test folder
-	beforeAll(async (done) => {
+	beforeAll(async done => {
 		fs.ensureDirSync('./test')
 		fs.writeFileSync('./test/test0.txt', '1234')
 
@@ -32,15 +32,18 @@ describe('LocalFolderHandler', () => {
 		}
 	})
 
-	it('returns a list of files in a folder', async (done) => {
+	it('returns a list of files in a folder', async done => {
 		expect.assertions(2)
-		lfh0.getAllFiles().then((files) => {
-			expect(files.length).toBe(1)
-			expect(files[0].name).toBe('test0.txt')
-			done()
-		}, reason => fail(reason))
+		lfh0.getAllFiles().then(
+			files => {
+				expect(files.length).toBe(1)
+				expect(files[0].name).toBe('test0.txt')
+				done()
+			},
+			reason => fail(reason)
+		)
 	}, 1000)
-	it('emits an event when a file is created', async (done) => {
+	it('emits an event when a file is created', async done => {
 		expect.assertions(1)
 
 		lfh0.on(StorageEventType.add, (file: StorageEvent) => {
@@ -49,7 +52,7 @@ describe('LocalFolderHandler', () => {
 		})
 		fs.writeFileSync('./test/test1.txt', '1234')
 	}, 10000)
-	it('emits an event when a file is deleted', async (done) => {
+	it('emits an event when a file is deleted', async done => {
 		expect.assertions(1)
 
 		lfh0.on(StorageEventType.delete, (file: StorageEvent) => {
@@ -58,7 +61,7 @@ describe('LocalFolderHandler', () => {
 		})
 		fs.unlinkSync('./test/test1.txt')
 	}, 10000)
-	it('returns a file handle to a file using a path', async (done) => {
+	it('returns a file handle to a file using a path', async done => {
 		try {
 			const file = await lfh0.getFile('test0.txt')
 			if (file.url === path.normalize('./test/test0.txt')) {
@@ -70,7 +73,7 @@ describe('LocalFolderHandler', () => {
 			fail('File could not be found')
 		}
 	}, 1000)
-	it('fails if a file name doesn\'t exist', async (done) => {
+	it("fails if a file name doesn't exist", async done => {
 		try {
 			const file = await lfh0.getFile('test-that-doesnt-exist.txt')
 			if (file.url === path.normalize('./test/test-that-doesnt-exist.txt')) {
@@ -82,7 +85,7 @@ describe('LocalFolderHandler', () => {
 			done()
 		}
 	}, 1000)
-	it('can remove a file', async (done) => {
+	it('can remove a file', async done => {
 		try {
 			fs.writeFileSync('./test/test1.txt', '1234')
 			const file = await lfh0.getFile('test1.txt')
@@ -95,7 +98,7 @@ describe('LocalFolderHandler', () => {
 			fail(e)
 		}
 	})
-	it('can copy files across handlers', async (done) => {
+	it('can copy files across handlers', async done => {
 		try {
 			fs.ensureDirSync('./test2')
 			fs.writeFileSync('./test2/test-copy.txt', '1234')
@@ -127,7 +130,7 @@ describe('LocalFolderHandler', () => {
 			fs.removeSync('./test2')
 		}
 	})
-	it('provides file properties for specified files', async (done) => {
+	it('provides file properties for specified files', async done => {
 		try {
 			expect.assertions(1)
 			fs.writeFileSync('./test/test0.txt', '1234')

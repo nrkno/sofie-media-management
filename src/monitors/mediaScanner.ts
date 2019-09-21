@@ -1,4 +1,3 @@
-
 import * as PouchDB from 'pouchdb-node'
 import * as _ from 'underscore'
 import * as PromiseSequence from 'promise-sequence'
@@ -11,7 +10,6 @@ import { LoggerInstance } from 'winston'
 import { FetchError } from 'node-fetch'
 
 export class MonitorMediaScanner extends Monitor {
-
 	protected _settings: MonitorSettingsMediaScanner
 
 	private _db: PouchDB.Database
@@ -39,7 +37,7 @@ export class MonitorMediaScanner extends Monitor {
 	private _isDestroyed: boolean = false
 	private _initialized: boolean = false
 
-	constructor (deviceId: string, _settings: MonitorSettingsMediaScanner, logger: LoggerInstance) {
+	constructor(deviceId: string, _settings: MonitorSettingsMediaScanner, logger: LoggerInstance) {
 		super(deviceId, _settings, logger)
 
 		this._settings.port = this._settings.port || 8000 // use default port if not set
@@ -47,7 +45,7 @@ export class MonitorMediaScanner extends Monitor {
 		this._updateStatus()
 	}
 
-	get deviceInfo (): MonitorDevice {
+	get deviceInfo(): MonitorDevice {
 		// @ts-ignore: todo: make stronger typed, via core-integration
 		return {
 			deviceName: `MediaScanner (${this._settings.host}:${this._settings.port})`,
@@ -59,18 +57,17 @@ export class MonitorMediaScanner extends Monitor {
 			deviceSubType: 'mediascanner'
 		}
 	}
-	public async restart (): Promise<void> {
+	public async restart(): Promise<void> {
 		throw Error('MediaScanner restart not implemented yet')
 	}
-	public async init (): Promise<void> {
+	public async init(): Promise<void> {
 		try {
 			this.logger.info(`Initializing MediaScanner-monitor`, this._settings)
 
 			if (!this._settings.disable) {
-
 				this.logger.info('MediaScanner init')
 
-				const baseUrl = 'http://' + this._settings.host + ':' + (this._settings.port)
+				const baseUrl = 'http://' + this._settings.host + ':' + this._settings.port
 
 				if (this._doReplication) {
 					this._db = new PouchDB('local')
@@ -105,53 +102,51 @@ export class MonitorMediaScanner extends Monitor {
 
 				this.logger.info('MediaScanner: synk objectlists', coreObjRevisions.length, allDocsResponse.total_rows)
 
-				const tasks: Array<() => Promise<any>> = _.compact(_.map(allDocsResponse.rows, (doc) => {
-					const docId = this.hashId(doc.id)
+				const tasks: Array<() => Promise<any>> = _.compact(
+					_.map(allDocsResponse.rows, doc => {
+						const docId = this.hashId(doc.id)
 
-					if (doc.value.deleted) {
-						if (coreObjRevisions[docId]) {
-							// deleted
+						if (doc.value.deleted) {
+							if (coreObjRevisions[docId]) {
+								// deleted
+							}
+							return null // handled later
+						} else if (
+							!coreObjRevisions[docId] || // created
+							coreObjRevisions[docId] !== doc.value.rev // changed
+						) {
+							delete coreObjRevisions[docId]
+
+							return async () => {
+								const doc2 = await this._db.get<MediaObject>(doc.id, {
+									attachments: true
+								})
+								doc2.mediaId = doc2._id
+								await this._sendChanged(doc2)
+
+								await new Promise(resolve => {
+									setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+								})
+							}
+						} else {
+							delete coreObjRevisions[docId]
+							// identical
+							return null
 						}
-						return null // handled later
-					} else if (
-						!coreObjRevisions[docId] ||				// created
-						coreObjRevisions[docId] !== doc.value.rev	// changed
-					) {
-						delete coreObjRevisions[docId]
-
-						return async () => {
-							const doc2 = await this._db.get<MediaObject>(doc.id, {
-								attachments: true
-							})
-							doc2.mediaId = doc2._id
-							await this._sendChanged(doc2)
-
-							await new Promise(resolve => {
-								setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
-							})
-
-						}
-					} else {
-						delete coreObjRevisions[docId]
-						// identical
-						return null
-					}
-				}))
+					})
+				)
 				if (parseInt(dbInfo.update_seq + '', 10)) this._lastSequenceNr = parseInt(dbInfo.update_seq + '', 10)
 				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
 				_.each(coreObjRevisions, (_rev, id) => {
 					// deleted
 
-					tasks.push(
-						async () => {
-							await this._sendRemoved(id)
-						}
-					)
+					tasks.push(async () => {
+						await this._sendRemoved(id)
+					})
 				})
 				await PromiseSequence(tasks)
 
 				this.logger.info('MediaScanner: Done file sync init')
-
 			} else {
 				this.logger.info('MediaScanner disabled')
 			}
@@ -161,7 +156,7 @@ export class MonitorMediaScanner extends Monitor {
 		}
 	}
 
-	public async dispose (): Promise<void> {
+	public async dispose(): Promise<void> {
 		await super.dispose()
 
 		this._isDestroyed = true
@@ -181,7 +176,7 @@ export class MonitorMediaScanner extends Monitor {
 			await this._remote.close()
 		}
 	}
-	private _triggerupdateFsStats (): void {
+	private _triggerupdateFsStats(): void {
 		if (!this._triggerupdateFsStatsTimeout) {
 			this._triggerupdateFsStatsTimeout = setTimeout(() => {
 				this._triggerupdateFsStatsTimeout = undefined
@@ -189,10 +184,10 @@ export class MonitorMediaScanner extends Monitor {
 			}, 5000)
 		}
 	}
-	private _updateFsStats (): void {
-
-		(async () => {
-
+	private _updateFsStats(): void {
+		// Prettier insists on this semicolon, and TSLint insists on it not being there
+		// tslint:disable-next-line
+		;(async () => {
 			const response = await request({
 				method: 'GET',
 				uri: `http://${this._settings.host}:${this._settings.port}/stat/fs`,
@@ -203,16 +198,19 @@ export class MonitorMediaScanner extends Monitor {
 			// @todo: we temporarily report under playout-gateway, until we can handle multiple media-scanners
 			let messages: Array<string> = []
 			let status = PeripheralDeviceAPI.StatusCode.GOOD
-			_.each(disks, (disk) => {
-
+			_.each(disks, disk => {
 				let diskStatus = PeripheralDeviceAPI.StatusCode.GOOD
 				if (disk.use) {
 					if (disk.use > 75) {
 						diskStatus = PeripheralDeviceAPI.StatusCode.WARNING_MAJOR
-						messages.push(`Disk usage for ${disk.fs} is at ${disk.use}%, this may cause degraded performance.`)
+						messages.push(
+							`Disk usage for ${disk.fs} is at ${disk.use}%, this may cause degraded performance.`
+						)
 					} else if (disk.use > 60) {
 						diskStatus = PeripheralDeviceAPI.StatusCode.WARNING_MINOR
-						messages.push(`Disk usage for ${disk.fs} is at ${disk.use}%, this may cause degraded performance.`)
+						messages.push(
+							`Disk usage for ${disk.fs} is at ${disk.use}%, this may cause degraded performance.`
+						)
 					}
 				}
 
@@ -223,17 +221,9 @@ export class MonitorMediaScanner extends Monitor {
 			this._statusDisk.statusCode = status
 			this._statusDisk.messages = messages
 			this._updateAndSendStatus()
-
-		})()
-		.catch((e) => {
+		})().catch(e => {
 			this.logger.warn('It appears as if media-scanner does not support disk usage stats.')
-			if (
-				!(
-					(e + '').match(/ECONNREFUSED/i) ||
-					(e + '').match(/ECONNRESET/i) ||
-					(e + '').match(/ENOTFOUND/i)
-				)
-			) {
+			if (!((e + '').match(/ECONNREFUSED/i) || (e + '').match(/ECONNRESET/i) || (e + '').match(/ENOTFOUND/i))) {
 				this.logger.warn('Error in _updateFsStats', e.message || e.stack || e)
 			}
 
@@ -242,7 +232,7 @@ export class MonitorMediaScanner extends Monitor {
 			this._updateAndSendStatus()
 		})
 	}
-	private getChangesOptions () {
+	private getChangesOptions() {
 		return {
 			since: this._lastSequenceNr || 'now',
 			include_docs: true,
@@ -250,25 +240,16 @@ export class MonitorMediaScanner extends Monitor {
 			attachments: true
 		}
 	}
-	private _setConnectionStatus (connected) {
-		let status = (
-			connected ?
-			PeripheralDeviceAPI.StatusCode.GOOD :
-			PeripheralDeviceAPI.StatusCode.BAD
-		)
-		let messages = (
-			connected ?
-			[] :
-			['MediaScanner not connected']
-		)
+	private _setConnectionStatus(connected) {
+		let status = connected ? PeripheralDeviceAPI.StatusCode.GOOD : PeripheralDeviceAPI.StatusCode.BAD
+		let messages = connected ? [] : ['MediaScanner not connected']
 		if (status !== this._statusConnection.statusCode) {
 			this._statusConnection.statusCode = status
 			this._statusConnection.messages = messages
 			this._updateAndSendStatus()
 		}
 	}
-	private _updateStatus (): PeripheralDeviceAPI.StatusObject {
-
+	private _updateStatus(): PeripheralDeviceAPI.StatusObject {
 		let statusCode: PeripheralDeviceAPI.StatusCode = PeripheralDeviceAPI.StatusCode.GOOD
 		let messages: Array<string> = []
 
@@ -296,11 +277,7 @@ export class MonitorMediaScanner extends Monitor {
 			}
 		}
 
-		_.each([
-			statusSettings,
-			this._statusConnection,
-			this._statusDisk
-		], (s) => {
+		_.each([statusSettings, this._statusConnection, this._statusDisk], s => {
 			if (s.statusCode > statusCode) {
 				messages = s.messages || []
 				statusCode = s.statusCode
@@ -315,13 +292,10 @@ export class MonitorMediaScanner extends Monitor {
 			messages
 		}
 	}
-	private _updateAndSendStatus () {
+	private _updateAndSendStatus() {
 		const status = this._updateStatus()
 
-		if (
-			this._status.statusCode !== status.statusCode ||
-			!_.isEqual(this._status.messages, status.messages)
-		) {
+		if (this._status.statusCode !== status.statusCode || !_.isEqual(this._status.messages, status.messages)) {
 			this._status = {
 				statusCode: status.statusCode,
 				messages: status.messages
@@ -330,7 +304,7 @@ export class MonitorMediaScanner extends Monitor {
 		}
 	}
 
-	private _triggerMonitorConnection () {
+	private _triggerMonitorConnection() {
 		if (!this._monitorConnectionTimeout) {
 			this._monitorConnectionTimeout = setTimeout(() => {
 				this._monitorConnectionTimeout = null
@@ -338,7 +312,7 @@ export class MonitorMediaScanner extends Monitor {
 			}, 10 * 1000)
 		}
 	}
-	private _monitorConnection () {
+	private _monitorConnection() {
 		if (this._isDestroyed) return
 
 		if (this._statusConnection.statusCode === PeripheralDeviceAPI.StatusCode.BAD) {
@@ -347,8 +321,7 @@ export class MonitorMediaScanner extends Monitor {
 			this._triggerMonitorConnection()
 		}
 	}
-	private _restartChangesStream (rewindSequence?: boolean) {
-
+	private _restartChangesStream(rewindSequence?: boolean) {
 		if (rewindSequence) {
 			if (this._lastSequenceNr > 0) {
 				this._lastSequenceNr--
@@ -360,32 +333,33 @@ export class MonitorMediaScanner extends Monitor {
 		}
 		const opts = this.getChangesOptions()
 		this.logger.info(`MediaScanner: Restarting changes stream (since ${opts.since})`)
-		this._changes = this._db.changes<MediaObject>(opts)
+		this._changes = this._db
+			.changes<MediaObject>(opts)
 			.on('change', changes => this._changeHandler(changes))
 			.on('error', error => this._errorHandler(error))
 	}
-	private _changeHandler (changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
+	private _changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
 		const newSequenceNr: string | number = changes.seq
 		if (_.isNumber(newSequenceNr)) this._lastSequenceNr = newSequenceNr
 		else this.logger.warn(`Expected changes.seq to be number, got "${newSequenceNr}"`)
 
 		if (changes.deleted) {
-			if (!(changes.id + '').match(/watchdogIgnore/i)) { // Ignore watchdog file changes
+			if (!(changes.id + '').match(/watchdogIgnore/i)) {
+				// Ignore watchdog file changes
 
 				this.logger.debug('MediaScanner: deleteMediaObject', changes.id, newSequenceNr)
-				this._sendRemoved(changes.id)
-				.catch((e) => {
+				this._sendRemoved(changes.id).catch(e => {
 					this.logger.error('MediaScanner: Error sending deleted doc', e)
 				})
 			}
 		} else if (changes.doc) {
 			const md: MediaObject = changes.doc
-			if (!(md._id + '').match(/watchdogIgnore/i)) { // Ignore watchdog file changes
+			if (!(md._id + '').match(/watchdogIgnore/i)) {
+				// Ignore watchdog file changes
 
 				this.logger.debug('MediaScanner: updateMediaObject', newSequenceNr, md._id, md.mediaId)
 				md.mediaId = md._id
-				this._sendChanged(md)
-				.catch((e) => {
+				this._sendChanged(md).catch(e => {
 					this.logger.error('MediaScanner: Error sending changed doc', e)
 				})
 
@@ -398,11 +372,8 @@ export class MonitorMediaScanner extends Monitor {
 
 		this._triggerupdateFsStats()
 	}
-	private _errorHandler (err) {
-		if (
-			err.code === 'ECONNREFUSED' ||
-			err.code === 'ECONNRESET'
-		) {
+	private _errorHandler(err) {
+		if (err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET') {
 			// TODO: try to reconnect
 			this.logger.warn('MediaScanner: ' + err.code)
 		} else if (err instanceof SyntaxError || err instanceof FetchError) {

@@ -1,17 +1,19 @@
 {
-  "extends": "tslint-config-standard",
-  "rules": {
-    "indent": [true, "tabs", 4],
-    "ter-indent": [true, "tab",{
-			"SwitchCase": 1
-    }],
-    "trailing-comma": false,
-    "semicolon": [
-      true,
-      "never"
-    ],
-    "triple-equals": true,
-    "no-empty": false,
-    "quotemark": [true, "single"]
-  }
+	"extends": "tslint-config-standard",
+	"rules": {
+		"indent": [true, "tabs", 4],
+		"ter-indent": [
+			true,
+			"tab",
+			{
+				"SwitchCase": 1
+			}
+		],
+		"trailing-comma": false,
+		"semicolon": [true, "never"],
+		"triple-equals": true,
+		"no-empty": false,
+		"space-before-function-paren": false,
+		"quotemark": [true, "single", "avoid-escape"]
+	}
 }

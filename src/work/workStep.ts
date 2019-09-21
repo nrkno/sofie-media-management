@@ -2,7 +2,7 @@ import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
 import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
-import { QuantelHTTPFile } from '../storageHandlers/quantelHttpHandler';
+import { QuantelHTTPFile } from '../storageHandlers/quantelHttpHandler'
 
 export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
 
@@ -16,7 +16,12 @@ export class WorkStepDB extends WorkStep {
 }
 
 export interface FileWorkStepInitial extends WorkStepInitial {
-	action: WorkStepAction.COPY | WorkStepAction.DELETE | WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL
+	action:
+		| WorkStepAction.COPY
+		| WorkStepAction.DELETE
+		| WorkStepAction.GENERATE_METADATA
+		| WorkStepAction.GENERATE_PREVIEW
+		| WorkStepAction.GENERATE_THUMBNAIL
 	file: File
 	target: StorageObject
 }
@@ -46,12 +51,16 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 	@Transform((value: string) => value, { toClassOnly: true })
 	target: StorageObject
 
-	constructor (init?: FileWorkStepInitialConstr) {
+	constructor(init?: FileWorkStepInitialConstr) {
 		super(init)
 	}
 }
 export interface ScannerWorkStepInitial extends WorkStepInitial {
-	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL | WorkStepAction.SCAN
+	action:
+		| WorkStepAction.GENERATE_METADATA
+		| WorkStepAction.GENERATE_PREVIEW
+		| WorkStepAction.GENERATE_THUMBNAIL
+		| WorkStepAction.SCAN
 	file: File
 	target: StorageObject
 }
@@ -62,7 +71,11 @@ export interface ScannerWorkStepInitialConstr extends ScannerWorkStepInitial {
  */
 
 export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial {
-	action: WorkStepAction.GENERATE_METADATA | WorkStepAction.GENERATE_PREVIEW | WorkStepAction.GENERATE_THUMBNAIL | WorkStepAction.SCAN
+	action:
+		| WorkStepAction.GENERATE_METADATA
+		| WorkStepAction.GENERATE_PREVIEW
+		| WorkStepAction.GENERATE_THUMBNAIL
+		| WorkStepAction.SCAN
 	priority = this.priority === undefined ? 1 : this.priority
 
 	// code annotations for class-transformer to automate serialization and deserialization
@@ -81,16 +94,16 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 	@Transform((value: string) => value, { toClassOnly: true })
 	target: StorageObject
 
-	constructor (init?: ScannerWorkStepInitialConstr) {
+	constructor(init?: ScannerWorkStepInitialConstr) {
 		super(init)
 	}
 }
 
-export function workStepToPlain (obj: WorkStep): object {
+export function workStepToPlain(obj: WorkStep): object {
 	return classToPlain(obj)
 }
 
-export function plainToWorkStep (obj: object, availableStorage: StorageObject[]): WorkStepDB {
+export function plainToWorkStep(obj: object, availableStorage: StorageObject[]): WorkStepDB {
 	const action = obj['action'] as WorkStepAction
 	switch (action) {
 		case WorkStepAction.COPY:
@@ -101,11 +114,11 @@ export function plainToWorkStep (obj: object, availableStorage: StorageObject[])
 		case WorkStepAction.SCAN:
 			try {
 				const cls = plainToClass(FileWorkStep, obj)
-				const storageId = cls.target as any as string
-				const storage = availableStorage.find((i) => i.id === storageId)
+				const storageId = (cls.target as any) as string
+				const storage = availableStorage.find(i => i.id === storageId)
 				if (!storage) throw new Error(`Unknown storage: "${storageId}"`)
 				cls.target = storage
-				return cls as any as WorkStepDB
+				return (cls as any) as WorkStepDB
 			} catch (e) {
 				throw new Error(`Error when deserializing WorkStep: ${e}`)
 			}

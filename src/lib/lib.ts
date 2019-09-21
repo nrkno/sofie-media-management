@@ -2,50 +2,66 @@ import * as _ from 'underscore'
 import * as crypto from 'crypto'
 import { WorkFlow } from '../api'
 
-export function getCurrentTime (): number {
+export function getCurrentTime(): number {
 	return Date.now()
 }
 
-export function literal<T> (arg: T): T {
+export function literal<T>(arg: T): T {
 	return arg
 }
 
-export function randomId (): string {
-	return Math.random().toString(36).substring(2, 8)
+export function randomId(): string {
+	return Math.random()
+		.toString(36)
+		.substring(2, 8)
 }
 
-export function getID (fileName: string): string {
-	return fileName.replace(/\\/g, '/').replace(/\.[\w]+$/i, '').toUpperCase()
+export function getID(fileName: string): string {
+	return fileName
+		.replace(/\\/g, '/')
+		.replace(/\.[\w]+$/i, '')
+		.toUpperCase()
 }
 
-export function getHash (str: string): string {
+export function getHash(str: string): string {
 	const hash = crypto.createHash('sha1')
-	return hash.update(str).digest('base64').replace(/[\+\/\=]/g, '_') // remove +/= from strings, because they cause troubles
+	return hash
+		.update(str)
+		.digest('base64')
+		.replace(/[\+\/\=]/g, '_') // remove +/= from strings, because they cause troubles
 }
 
-export function getWorkFlowName (name: string): string {
+export function getWorkFlowName(name: string): string {
 	const label = name.split(/[\\\/]/).pop()
 	return label || name
 }
 
-export function retryNumber<T> (test: () => Promise<T>, count: number, timeout?: number, doneSoFar?: number): Promise<T> {
+export function retryNumber<T>(
+	test: () => Promise<T>,
+	count: number,
+	timeout?: number,
+	doneSoFar?: number
+): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
-		test().then((res) => {
-			resolve(res)
-		}, (reason) => {
-			doneSoFar = doneSoFar === undefined ? 1 : (doneSoFar + 1)
-			if (doneSoFar >= count) {
-				reject(reason)
-			} else {
-				if (timeout !== undefined && timeout > 0) {
-					setTimeout(() => {
-						retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
-					}, timeout)
+		test().then(
+			res => {
+				resolve(res)
+			},
+			reason => {
+				doneSoFar = doneSoFar === undefined ? 1 : doneSoFar + 1
+				if (doneSoFar >= count) {
+					reject(reason)
 				} else {
-					retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+					if (timeout !== undefined && timeout > 0) {
+						setTimeout(() => {
+							retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+						}, timeout)
+					} else {
+						retryNumber(test, count, timeout, doneSoFar).then(resolve, reject)
+					}
 				}
 			}
-		})
+		)
 	})
 }
 
@@ -58,24 +74,31 @@ export type Difference<A, B extends A> = Pick<B, Exclude<keyof B, keyof A>>
  * @param original Object to be extended
  * @param extendObj properties to add
  */
-export function extendMandadory<A, B extends A> (original: A, extendObj: Difference<A, B>): B {
+export function extendMandadory<A, B extends A>(original: A, extendObj: Difference<A, B>): B {
 	return _.extend(original, extendObj)
 }
 
 export type LogEvents = 'debug' | 'info' | 'warn' | 'error'
 
-export function getFlowHash (wf: WorkFlow): string {
-	const stringified = (wf.name || 'UNNAMED') + ';' +
-		wf.steps.map(i => _.values(
-			_.omit(i, ['_id', '_rev', 'status', 'messages', 'modified', 'priority', 'progress', 'expectedLeft'])
-			).map(j => {
-				if (typeof j === 'object') {
-					return _.compact(_.values(j).map(k => typeof k === 'object' ? null : k)).join(':')
-				} else {
-					return j
-				}
-			}).join('_')
-		).join(';')
+export function getFlowHash(wf: WorkFlow): string {
+	const stringified =
+		(wf.name || 'UNNAMED') +
+		';' +
+		wf.steps
+			.map(i =>
+				_.values(
+					_.omit(i, ['_id', '_rev', 'status', 'messages', 'modified', 'priority', 'progress', 'expectedLeft'])
+				)
+					.map(j => {
+						if (typeof j === 'object') {
+							return _.compact(_.values(j).map(k => (typeof k === 'object' ? null : k))).join(':')
+						} else {
+							return j
+						}
+					})
+					.join('_')
+			)
+			.join(';')
 	return getHash(stringified)
 }
 
@@ -88,14 +111,18 @@ const keyThrottleHistory: {
 	}
 } = {}
 
-export function throttleOnKey<T extends ((key: string, ...args: any[]) => void | Promise<any>)> (fcn: T, wait: number, functionName?: string): T {
-	return (function (key: string, ...args: any[]): void | Promise<any> {
+export function throttleOnKey<T extends (key: string, ...args: any[]) => void | Promise<any>>(
+	fcn: T,
+	wait: number,
+	functionName?: string
+): T {
+	return function(key: string, ...args: any[]): void | Promise<any> {
 		const id = (fcn.name || functionName || randomId()) + '_' + key
-		if (!keyThrottleHistory[id] || (keyThrottleHistory[id].lastCalled + wait < Date.now())) {
+		if (!keyThrottleHistory[id] || keyThrottleHistory[id].lastCalled + wait < Date.now()) {
 			keyThrottleHistory[id] = {
 				args,
 				lastCalled: Date.now(),
-				timeout: undefined,
+				timeout: undefined
 			}
 			const p = fcn(key, ...args)
 			if (p) keyThrottleHistory[id].isPromise = true
@@ -117,8 +144,10 @@ export function throttleOnKey<T extends ((key: string, ...args: any[]) => void |
 					// console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)
 					const p = fcn(key, ...keyThrottleHistory[id].args)
 					if (p) {
-						p.catch((e) => {
-							console.error(`There was an error in a throttled function ${fcn.name}: ${JSON.stringify(e)}`)
+						p.catch(e => {
+							console.error(
+								`There was an error in a throttled function ${fcn.name}: ${JSON.stringify(e)}`
+							)
 						})
 					}
 				}, wait)
@@ -127,7 +156,7 @@ export function throttleOnKey<T extends ((key: string, ...args: any[]) => void |
 				}
 			}
 		}
-	}) as T
+	} as T
 }
 
 enum syncFunctionFcnStatus {
@@ -152,13 +181,16 @@ const syncFunctionRunningFcns: { [id: string]: number } = {}
  * @param id0 (Optional) Id to determine which functions are to wait for each other. Can use "$0" to refer first argument. Example: "myFcn_$0,$1" will let myFcn(0, 0, 13) and myFcn(0, 1, 32) run in parallell, byt not myFcn(0, 0, 13) and myFcn(0, 0, 14)
  * @param timeout (Optional)
  */
-export function atomic<T extends (finished: () => void, ...args: any[]) => void>
-	(fcn: T, id0?: string, timeout: number = 10000): ((...args: any[]) => void) {
+export function atomic<T extends (finished: () => void, ...args: any[]) => void>(
+	fcn: T,
+	id0?: string,
+	timeout: number = 10000
+): (...args: any[]) => void {
 	// TODO: typing for the returned function could be improved with TypeScript 3.3
 
 	let id = id0 || randomId()
 
-	return (function (...args: any[]): void {
+	return function(...args: any[]): void {
 		syncFunctionFcns.push({
 			id: id,
 			fcn: fcn,
@@ -167,13 +199,11 @@ export function atomic<T extends (finished: () => void, ...args: any[]) => void>
 			status: syncFunctionFcnStatus.WAITING
 		})
 		evaluateFunctions()
-	}) as T
+	} as T
 }
-function evaluateFunctions () {
-
-	_.each(syncFunctionFcns, (o) => {
+function evaluateFunctions() {
+	_.each(syncFunctionFcns, o => {
 		if (o.status === syncFunctionFcnStatus.WAITING) {
-
 			let runIt = false
 			// is the function running?
 			if (syncFunctionRunningFcns[o.id]) {
@@ -215,8 +245,8 @@ function evaluateFunctions () {
 }
 export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>
 
-const atomicPromiseQueue: {[id: string]:
-	Array<{
+const atomicPromiseQueue: {
+	[id: string]: Array<{
 		resolve: Function
 		reject: Function
 		fcn: Function
@@ -229,10 +259,9 @@ const atomicPromiseQueue: {[id: string]:
  * @param id
  * @param fcn
  */
-export function atomicPromise <T> (id: string, fcn: (...args: any[]) => Promise<T>): Promise<T> {
+export function atomicPromise<T>(id: string, fcn: (...args: any[]) => Promise<T>): Promise<T> {
 	if (!atomicPromiseQueue[id]) atomicPromiseQueue[id] = []
 	return new Promise((resolve, reject) => {
-
 		atomicPromiseQueue[id].push({
 			resolve,
 			reject,
@@ -243,73 +272,76 @@ export function atomicPromise <T> (id: string, fcn: (...args: any[]) => Promise<
 		evaluateAtomicPromiseQueue()
 	})
 }
-function evaluateAtomicPromiseQueue () {
-	_.each(atomicPromiseQueue, (queue) => {
-
+function evaluateAtomicPromiseQueue() {
+	_.each(atomicPromiseQueue, queue => {
 		const first = _.first(queue)
 
 		if (first && !first.running) {
 			first.running = true
 
 			Promise.resolve(first.fcn())
-			.then((result) => {
-				queue.shift()
-				first.resolve(result)
-				evaluateAtomicPromiseQueue()
-			})
-			.catch((error) => {
-				queue.shift()
-				first.reject(error)
-				evaluateAtomicPromiseQueue()
-			})
+				.then(result => {
+					queue.shift()
+					first.resolve(result)
+					evaluateAtomicPromiseQueue()
+				})
+				.catch(error => {
+					queue.shift()
+					first.reject(error)
+					evaluateAtomicPromiseQueue()
+				})
 		}
 	})
 }
 /** Used to make sure that only ONE put is being performed at the same time */
-export function updateDB <T> (db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
-
+export function updateDB<T>(db: PouchDB.Database<T>, objId: string, cb: (obj: T) => T): Promise<T> {
 	return atomicPromise('put_' + objId, () => {
-		return db.get(objId)
-		.then((obj) => {
-			const updatedObj = cb(obj)
-			return db.put(updatedObj)
-			.then(() => {
-				return updatedObj
+		return db
+			.get(objId)
+			.then(obj => {
+				const updatedObj = cb(obj)
+				return db.put(updatedObj).then(() => {
+					return updatedObj
+				})
 			})
-		})
-		.catch(e => {
-			console.log('Error in updateDB ', objId)
-			throw e
-		})
+			.catch(e => {
+				console.log('Error in updateDB ', objId)
+				throw e
+			})
 	})
 }
 /** Like putToDB, but will insert the object if it doesnt exist */
-export function putToDBUpsert <T> (db: PouchDB.Database<T>, objId: string, cb: (obj?: T) => T | undefined): Promise<T | undefined> {
-
+export function putToDBUpsert<T>(
+	db: PouchDB.Database<T>,
+	objId: string,
+	cb: (obj?: T) => T | undefined
+): Promise<T | undefined> {
 	return atomicPromise('put_' + objId, () => {
-		return db.get(objId)
-		.then((obj: T) => {
-			const updatedObj = cb(obj)
-			if (updatedObj) {
-				return db.put(updatedObj)
-				.then(() => {
-					return updatedObj
-				})
-			} else return Promise.resolve(undefined)
-		}, (error) => {
-			if (error.status === 404) {
-				const updatedObj = cb(undefined)
-				if (updatedObj) {
-					return db.put(updatedObj)
-					.then(() => {
-						return updatedObj
-					})
-				} else return Promise.resolve(undefined)
-			} else throw error
-		})
-		.catch(e => {
-			console.log('Error in putToDBUpsert ', objId)
-			throw e
-		})
+		return db
+			.get(objId)
+			.then(
+				(obj: T) => {
+					const updatedObj = cb(obj)
+					if (updatedObj) {
+						return db.put(updatedObj).then(() => {
+							return updatedObj
+						})
+					} else return Promise.resolve(undefined)
+				},
+				error => {
+					if (error.status === 404) {
+						const updatedObj = cb(undefined)
+						if (updatedObj) {
+							return db.put(updatedObj).then(() => {
+								return updatedObj
+							})
+						} else return Promise.resolve(undefined)
+					} else throw error
+				}
+			)
+			.catch(e => {
+				console.log('Error in putToDBUpsert ', objId)
+				throw e
+			})
 	})
 }

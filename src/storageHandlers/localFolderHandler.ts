@@ -14,15 +14,18 @@ import { CancelablePromise } from '../lib/cancelablePromise'
  * @param  {string} fileUrl
  * @return Promise<FileProperties>
  */
-function getLocalFileProperties (fileUrl: string): Promise<FileProperties> {
+function getLocalFileProperties(fileUrl: string): Promise<FileProperties> {
 	return new Promise((resolve, reject) => {
-		fs.stat(fileUrl).then((stats) => {
-			resolve({
-				created: stats.ctimeMs,
-				modified: stats.mtimeMs,
-				size: stats.size
-			})
-		}, err => reject(err))
+		fs.stat(fileUrl).then(
+			stats => {
+				resolve({
+					created: stats.ctimeMs,
+					modified: stats.mtimeMs,
+					size: stats.size
+				})
+			},
+			err => reject(err)
+		)
 	})
 }
 
@@ -33,9 +36,9 @@ export class LocalFolderFile implements File {
 	private _read: boolean
 	private _write: boolean
 
-	constructor ()
-	constructor (url: string, read: boolean, write: boolean, name?: string)
-	constructor (url?: string, read?: boolean, write?: boolean, name?: string) {
+	constructor()
+	constructor(url: string, read: boolean, write: boolean, name?: string)
+	constructor(url?: string, read?: boolean, write?: boolean, name?: string) {
 		if (url) {
 			this._url = url
 			this._name = name || path.basename(url)
@@ -44,25 +47,25 @@ export class LocalFolderFile implements File {
 		}
 	}
 
-	get name (): string {
+	get name(): string {
 		return this._name
 	}
 
-	get url (): string {
+	get url(): string {
 		return this._url
 	}
 
-	async getWritableStream (): Promise<stream.Writable> {
+	async getWritableStream(): Promise<stream.Writable> {
 		if (!this._write) throw Error(`File "${this._name}" is not writeable.`)
 		return fs.createWriteStream(this._url)
 	}
 
-	async getReadableStream (): Promise<stream.Readable> {
+	async getReadableStream(): Promise<stream.Readable> {
 		if (!this._read) throw Error(`File "${this._name}" is not readable.`)
 		return fs.createReadStream(this._url)
 	}
 
-	async getProperties (): Promise<FileProperties> {
+	async getProperties(): Promise<FileProperties> {
 		return getLocalFileProperties(this._url)
 	}
 }
@@ -86,7 +89,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	 * @param  {boolean} [selectiveListen] The underlying FS watcher will not listen for all file changes in the basePath, but instead will await a list of monitored file paths
 	 * @memberof LocalFolderHandler
 	 */
-	constructor (settings: LocalFolderStorage) {
+	constructor(settings: LocalFolderStorage) {
 		super()
 
 		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
@@ -99,28 +102,29 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		this._selectiveListen = settings.options.onlySelectedFiles || false
 	}
 
-	async init (): Promise<void> {
-		this._watcher = chokidar.watch(this._selectiveListen ? [] : '.', {
-			cwd: this._basePath,
-			ignoreInitial: true,
-			awaitWriteFinish: {
-				stabilityThreshold: 3000,
-				pollInterval: 100
-			},
-			atomic: true,
-			disableGlobbing: true,
-			alwaysStat: true,
-			usePolling: this._usePolling,
-			// following will only be effective if usePolling: true
-			interval: 3000,
-			binaryInterval: 3000
-		})
-		.on('error', this.onError)
-		.on('add', this.onAdd)
-		.on('change', this.onChange)
-		.on('unlink', this.onUnlink)
+	async init(): Promise<void> {
+		this._watcher = chokidar
+			.watch(this._selectiveListen ? [] : '.', {
+				cwd: this._basePath,
+				ignoreInitial: true,
+				awaitWriteFinish: {
+					stabilityThreshold: 3000,
+					pollInterval: 100
+				},
+				atomic: true,
+				disableGlobbing: true,
+				alwaysStat: true,
+				usePolling: this._usePolling,
+				// following will only be effective if usePolling: true
+				interval: 3000,
+				binaryInterval: 3000
+			})
+			.on('error', this.onError)
+			.on('add', this.onAdd)
+			.on('change', this.onChange)
+			.on('unlink', this.onUnlink)
 
-		return new Promise<void>((resolve) => {
+		return new Promise<void>(resolve => {
 			this._watcher.on('ready', () => {
 				this._initialized = true
 				resolve()
@@ -128,7 +132,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
-	async destroy (): Promise<void> {
+	async destroy(): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
 			setTimeout(() => {
 				if (this._initialized) {
@@ -141,7 +145,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		})
 	}
 
-	async getAllFiles (): Promise<File[]> {
+	async getAllFiles(): Promise<File[]> {
 		return _.compact(_.flatten(await this.traverseFolder(this._basePath)))
 	}
 
@@ -157,147 +161,170 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		}
 	}
 
-	getFile (name: string): Promise<File> {
+	getFile(name: string): Promise<File> {
 		if (!this._readable) throw Error('This storage is not readable.')
 		return new Promise((resolve, reject) => {
 			const localUrl = path.join(this._basePath, name)
-			fs.stat(localUrl).then((stats) => {
-				if (stats.isFile()) {
-					resolve(new LocalFolderFile(localUrl, this._readable, this._writable, name))
-				} else {
-					reject('Object is not a file')
-				}
-			}, (err) => reject(err))
+			fs.stat(localUrl).then(
+				stats => {
+					if (stats.isFile()) {
+						resolve(new LocalFolderFile(localUrl, this._readable, this._writable, name))
+					} else {
+						reject('Object is not a file')
+					}
+				},
+				err => reject(err)
+			)
 		})
 	}
 
-	putFile (file: File, progressCallback?: (progress: number) => void): CancelablePromise<File> {
-		function monitorProgress (localFile: File, sourceProperties: FileProperties): void {
-
-			localFile.getProperties()
-			.then((targetProperties) => {
-				if (typeof progressCallback === 'function') {
-					progressCallback((targetProperties.size || 0) / (sourceProperties.size || 1))
+	putFile(file: File, progressCallback?: (progress: number) => void): CancelablePromise<File> {
+		function monitorProgress(localFile: File, sourceProperties: FileProperties): void {
+			localFile.getProperties().then(
+				targetProperties => {
+					if (typeof progressCallback === 'function') {
+						progressCallback((targetProperties.size || 0) / (sourceProperties.size || 1))
+					}
+				},
+				error => {
+					// this is just to report progress on the file
+					console.log(error)
 				}
-			}, (error) => {
-				// this is just to report progress on the file
-				console.log(error)
-			})
+			)
 		}
 
 		if (!this._writable) throw Error('This storage is not writable.')
-		if ((file.source === StorageType.LOCAL_FOLDER) || (file.source === StorageType.FILE_SHARE)) {
+		if (file.source === StorageType.LOCAL_FOLDER || file.source === StorageType.FILE_SHARE) {
 			// Use fast copy if possible
 			return new CancelablePromise((resolve, reject, onCancel) => {
 				const localFile = this.createFile(file)
-				file.getProperties().then((sourceProperties) => {
-					fs.ensureDir(path.dirname(localFile.url)).then(async () => {
-						let dstFileNotFound = false
-						try {
-							await fs.access(localFile.url)
-						} catch (e0) {
-							// this is alright, we expect fs.access to throw an exception, since
-							// we expect the target file path not to exist
-							dstFileNotFound = true
-						}
-						if (dstFileNotFound === false) {
-							try {
-								await fs.unlink(localFile.url)
-							} catch (e1) {
-								reject(e1)
-							}
-						}
+				file.getProperties().then(
+					sourceProperties => {
+						fs.ensureDir(path.dirname(localFile.url))
+							.then(
+								async () => {
+									let dstFileNotFound = false
+									try {
+										await fs.access(localFile.url)
+									} catch (e0) {
+										// this is alright, we expect fs.access to throw an exception, since
+										// we expect the target file path not to exist
+										dstFileNotFound = true
+									}
+									if (dstFileNotFound === false) {
+										try {
+											await fs.unlink(localFile.url)
+										} catch (e1) {
+											reject(e1)
+										}
+									}
 
-						if (process.platform === 'win32') {
-							const p = robocopy.copyFile(file.url, localFile.url, (progress) => {
-								if (typeof progressCallback === 'function') {
-									progressCallback(progress)
-								}
-							})
-							p.then(() => {
-								resolve()
-							}).catch((e) => {
-								reject(e)
-							})
-							onCancel(() => {
-								p.cancel()
-								reject('File write cancelled')
-							})
-						} else {
-							const progressMonitor = setInterval(() => {
-								monitorProgress(localFile, sourceProperties)
-							}, 1000)
+									if (process.platform === 'win32') {
+										const p = robocopy.copyFile(file.url, localFile.url, progress => {
+											if (typeof progressCallback === 'function') {
+												progressCallback(progress)
+											}
+										})
+										p.then(() => {
+											resolve()
+										}).catch(e => {
+											reject(e)
+										})
+										onCancel(() => {
+											p.cancel()
+											reject('File write cancelled')
+										})
+									} else {
+										const progressMonitor = setInterval(() => {
+											monitorProgress(localFile, sourceProperties)
+										}, 1000)
 
-							fs.copyFile(file.url, localFile.url, (err) => {
-								clearInterval(progressMonitor)
+										fs.copyFile(file.url, localFile.url, err => {
+											clearInterval(progressMonitor)
 
-								if (err) {
-									reject(err)
-									return
-								}
+											if (err) {
+												reject(err)
+												return
+											}
 
-								resolve()
-							})
-						}
-					}, (err) => reject(err))
-					.catch((err) => reject(err))
-				}, (err) => reject(err))
+											resolve()
+										})
+									}
+								},
+								err => reject(err)
+							)
+							.catch(err => reject(err))
+					},
+					err => reject(err)
+				)
 			})
 		} else {
 			// Use streams if fast, system-level file system copy is not possible
 			return new CancelablePromise((resolve, reject, onCancel) => {
-				file.getReadableStream().then((rStream) => {
-					const localFile = this.createFile(file)
-					file.getProperties().then((sourceProperties) => {
-						fs.ensureDir(path.dirname(localFile.url)).then(() => {
-							localFile.getWritableStream().then((wStream) => {
-								const progressMonitor = setInterval(() => {
-									monitorProgress(localFile, sourceProperties)
-								}, 1000)
+				file.getReadableStream().then(
+					rStream => {
+						const localFile = this.createFile(file)
+						file.getProperties().then(
+							sourceProperties => {
+								fs.ensureDir(path.dirname(localFile.url)).then(
+									() => {
+										localFile.getWritableStream().then(
+											wStream => {
+												const progressMonitor = setInterval(() => {
+													monitorProgress(localFile, sourceProperties)
+												}, 1000)
 
-								function handleError (e) {
-									clearInterval(progressMonitor)
-									reject(e)
-								}
+												function handleError(e) {
+													clearInterval(progressMonitor)
+													reject(e)
+												}
 
-								rStream.on('end', () => {
-									clearInterval(progressMonitor)
-									resolve(localFile)
-								})
-								rStream.on('error', handleError)
-								wStream.on('error', handleError)
+												rStream.on('end', () => {
+													clearInterval(progressMonitor)
+													resolve(localFile)
+												})
+												rStream.on('error', handleError)
+												wStream.on('error', handleError)
 
-								rStream.pipe(wStream)
+												rStream.pipe(wStream)
 
-								onCancel(() => {
-									rStream.unpipe()
-									wStream.end()
-									reject('File write cancelled')
-								})
-							}, (reason) => {
-								reject(reason)
-							})
-						}, err => reject(err))
-					}, (e) => {
-						throw new Error(`Could not get file properties for file: "${file.name}": ${e}`)
-					})
-				}, reason => reject(reason))
+												onCancel(() => {
+													rStream.unpipe()
+													wStream.end()
+													reject('File write cancelled')
+												})
+											},
+											reason => {
+												reject(reason)
+											}
+										)
+									},
+									err => reject(err)
+								)
+							},
+							e => {
+								throw new Error(`Could not get file properties for file: "${file.name}": ${e}`)
+							}
+						)
+					},
+					reason => reject(reason)
+				)
 			})
 		}
 	}
 
-	deleteFile (file: File): Promise<void> {
+	deleteFile(file: File): Promise<void> {
 		if (!this._writable) throw Error('This storage is not writable.')
 		return new Promise((resolve, reject) => {
-			fs.unlink(file.url).then(() => resolve(), (err) => reject(err))
+			fs.unlink(file.url).then(() => resolve(), err => reject(err))
 		})
 	}
 
-	getFileProperties (file: File): Promise<FileProperties> {
+	getFileProperties(file: File): Promise<FileProperties> {
 		return getLocalFileProperties(file.url)
 	}
 
-	parseUrl (url: string): string {
+	parseUrl(url: string): string {
 		if (url.startsWith(this._basePath)) {
 			return url.substr(this._basePath.length).replace(/^\\/, '')
 		}
@@ -358,8 +385,13 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	 * @return LocalFolderFile
 	 * @memberof LocalFolderHandler
 	 */
-	private createFile (sourceFile: File): LocalFolderFile {
-		const newFile = new LocalFolderFile(path.join(this._basePath, sourceFile.name), this._readable, this._writable, sourceFile.name)
+	private createFile(sourceFile: File): LocalFolderFile {
+		const newFile = new LocalFolderFile(
+			path.join(this._basePath, sourceFile.name),
+			this._readable,
+			this._writable,
+			sourceFile.name
+		)
 		return newFile
 	}
 
@@ -371,27 +403,42 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	 * @return Promise<NestedFiles>
 	 * @memberof LocalFolderHandler
 	 */
-	private traverseFolder (folder: string, accumulatedPath?: string): Promise<NestedFiles> {
+	private traverseFolder(folder: string, accumulatedPath?: string): Promise<NestedFiles> {
 		return new Promise((resolve, reject) => {
-			fs.readdir(folder).then((files) => {
-				const result: NestedFiles = files.map((entry) => {
-					const entryUrl = path.join(folder, entry)
-					return new Promise((resolve, reject) => {
-						fs.stat(entryUrl).then((stats) => {
-							if (stats.isFile()) {
-								resolve(new LocalFolderFile(entryUrl, this._readable, this._writable, path.join(accumulatedPath || '', entry)))
-							} else if (stats.isDirectory()) {
-								resolve(this.traverseFolder(entryUrl, path.join(accumulatedPath || '', entry)))
-							} else {
-								resolve(null)
-							}
-						}, err => reject(err))
+			fs.readdir(folder).then(
+				files => {
+					const result: NestedFiles = files.map(entry => {
+						const entryUrl = path.join(folder, entry)
+						return new Promise((resolve, reject) => {
+							fs.stat(entryUrl).then(
+								stats => {
+									if (stats.isFile()) {
+										resolve(
+											new LocalFolderFile(
+												entryUrl,
+												this._readable,
+												this._writable,
+												path.join(accumulatedPath || '', entry)
+											)
+										)
+									} else if (stats.isDirectory()) {
+										resolve(this.traverseFolder(entryUrl, path.join(accumulatedPath || '', entry)))
+									} else {
+										resolve(null)
+									}
+								},
+								err => reject(err)
+							)
+						})
 					})
-				})
-				Promise.all(result).then((resolved) => {
-					resolve(_.flatten(resolved))
-				}).catch(reason => reject(reason))
-			}, err => reject(err))
+					Promise.all(result)
+						.then(resolved => {
+							resolve(_.flatten(resolved))
+						})
+						.catch(reason => reject(reason))
+				},
+				err => reject(err)
+			)
 		})
 	}
 }

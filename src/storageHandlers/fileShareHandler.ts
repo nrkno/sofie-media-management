@@ -12,10 +12,12 @@ export class FileShareHandler extends LocalFolderHandler {
 	private _username: string | undefined
 	private _password: string | undefined
 
-	constructor (settings: FileShareStorage) {
-		if (!settings.options.mappedNetworkedDriveTarget) throw new Error(`"${settings.id}": mappedNetworkedDriveTarget not set!`)
+	constructor(settings: FileShareStorage) {
+		if (!settings.options.mappedNetworkedDriveTarget) {
+			throw new Error(`"${settings.id}": mappedNetworkedDriveTarget not set!`)
+		}
 		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
-		const targetBasePath = settings.options.mappedNetworkedDriveTarget + ':\/'
+		const targetBasePath = settings.options.mappedNetworkedDriveTarget + ':/'
 		if (!targetBasePath.match(/[a-zA-Z]/)) throw Error('mappedNetworkedDriveTarget needs to be a drive letter')
 		const settingsObj: LocalFolderStorage = {
 			id: settings.id,
@@ -35,8 +37,7 @@ export class FileShareHandler extends LocalFolderHandler {
 		this._password = settings.options.password
 	}
 
-	async init (): Promise<void> {
-
+	async init(): Promise<void> {
 		let usedLetters: networkDrive.Dictionary<string> = {}
 		try {
 			usedLetters = await networkDrive.list()
@@ -65,7 +66,7 @@ export class FileShareHandler extends LocalFolderHandler {
 		return super.init()
 	}
 
-	parseUrl (url: string): string {
+	parseUrl(url: string): string {
 		if (url.startsWith(this._uncPath)) {
 			return url.substr(this._uncPath.length).replace(/^\\/, '')
 		}

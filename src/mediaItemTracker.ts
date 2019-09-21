@@ -27,7 +27,7 @@ export interface TrackedMediaItemDB extends TrackedMediaItem {
 export class TrackedMediaItems extends EventEmitter {
 	private _db: PouchDB.Database<TrackedMediaItem>
 
-	constructor (dbAdapter?: string, dbPrefix?: string) {
+	constructor(dbAdapter?: string, dbPrefix?: string) {
 		super()
 
 		PouchDB.plugin(PouchDBFind)
@@ -40,20 +40,26 @@ export class TrackedMediaItems extends EventEmitter {
 		this._db = new PrefixedPouchDB('trackedMediaItems', {
 			adapter: dbAdapter
 		})
-		this._db.compact()
-		.then(() => this._db.createIndex({
-			index: {
-				fields: ['sourceStorageId']
-			}
-		})).then(() => this._db.createIndex({
-			index: {
-				fields: ['mediaFlowId']
-			}
-		}))
-		.then(() => {
-			// Index created
-		})
-		.catch((e) => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', e))
+		this._db
+			.compact()
+			.then(() =>
+				this._db.createIndex({
+					index: {
+						fields: ['sourceStorageId']
+					}
+				})
+			)
+			.then(() =>
+				this._db.createIndex({
+					index: {
+						fields: ['mediaFlowId']
+					}
+				})
+			)
+			.then(() => {
+				// Index created
+			})
+			.catch(e => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', e))
 	}
 
 	/**
@@ -61,10 +67,11 @@ export class TrackedMediaItems extends EventEmitter {
 	 * If the item is not found (to be inserted), undefined will be sent to delta-function
 	 * If undefined is returned from delta-function, no update will be made
 	 */
-	async upsert (id: string, delta: (tmi?: TrackedMediaItem) => TrackedMediaItem | undefined): Promise<TrackedMediaItem | undefined> {
-
+	async upsert(
+		id: string,
+		delta: (tmi?: TrackedMediaItem) => TrackedMediaItem | undefined
+	): Promise<TrackedMediaItem | undefined> {
 		return putToDBUpsert(this._db, id, (original?: TrackedMediaItem): TrackedMediaItem | undefined => {
-
 			const modified = delta(original)
 			if (original && modified) {
 				modified._id = original._id
@@ -76,29 +83,36 @@ export class TrackedMediaItems extends EventEmitter {
 		})
 	}
 
-	async put (tmi: TrackedMediaItem): Promise<string> {
+	async put(tmi: TrackedMediaItem): Promise<string> {
 		return this._db.put(tmi).then(value => value.id)
 	}
 
-	async getById (_id: string): Promise<TrackedMediaItemDB> {
-		return this._db.get(_id).then((value) => {
+	async getById(_id: string): Promise<TrackedMediaItemDB> {
+		return this._db.get(_id).then(value => {
 			return value as TrackedMediaItemDB
 		})
 	}
 
-	async getAllFromStorage (storageId: string, query?: PouchDB.Find.Selector) {
-		return this._db.find({selector: _.extend({
-			sourceStorageId: storageId
-		}, query || {})}).then((value) => {
-			return value.docs as TrackedMediaItemDB[]
-		})
+	async getAllFromStorage(storageId: string, query?: PouchDB.Find.Selector) {
+		return this._db
+			.find({
+				selector: _.extend(
+					{
+						sourceStorageId: storageId
+					},
+					query || {}
+				)
+			})
+			.then(value => {
+				return value.docs as TrackedMediaItemDB[]
+			})
 	}
 
-	async remove (tmi: TrackedMediaItemDB): Promise<boolean> {
-		return this._db.remove(tmi._id, tmi._rev).then((value) => value.ok)
+	async remove(tmi: TrackedMediaItemDB): Promise<boolean> {
+		return this._db.remove(tmi._id, tmi._rev).then(value => value.ok)
 	}
 
-	async bulkChange (tmis: TrackedMediaItem[]): Promise<void> {
-		return this._db.bulkDocs(tmis).then(({}) => { })
+	async bulkChange(tmis: TrackedMediaItem[]): Promise<void> {
+		return this._db.bulkDocs(tmis).then(({}) => {})
 	}
 }

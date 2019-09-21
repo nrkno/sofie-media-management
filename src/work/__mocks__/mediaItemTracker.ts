@@ -4,7 +4,7 @@ import * as PouchDB from 'pouchdb-node'
 import * as PouchDBMemory from 'pouchdb-adapter-memory'
 
 export class TrackedMediaItems extends OriginalTrackedMediaItems {
-	constructor () {
+	constructor() {
 		PouchDB.plugin(PouchDBMemory)
 		super('memory')
 	}

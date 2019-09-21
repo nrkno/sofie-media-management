@@ -38,21 +38,21 @@ export abstract class File {
 	 * @return Promise<stream.Writable>
 	 * @memberof File
 	 */
-	abstract getWritableStream (): Promise<stream.Writable>
+	abstract getWritableStream(): Promise<stream.Writable>
 	/**
 	 * Return a readable stream to read from the file
 	 * @abstract
 	 * @return Promise<stream.Readable>
 	 * @memberof File
 	 */
-	abstract getReadableStream (): Promise<stream.Readable>
+	abstract getReadableStream(): Promise<stream.Readable>
 	/**
 	 * Get the properties (created timestamp, modified timestamp and file size)
 	 * @abstract
 	 * @return Promise<FileProperties>
 	 * @memberof File
 	 */
-	abstract getProperties (): Promise<FileProperties>
+	abstract getProperties(): Promise<FileProperties>
 }
 
 export interface FileProperties {
@@ -68,7 +68,7 @@ export enum StorageEventType {
 }
 
 export interface StorageEvent {
-	type: StorageEventType,
+	type: StorageEventType
 	path: string
 	file?: File
 }
@@ -79,33 +79,35 @@ export interface StorageEvent {
  * ( to abstract storage to local folders, network shared, FTP:s, Amazon G3 etc...)
  */
 export abstract class StorageHandler extends EventEmitter {
-
-	on (type: StorageEventType.add | StorageEventType.change | StorageEventType.delete, listener: (e: StorageEvent) => void): this {
+	on(
+		type: StorageEventType.add | StorageEventType.change | StorageEventType.delete,
+		listener: (e: StorageEvent) => void
+	): this {
 		return super.on(type, listener)
 	}
 
-	abstract parseUrl (url: string): string
+	abstract parseUrl(url: string): string
 
 	/**
 	 * Get all file handles on the storage
 	 * @abstract
 	 * @returns An array of file handles in the storage
 	 */
-	abstract getAllFiles (): Promise<Array<File>>
+	abstract getAllFiles(): Promise<Array<File>>
 
 	/**
 	 * Hint to the storage handler to monitor a specific file. How & if this is implemented is up to the storage handler. It is acceptable to monitor all files within the storage scope and fire events on them, even if addMonitoredPath is used.
 	 * @param  {string} url
 	 * @return {void}@memberof StorageHandler
 	 */
-	abstract addMonitoredFile (url: string): void
+	abstract addMonitoredFile(url: string): void
 
 	/**
 	 * Hint to the storage handler that a specific file can be not monitored.
 	 * @param  {string} url
 	 * @return {void}@memberof StorageHandler
 	 */
-	abstract removeMonitoredFile (url: string): void
+	abstract removeMonitoredFile(url: string): void
 
 	/**
 	 * Get a file handle
@@ -113,7 +115,7 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @param  name The file name (relative to the storage root)
 	 * @returns Given file handle
 	 */
-	abstract getFile (name: string): Promise<File>
+	abstract getFile(name: string): Promise<File>
 	/**
 	 * Write a file to storage. If a file of the same name already exists, overwrite it.
 	 * @abstract
@@ -121,14 +123,14 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @param  progressCallback? An optional callback to be called when the progress of the operation changes
 	 * @returns The file created on the storage
 	 */
-	abstract putFile (file: File, progressCallback?: (progress: number) => void): CancelablePromise<File>
+	abstract putFile(file: File, progressCallback?: (progress: number) => void): CancelablePromise<File>
 	/**
 	 *
 	 * @abstract Delete a file from storage
 	 * @param  file The file to be deleted from this storage
 	 * @return
 	 */
-	abstract deleteFile (file: File): Promise<void>
+	abstract deleteFile(file: File): Promise<void>
 
 	/**
 	 * Get file properties (file size, created timestamp and modified timestamp)
@@ -137,7 +139,7 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @return Promise<FileProperties>
 	 * @memberof StorageHandler
 	 */
-	abstract getFileProperties (file: File): Promise<FileProperties>
+	abstract getFileProperties(file: File): Promise<FileProperties>
 
 	/**
 	 * Initialize the handler, set up the environment to be whatever it needs to be.
@@ -145,7 +147,7 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @return
 	 * @memberof StorageHandler
 	 */
-	abstract init (): Promise<void>
+	abstract init(): Promise<void>
 
 	/**
 	 * Uninitialize the handler, stop sending events.
@@ -153,7 +155,7 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @return
 	 * @memberof StorageHandler
 	 */
-	abstract destroy (): Promise<void>
+	abstract destroy(): Promise<void>
 }
 
 /**
@@ -162,7 +164,7 @@ export abstract class StorageHandler extends EventEmitter {
  * @param  {StorageSettings} storage
  * @return StorageHandler
  */
-export function buildStorageHandler (storage: GeneralStorageSettings): StorageHandler {
+export function buildStorageHandler(storage: GeneralStorageSettings): StorageHandler {
 	switch (storage.type) {
 		case StorageType.LOCAL_FOLDER:
 			return new LocalFolderHandler(storage)

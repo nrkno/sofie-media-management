@@ -1,10 +1,6 @@
 import * as _ from 'underscore'
 import * as url from 'url'
-import {
-	PeripheralDeviceAPI,
-	Collection,
-	Observer
-} from 'tv-automation-server-core-integration'
+import { PeripheralDeviceAPI, Collection, Observer } from 'tv-automation-server-core-integration'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
 import { LoggerInstance } from 'winston'
@@ -22,13 +18,12 @@ const CHECK_TIME_READY = 60 * 1000
 const CHECK_TIME_OTHER = 2 * 1000
 
 type QuantelClipSearchQuery = {
-	ClipGUID?: string,
+	ClipGUID?: string
 	Title?: string
 }
 const QUANTEL_URL_PROTOCOL = 'quantel:'
 
 export class MonitorQuantel extends Monitor {
-
 	logger: LoggerInstance
 	protected _settings: MonitorSettingsQuantel
 
@@ -41,16 +36,16 @@ export class MonitorQuantel extends Monitor {
 	private _quantel: QuantelGateway
 	private _isDestroyed: boolean = false
 	private _watchError: string | null
-	private _cachedMediaObjects: {[objectId: string]: (MediaObject | { _id: string,_rev: string})} = {}
+	private _cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
 
-	constructor (deviceId: string, _settings: MonitorSettingsQuantel, logger: LoggerInstance) {
+	constructor(deviceId: string, _settings: MonitorSettingsQuantel, logger: LoggerInstance) {
 		super(deviceId, _settings, logger)
 
 		this._quantel = new QuantelGateway()
 		this._quantel.on('error', e => this.logger.error('Quantel.QuantelGateway', e))
 	}
 
-	get deviceInfo (): MonitorDevice {
+	get deviceInfo(): MonitorDevice {
 		// @ts-ignore: todo: make stronger typed, via core-integration
 		return {
 			deviceName: `Quantel (${this._settings.gatewayUrl} ${this._quantel.zoneId}/${this._quantel.serverId})`,
@@ -63,11 +58,10 @@ export class MonitorQuantel extends Monitor {
 			deviceSubType: 'quantel'
 		}
 	}
-	public async restart (): Promise<void> {
+	public async restart(): Promise<void> {
 		throw Error('Quantel restart not implemented yet')
 	}
-	public async init (): Promise<void> {
-
+	public async init(): Promise<void> {
 		this.logger.info(`Initializing Quantel-monitor`, this._settings)
 
 		const device = await this._coreHandler.getParentDevice()
@@ -91,11 +85,14 @@ export class MonitorQuantel extends Monitor {
 		this._expectedMediaItemsSubscription = await this._coreHandler.core.subscribe('expectedMediaItems', {
 			studioId: this._studioId
 		})
-		_.each(this.expectedMediaItems().find({
-			studioId: this._studioId
-		}), doc => {
-			this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
-		})
+		_.each(
+			this.expectedMediaItems().find({
+				studioId: this._studioId
+			}),
+			doc => {
+				this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
+			}
+		)
 		this.logger.debug(`Quantel: Subscribed to expectedMediaItems for studio "${this._studioId}"`)
 
 		this.observer = observer
@@ -124,9 +121,8 @@ export class MonitorQuantel extends Monitor {
 
 		// Start watching:
 		this.triggerWatch()
-
 	}
-	async dispose (): Promise<void> {
+	async dispose(): Promise<void> {
 		await super.dispose()
 
 		this._isDestroyed = true
@@ -134,7 +130,7 @@ export class MonitorQuantel extends Monitor {
 		this._coreHandler.core.unsubscribe(this._expectedMediaItemsSubscription)
 		this.observer.stop()
 	}
-	private wrapError (fcn) {
+	private wrapError(fcn) {
 		return (...args) => {
 			try {
 				return fcn(...args)
@@ -143,20 +139,21 @@ export class MonitorQuantel extends Monitor {
 			}
 		}
 	}
-	private shouldHandleItem (obj: ExpectedMediaItem): boolean {
+	private shouldHandleItem(obj: ExpectedMediaItem): boolean {
 		if (obj.url && obj.url.startsWith(QUANTEL_URL_PROTOCOL)) {
 			return true
 		}
 		return false
 	}
-	private parseUrlToQuery (queryUrl: string): QuantelClipSearchQuery {
+	private parseUrlToQuery(queryUrl: string): QuantelClipSearchQuery {
 		const parsed = url.parse(queryUrl)
 		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`Unsupported URL format: ${queryUrl}`)
 		let guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
-																 // path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
-		let title = decodeURI(parsed.query || '')				 // query for quantel:?Clip title or quantel:?"Clip title"
+		// path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
+		let title = decodeURI(parsed.query || '') // query for quantel:?Clip title or quantel:?"Clip title"
 
-		if (guid.startsWith("?")) {	// check if the title wasn't mistakenly matched as GUID
+		if (guid.startsWith('?')) {
+			// check if the title wasn't mistakenly matched as GUID
 			title = guid.substr(1)
 			guid = ''
 		}
@@ -191,7 +188,7 @@ export class MonitorQuantel extends Monitor {
 					title: '',
 					lastChecked: 0,
 					url: item.url
-			   }
+				}
 			}
 		}
 	}
@@ -208,7 +205,7 @@ export class MonitorQuantel extends Monitor {
 					title: '',
 					lastChecked: 0,
 					url: item.url
-			   }
+				}
 			} else {
 				// if the item shouldn't be handled, treat it as if it was removed
 				this.onExpectedRemoved(id, item)
@@ -221,24 +218,21 @@ export class MonitorQuantel extends Monitor {
 		}
 	}
 
-	private triggerWatch (): void {
+	private triggerWatch(): void {
 		// This function should only be called once during init, and then upon end of this.doWatch()
 		setTimeout(() => {
 			if (!this._isDestroyed) {
-				this.doWatch()
-				.catch((e) => {
+				this.doWatch().catch(e => {
 					this.logger.error('Error in Quantel doWatch:' + e)
 				})
 			}
 		}, BREATHING_ROOM)
 	}
-	private async doWatch (): Promise<void> {
+	private async doWatch(): Promise<void> {
 		try {
-
 			const server = await this._quantel.getServer()
 			if (server) {
-
-				const mediaObjects: {[objectId: string]: MediaObject | null} = {}
+				const mediaObjects: { [objectId: string]: MediaObject | null } = {}
 
 				// Fetch all url/GUID:s that we are to monitor
 				const urls = _.keys(this.monitoredFiles)
@@ -248,12 +242,10 @@ export class MonitorQuantel extends Monitor {
 					const monitoredFile = this.monitoredFiles[url]
 
 					const timeSinceLastCheck = Date.now() - (monitoredFile.lastChecked || 0)
-					const checkTime = (
-						monitoredFile.status === QuantelMonitorFileStatus.READY ?
-						CHECK_TIME_READY :
-						CHECK_TIME_OTHER
-					)
-					if (timeSinceLastCheck >= checkTime) { // It's time to check the file again
+					const checkTime =
+						monitoredFile.status === QuantelMonitorFileStatus.READY ? CHECK_TIME_READY : CHECK_TIME_OTHER
+					if (timeSinceLastCheck >= checkTime) {
+						// It's time to check the file again
 
 						monitoredFile.lastChecked = Date.now()
 
@@ -262,7 +254,7 @@ export class MonitorQuantel extends Monitor {
 						if (url) {
 							const clipSummaries = await this._quantel.searchClip(this.parseUrlToQuery(url))
 							if (clipSummaries.length >= 1) {
-								const clipSummary = _.find(clipSummaries, (clipData) => {
+								const clipSummary = _.find(clipSummaries, clipData => {
 									return (
 										clipData.PoolID &&
 										(server.pools || []).indexOf(clipData.PoolID) !== -1 && // If present in any of the pools of the server
@@ -299,16 +291,16 @@ export class MonitorQuantel extends Monitor {
 											_id: getHash(url + clipData.ClipGUID),
 											_rev: 'modified' + clipData.Modified
 										}
-									} else this.logger.warn(`Clip "${url}" summary found, but clip not found when asking for clipId`)
+									} else {
+										this.logger.warn(
+											`Clip "${url}" summary found, but clip not found when asking for clipId`
+										)
+									}
 								} else this.logger.debug(`Clip "${url}" found, but doesn't exist on the right server`)
 							} else this.logger.debug(`Clip "${url}" not found`)
 						} else this.logger.error(`Quantel: Falsy url encountered`)
 
-						let newStatus = (
-							mediaObject ?
-							QuantelMonitorFileStatus.READY :
-							QuantelMonitorFileStatus.MISSING
-						)
+						let newStatus = mediaObject ? QuantelMonitorFileStatus.READY : QuantelMonitorFileStatus.MISSING
 
 						monitoredFile.status = newStatus
 
@@ -321,19 +313,16 @@ export class MonitorQuantel extends Monitor {
 				_.each(mediaObjects, (newMediaObject: MediaObject | null, objectId: string) => {
 					const oldMediaObject = this._cachedMediaObjects[objectId]
 					if (newMediaObject) {
-						if (
-							!oldMediaObject ||
-							newMediaObject._rev !== oldMediaObject._rev
-							) {
+						if (!oldMediaObject || newMediaObject._rev !== oldMediaObject._rev) {
 							// Added or changed
-							p.then(() => this._sendChanged(newMediaObject)).catch((e) => {
+							p.then(() => this._sendChanged(newMediaObject)).catch(e => {
 								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
 							})
 						}
 					} else {
 						if (oldMediaObject) {
 							// Removed
-							p.then(() => this._sendRemoved(oldMediaObject._id)).catch((e) => {
+							p.then(() => this._sendRemoved(oldMediaObject._id)).catch(e => {
 								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
 							})
 						}
@@ -346,7 +335,6 @@ export class MonitorQuantel extends Monitor {
 				})
 				await p
 				// this._cachedMediaObjects = mediaObjects
-
 			} else {
 				throw new Error('Quantel: Has no server')
 			}
@@ -359,7 +347,7 @@ export class MonitorQuantel extends Monitor {
 		}
 		this.triggerWatch()
 	}
-	private _updateStatus (): PeripheralDeviceAPI.StatusObject {
+	private _updateStatus(): PeripheralDeviceAPI.StatusObject {
 		let statusSettings: PeripheralDeviceAPI.StatusObject = { statusCode: PeripheralDeviceAPI.StatusCode.GOOD }
 
 		if (!this._settings.gatewayUrl) {
@@ -395,13 +383,10 @@ export class MonitorQuantel extends Monitor {
 		}
 		return statusSettings
 	}
-	private _updateAndSendStatus () {
+	private _updateAndSendStatus() {
 		const status = this._updateStatus()
 
-		if (
-			this._status.statusCode !== status.statusCode ||
-			!_.isEqual(this._status.messages, status.messages)
-		) {
+		if (this._status.statusCode !== status.statusCode || !_.isEqual(this._status.messages, status.messages)) {
 			this._status = {
 				statusCode: status.statusCode,
 				messages: status.messages
@@ -412,12 +397,11 @@ export class MonitorQuantel extends Monitor {
 			this.emit('connectionChanged', this._status)
 		}
 	}
-	private wait (time): Promise<void> {
+	private wait(time): Promise<void> {
 		return new Promise(resolve => {
 			setTimeout(resolve, time)
 		})
 	}
-
 }
 interface QuantelMonitor {
 	[guid: string]: QuantelMonitorFile

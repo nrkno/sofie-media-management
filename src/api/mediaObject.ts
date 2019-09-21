@@ -1,6 +1,6 @@
 export interface MediaScannerConfig {
-	host?: string,
-	port?: number,
+	host?: string
+	port?: number
 	collectionId: string
 }
 export enum MediaStreamType {

@@ -7,7 +7,7 @@ jest.mock('windows-network-drive')
 describe('FileShareHandler', () => {
 	let fsh0: FileShareHandler
 
-	beforeAll(async (done) => {
+	beforeAll(async done => {
 		fsh0 = new FileShareHandler({
 			id: 'remote0',
 			type: StorageType.FILE_SHARE,

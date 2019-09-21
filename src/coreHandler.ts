@@ -1,5 +1,5 @@
-
-import { CoreConnection,
+import {
+	CoreConnection,
 	CoreOptions,
 	PeripheralDeviceAPI as P,
 	DDPConnectorOptions,
@@ -13,9 +13,9 @@ import { Process } from './process'
 import { Monitor } from './monitors/_monitor'
 
 export interface CoreConfig {
-	host: string,
-	port: number,
-	ssl: boolean,
+	host: string
+	port: number
+	ssl: boolean
 	watchdog: boolean
 }
 export interface PeripheralDeviceCommand {
@@ -39,7 +39,7 @@ export class CoreHandler {
 	logger: Winston.LoggerInstance
 
 	public _observers: Array<any> = []
-	public deviceSettings: {[key: string]: any} = {}
+	public deviceSettings: { [key: string]: any } = {}
 
 	// Mediascanner statuses: temporary implementation, to be moved into casparcg device later:
 	public deviceStatus: P.StatusCode = P.StatusCode.GOOD
@@ -57,7 +57,7 @@ export class CoreHandler {
 	private _deviceOptions: DeviceConfig
 	private _onConnected?: () => any
 	private _onChanged?: () => any
-	private _executedFunctions: {[id: string]: boolean} = {}
+	private _executedFunctions: { [id: string]: boolean } = {}
 	private _coreConfig?: CoreConfig
 	private _process?: Process
 
@@ -66,18 +66,18 @@ export class CoreHandler {
 
 	private _processState: {
 		[key: string]: {
-			comments: string[],
+			comments: string[]
 			status: P.StatusCode
 		}
 	}
 
-	constructor (logger: Winston.LoggerInstance, deviceOptions: DeviceConfig) {
+	constructor(logger: Winston.LoggerInstance, deviceOptions: DeviceConfig) {
 		this.logger = logger
 		this._deviceOptions = deviceOptions
 		this._processState = {}
 	}
 
-	async init (config: CoreConfig, process: Process): Promise<void> {
+	async init(config: CoreConfig, process: Process): Promise<void> {
 		// this.logger.info('========')
 		this._statusInitialized = false
 		this._coreConfig = config
@@ -87,8 +87,7 @@ export class CoreHandler {
 
 		this.core.onConnected(() => {
 			this.logger.info('Core Connected!')
-			this.setupObserversAndSubscriptions()
-			.catch((e) => {
+			this.setupObserversAndSubscriptions().catch(e => {
 				this.logger.error('Core Error:', e)
 			})
 			if (this._onConnected) this._onConnected()
@@ -96,7 +95,7 @@ export class CoreHandler {
 		this.core.onDisconnected(() => {
 			this.logger.warn('Core Disconnected!')
 		})
-		this.core.onError((err) => {
+		this.core.onError(err => {
 			this.logger.error('Core Error: ' + (err.message || err.toString() || err))
 		})
 
@@ -117,7 +116,7 @@ export class CoreHandler {
 		await this.updateCoreStatus()
 		return
 	}
-	async setupObserversAndSubscriptions () {
+	async setupObserversAndSubscriptions() {
 		this.logger.info('Core: Setting up subscriptions..')
 		this.logger.info('DeviceId: ' + this.core.deviceId)
 		await Promise.all([
@@ -130,7 +129,7 @@ export class CoreHandler {
 		this.logger.info('Core: Subscriptions are set up!')
 		if (this._observers.length) {
 			this.logger.info('Core: Clearing observers..')
-			this._observers.forEach((obs) => {
+			this._observers.forEach(obs => {
 				obs.stop()
 			})
 			this._observers = []
@@ -146,12 +145,12 @@ export class CoreHandler {
 		this.setupObserverForPeripheralDeviceCommands(this)
 		return
 	}
-	async destroy (): Promise<void> {
+	async destroy(): Promise<void> {
 		this._statusDestroyed = true
 		await this.updateCoreStatus()
 		await this.core.destroy()
 	}
-	getCoreConnectionOptions (name: string, subDeviceId: string, subType?: P.DeviceSubType): CoreOptions {
+	getCoreConnectionOptions(name: string, subDeviceId: string, subType?: P.DeviceSubType): CoreOptions {
 		let credentials: {
 			deviceId: string
 			deviceToken: string
@@ -179,18 +178,18 @@ export class CoreHandler {
 			deviceSubType: subType || P.SUBTYPE_PROCESS,
 
 			deviceName: name,
-			watchDog: (this._coreConfig ? this._coreConfig.watchdog : true)
+			watchDog: this._coreConfig ? this._coreConfig.watchdog : true
 		}
 		options.versions = this._getVersions()
 		return options
 	}
-	onConnected (fcn: () => any) {
+	onConnected(fcn: () => any) {
 		this._onConnected = fcn
 	}
-	onChanged (fcn: () => any) {
+	onChanged(fcn: () => any) {
 		this._onChanged = fcn
 	}
-	onDeviceChanged (id: string) {
+	onDeviceChanged(id: string) {
 		if (id === this.core.deviceId) {
 			let col = this.core.getCollection('peripheralDevices')
 			if (!col) throw new Error('collection "peripheralDevices" not found!')
@@ -202,11 +201,7 @@ export class CoreHandler {
 				this.deviceSettings = {}
 			}
 
-			let logLevel = (
-				this.deviceSettings['debugLogging'] ?
-				'debug' :
-				'info'
-			)
+			let logLevel = this.deviceSettings['debugLogging'] ? 'debug' : 'info'
 			if (logLevel !== this.logger.level) {
 				this.logger.level = logLevel
 
@@ -226,11 +221,11 @@ export class CoreHandler {
 			if (this._onChanged) this._onChanged()
 		}
 	}
-	get logDebug (): boolean {
+	get logDebug(): boolean {
 		return !!this.deviceSettings['debugLogging']
 	}
 
-	executeFunction (cmd: PeripheralDeviceCommand, fcnObject: any) {
+	executeFunction(cmd: PeripheralDeviceCommand, fcnObject: any) {
 		if (cmd) {
 			if (this._executedFunctions[cmd._id]) return // prevent it from running multiple times
 			this.logger.info(cmd.functionName, cmd.args)
@@ -241,13 +236,14 @@ export class CoreHandler {
 				if (err) {
 					this.logger.error('executeFunction error', err, err.stack)
 				}
-				this.core.callMethod(P.methods.functionReply, [cmd._id, err, res])
-				.then(() => {
-					// console.log('cb done')
-				})
-				.catch((e) => {
-					this.logger.error(e)
-				})
+				this.core
+					.callMethod(P.methods.functionReply, [cmd._id, err, res])
+					.then(() => {
+						// console.log('cb done')
+					})
+					.catch(e => {
+						this.logger.error(e)
+					})
 			}
 			// @ts-ignore
 			let fcn: Function = fcnObject[cmd.functionName]
@@ -255,21 +251,21 @@ export class CoreHandler {
 				if (!fcn) throw Error('Function "' + cmd.functionName + '" not found!')
 
 				Promise.resolve(fcn.apply(fcnObject, cmd.args))
-				.then((result) => {
-					cb(null, result)
-				})
-				.catch((e) => {
-					cb(e.toString(), null)
-				})
+					.then(result => {
+						cb(null, result)
+					})
+					.catch(e => {
+						cb(e.toString(), null)
+					})
 			} catch (e) {
 				cb(e.toString(), null)
 			}
 		}
 	}
-	retireExecuteFunction (cmdId: string) {
+	retireExecuteFunction(cmdId: string) {
 		delete this._executedFunctions[cmdId]
 	}
-	setupObserverForPeripheralDeviceCommands (functionObject: CoreHandler | CoreMonitorHandler) {
+	setupObserverForPeripheralDeviceCommands(functionObject: CoreHandler | CoreMonitorHandler) {
 		let observer = functionObject.core.observe('peripheralDeviceCommands')
 		functionObject.killProcess(0)
 		functionObject._observers.push(observer)
@@ -302,7 +298,7 @@ export class CoreHandler {
 			}
 		})
 	}
-	killProcess (actually: number) {
+	killProcess(actually: number) {
 		if (actually === 1) {
 			this.logger.info('KillProcess command received, shutting down in 1000ms!')
 			setTimeout(() => {
@@ -320,11 +316,11 @@ export class CoreHandler {
 		// TODO: perhaps do something here?
 		return Promise.resolve()
 	} */
-	pingResponse (message: string) {
+	pingResponse(message: string) {
 		this.core.setPingResponse(message)
 		return true
 	}
-	getSnapshot (): any {
+	getSnapshot(): any {
 		this.logger.info('getSnapshot')
 
 		// TODO: collect some proper data here to send to Core, so it can create a nice debug report
@@ -333,14 +329,14 @@ export class CoreHandler {
 			// transferStatus: myTransferStatus,
 		}
 	}
-	updateCoreStatus (): Promise<any> {
+	updateCoreStatus(): Promise<any> {
 		let statusCode = P.StatusCode.GOOD
 		let messages: Array<string> = []
 
 		if (this.deviceStatus !== P.StatusCode.GOOD) {
 			statusCode = this.deviceStatus
 			if (this.deviceMessages) {
-				_.each(this.deviceMessages, (msg) => {
+				_.each(this.deviceMessages, msg => {
 					messages.push(msg)
 				})
 			}
@@ -365,24 +361,28 @@ export class CoreHandler {
 			status
 		}
 
-		const deviceState = _.reduce(this._processState, (memo, value) => {
-			let status = memo.status
-			let comments = memo.comments
-			if (value.status > status) {
-				status = value.status
-			}
-			if (value.comments) {
-				comments = comments.concat(value.comments)
-			}
+		const deviceState = _.reduce(
+			this._processState,
+			(memo, value) => {
+				let status = memo.status
+				let comments = memo.comments
+				if (value.status > status) {
+					status = value.status
+				}
+				if (value.comments) {
+					comments = comments.concat(value.comments)
+				}
 
-			return {
-				status,
-				comments
+				return {
+					status,
+					comments
+				}
+			},
+			{
+				status: P.StatusCode.GOOD,
+				comments: [] as string[]
 			}
-		}, {
-			status: P.StatusCode.GOOD,
-			comments: [] as string[]
-		})
+		)
 
 		this.deviceStatus = deviceState.status
 		this.deviceMessages = deviceState.comments
@@ -390,10 +390,9 @@ export class CoreHandler {
 			this.logger.error('Could not update Media Manager status in Core')
 		})
 	}
-	private _getVersions () {
+	private _getVersions() {
 		return depsVersions || {}
 	}
-
 }
 
 /**
@@ -408,15 +407,14 @@ export class CoreMonitorHandler {
 	private _subscriptions: Array<string> = []
 	private _hasGottenStatusChange: boolean = false
 
-	constructor (parent: CoreHandler, monitor: Monitor) {
+	constructor(parent: CoreHandler, monitor: Monitor) {
 		this._coreParentHandler = parent
 		// this._device = device
 		this.monitor = monitor
 
 		this._coreParentHandler.logger.info('new CoreMonitorHandler ' + monitor.deviceInfo.deviceName)
-
 	}
-	async init (): Promise<void> {
+	async init(): Promise<void> {
 		let deviceName = this.monitor.deviceInfo.deviceName
 		let deviceId = this.monitor.deviceInfo.deviceId
 
@@ -427,11 +425,15 @@ export class CoreMonitorHandler {
 				this.monitor.deviceType as P.DeviceSubType // tmp, this should be a proper subType
 			)
 		)
-		this.core.onError((err) => {
-			this._coreParentHandler.logger.error('Core Error: ' + ((_.isObject(err) && err.message) || err.toString() || err))
+		this.core.onError(err => {
+			this._coreParentHandler.logger.error(
+				'Core Error: ' + ((_.isObject(err) && err.message) || err.toString() || err)
+			)
 		})
-		this.core.onInfo((message) => {
-			this._coreParentHandler.logger.info('Core Info: ' + ((_.isObject(message) && message.message) || message.toString() || message))
+		this.core.onInfo(message => {
+			this._coreParentHandler.logger.info(
+				'Core Info: ' + ((_.isObject(message) && message.message) || message.toString() || message)
+			)
 		})
 		await this.core.init(this._coreParentHandler.core)
 
@@ -440,18 +442,19 @@ export class CoreMonitorHandler {
 		}
 		await this.setupSubscriptionsAndObservers()
 	}
-	async setupSubscriptionsAndObservers (): Promise<void> {
-
+	async setupSubscriptionsAndObservers(): Promise<void> {
 		if (this._observers.length) {
 			this._coreParentHandler.logger.info('CoreMonitorHandler: Clearing observers..')
-			this._observers.forEach((obs) => {
+			this._observers.forEach(obs => {
 				obs.stop()
 			})
 			this._observers = []
 		}
 		let deviceId = this.monitor.deviceInfo.deviceId
 
-		this._coreParentHandler.logger.info('CoreMonitorHandler: Setting up subscriptions for ' + this.core.deviceId + ' for device ' + deviceId + ' ..')
+		this._coreParentHandler.logger.info(
+			'CoreMonitorHandler: Setting up subscriptions for ' + this.core.deviceId + ' for device ' + deviceId + ' ..'
+		)
 		this._subscriptions = []
 		try {
 			let sub = await this.core.autoSubscribe('peripheralDeviceCommands', this.core.deviceId)
@@ -465,30 +468,30 @@ export class CoreMonitorHandler {
 		// setup observers
 		this._coreParentHandler.setupObserverForPeripheralDeviceCommands(this)
 	}
-	onConnectionChanged (deviceStatus: P.StatusObject) {
+	onConnectionChanged(deviceStatus: P.StatusObject) {
 		this._hasGottenStatusChange = true
 
-		this.core.setStatus(deviceStatus)
-		.catch(e => this._coreParentHandler.logger.error('Error when setting status: ' + e, e.stack))
+		this.core
+			.setStatus(deviceStatus)
+			.catch(e => this._coreParentHandler.logger.error('Error when setting status: ' + e, e.stack))
 	}
-	onCommandError (
+	onCommandError(
 		errorMessage: string,
 		ref: {
-			rundownId?: string,
-			partId?: string,
-			pieceId?: string,
-			context: string,
+			rundownId?: string
+			partId?: string
+			pieceId?: string
+			context: string
 			timelineObjId: string
-		}) {
-		this.core.callMethodLowPrio(PeripheralDeviceAPI.methods.reportCommandError, [
-			errorMessage,
-			ref
-		])
-		.catch(e => this._coreParentHandler.logger.error('Error when setting status: ' + e, e.stack))
+		}
+	) {
+		this.core
+			.callMethodLowPrio(PeripheralDeviceAPI.methods.reportCommandError, [errorMessage, ref])
+			.catch(e => this._coreParentHandler.logger.error('Error when setting status: ' + e, e.stack))
 	}
 
-	async dispose (dontUpdateStatus?: boolean): Promise<void> {
-		this._observers.forEach((obs) => {
+	async dispose(dontUpdateStatus?: boolean): Promise<void> {
+		this._observers.forEach(obs => {
 			obs.stop()
 		})
 
@@ -499,12 +502,12 @@ export class CoreMonitorHandler {
 			})
 		}
 	}
-	async getParentDevice () {
+	async getParentDevice() {
 		return this._coreParentHandler.core.getPeripheralDevice()
 	}
 	// Methods callable by Core:
 	// -------------------------
-	killProcess (actually: number) {
+	killProcess(actually: number) {
 		// if (actually === 1) {
 		// 	this._coreParentHandler.logger.info('KillProcess command received, shutting down in 1000ms!')
 		// 	setTimeout(() => {

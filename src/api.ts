@@ -116,10 +116,10 @@ export interface StorageSettings {
 export interface QuantelHTTPStorage extends StorageSettings {
 	type: StorageType.QUANTEL_HTTP
 	options: {
-		transformerUrl: string,
-		gatewayUrl: string,
-		ISAUrl: string,
-		zoneId: string | undefined,
+		transformerUrl: string
+		gatewayUrl: string
+		ISAUrl: string
+		zoneId: string | undefined
 		serverId: number
 		onlySelectedFiles: true
 	}
@@ -216,7 +216,7 @@ export abstract class WorkStep implements WorkStepInitial {
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 
-	constructor (init?: WorkStepInitial) {
+	constructor(init?: WorkStepInitial) {
 		Object.assign(this, init)
 	}
 }

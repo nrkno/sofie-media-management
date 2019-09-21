@@ -6,31 +6,39 @@ import { LocalFolderStorage } from '../../api'
 export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _files: File[] = []
 
-	constructor (settings: LocalFolderStorage) {
+	constructor(settings: LocalFolderStorage) {
 		super()
 	}
 
-	init = jest.fn((): Promise<void> => {
-		return Promise.resolve()
-	})
-	destroy = jest.fn((): Promise<void> => {
-		return Promise.resolve()
-	})
+	init = jest.fn(
+		(): Promise<void> => {
+			return Promise.resolve()
+		}
+	)
+	destroy = jest.fn(
+		(): Promise<void> => {
+			return Promise.resolve()
+		}
+	)
 
-	getAllFiles = jest.fn((): Promise<File[]> => {
-		return Promise.resolve().then(() => this._files)
-	})
+	getAllFiles = jest.fn(
+		(): Promise<File[]> => {
+			return Promise.resolve().then(() => this._files)
+		}
+	)
 	_setAllFiles = (files: File[]) => {
 		this._files = files
 	}
 
-	getFile = jest.fn((name: string): Promise<File> => {
-		return Promise.resolve().then(() => {
-			const obj = this._files.find(i => i.name === name)
-			if (!obj) throw new Error(`File "${name}" not found!`)
-			return obj
-		})
-	})
+	getFile = jest.fn(
+		(name: string): Promise<File> => {
+			return Promise.resolve().then(() => {
+				const obj = this._files.find(i => i.name === name)
+				if (!obj) throw new Error(`File "${name}" not found!`)
+				return obj
+			})
+		}
+	)
 	_setFile = (name: string, obj: File) => {
 		const idx = this._files.findIndex(i => i.name === name)
 		if (idx < 0) {
@@ -40,25 +48,31 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		}
 	}
 
-	putFile = jest.fn((file: File, progressCallback?: (progress: number) => void): Promise<File> => {
-		const newFile = _.clone(file)
-		this._setFile(file.name, newFile)
-		return Promise.resolve().then(() => newFile)
-	})
+	putFile = jest.fn(
+		(file: File, progressCallback?: (progress: number) => void): Promise<File> => {
+			const newFile = _.clone(file)
+			this._setFile(file.name, newFile)
+			return Promise.resolve().then(() => newFile)
+		}
+	)
 
-	deleteFile = jest.fn((file: File): Promise<void> => {
-		const idx = this._files.indexOf(file)
-		if (idx < 0) throw new Error(`File "${file.name}" not found in storage`)
-		return Promise.resolve()
-	})
+	deleteFile = jest.fn(
+		(file: File): Promise<void> => {
+			const idx = this._files.indexOf(file)
+			if (idx < 0) throw new Error(`File "${file.name}" not found in storage`)
+			return Promise.resolve()
+		}
+	)
 
-	getFileProperties = jest.fn((file: File): Promise<FileProperties> => {
-		return new Promise((resolve, reject) => {
-			resolve({
-				created: Date.now(),
-				modified: Date.now(),
-				size: 1000
+	getFileProperties = jest.fn(
+		(file: File): Promise<FileProperties> => {
+			return new Promise((resolve, reject) => {
+				resolve({
+					created: Date.now(),
+					modified: Date.now(),
+					size: 1000
+				})
 			})
-		})
-	})
+		}
+	)
 }

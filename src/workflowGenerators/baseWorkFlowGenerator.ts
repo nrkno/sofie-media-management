@@ -7,16 +7,19 @@ export enum WorkFlowGeneratorEventType {
 }
 
 export abstract class BaseWorkFlowGenerator extends EventEmitter {
-	constructor () {
+	constructor() {
 		super()
 
 		// TODO: generic setup
 	}
 
-	on (type: WorkFlowGeneratorEventType.NEW_WORKFLOW | LogEvents, listener: (flow: WorkFlow, generator?: BaseWorkFlowGenerator) => void): this {
+	on(
+		type: WorkFlowGeneratorEventType.NEW_WORKFLOW | LogEvents,
+		listener: (flow: WorkFlow, generator?: BaseWorkFlowGenerator) => void
+	): this {
 		return super.on(type, listener)
 	}
 
-	abstract async init (): Promise<void>
-	abstract async destroy (): Promise<void>
+	abstract async init(): Promise<void>
+	abstract async destroy(): Promise<void>
 }

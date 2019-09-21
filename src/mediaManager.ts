@@ -1,8 +1,6 @@
 import * as Winston from 'winston'
 import * as _ from 'underscore'
-import {
-	PeripheralDeviceAPI as P
-} from 'tv-automation-server-core-integration'
+import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
 import { StorageSettings, DeviceSettings } from './api'
@@ -37,7 +35,6 @@ export interface DeviceConfig {
 	deviceToken: string
 }
 export class MediaManager {
-
 	private coreHandler: CoreHandler
 	private _config: Config
 	private _logger: Winston.LoggerInstance
@@ -50,11 +47,11 @@ export class MediaManager {
 
 	private _monitorManager: MonitorManager = new MonitorManager()
 
-	constructor (logger: Winston.LoggerInstance) {
+	constructor(logger: Winston.LoggerInstance) {
 		this._logger = logger
 	}
 
-	async init (config: Config): Promise<void> {
+	async init(config: Config): Promise<void> {
 		this._config = config
 
 		try {
@@ -90,8 +87,7 @@ export class MediaManager {
 			this._logger.error(e.stack)
 			try {
 				if (this.coreHandler) {
-					this.coreHandler.destroy()
-						.catch(this._logger.error)
+					this.coreHandler.destroy().catch(this._logger.error)
 				}
 			} catch (e1) {
 				this._logger.error(e1)
@@ -103,23 +99,23 @@ export class MediaManager {
 			return
 		}
 	}
-	initProcess () {
+	initProcess() {
 		this._process = new Process(this._logger)
 		this._process.init(this._config.process)
 	}
-	async initCore () {
+	async initCore() {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
 		return this.coreHandler.init(this._config.core, this._process)
 	}
 
-	async initMediaManager (settings: DeviceSettings): Promise<void> {
+	async initMediaManager(settings: DeviceSettings): Promise<void> {
 		// console.log(this.coreHandler.deviceSettings)
 		this._logger.debug('Initializing Media Manager with the following settings:')
 		this._logger.debug(JSON.stringify(settings))
 
 		// TODO: Initialize Media Manager
 
-		this._availableStorage = _.map(settings.storages || [], (item) => {
+		this._availableStorage = _.map(settings.storages || [], item => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
 				handler: buildStorageHandler(item as GeneralStorageSettings)
 			})
@@ -131,7 +127,14 @@ export class MediaManager {
 		this._workFlowGenerators.push(
 			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || []),
 			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || []),
-			new ExpectedItemsGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this.coreHandler, settings.lingerTime, settings.cronJobTime),
+			new ExpectedItemsGenerator(
+				this._availableStorage,
+				this._trackedMedia,
+				settings.mediaFlows || [],
+				this.coreHandler,
+				settings.lingerTime,
+				settings.cronJobTime
+			)
 		)
 
 		this._dispatcher = new Dispatcher(
@@ -141,21 +144,32 @@ export class MediaManager {
 			settings,
 			settings.workers || DEFAULT_WORKERS,
 			settings.workFlowLingerTime || DEFAULT_WORKFLOW_LINGER_TIME,
-			this.coreHandler)
+			this.coreHandler
+		)
 
-		this._dispatcher.on('error', this._logger.error)
-		.on('warn', this._logger.warn)
-		.on('info', this._logger.info)
-		.on('debug', this._logger.debug)
+		this._dispatcher
+			.on('error', this._logger.error)
+			.on('warn', this._logger.warn)
+			.on('info', this._logger.info)
+			.on('debug', this._logger.debug)
 
-		await Promise.all(this._availableStorage.map((st) => {
-			st.handler.init().then(() => {
-				this._logger.info(`Storage handler for "${st.id}" initialized.`)
-			}).catch(reason => {
-				this.coreHandler.setProcessState(st.id, [`Could not set up storage handler "${st.id}": ${reason}`], P.StatusCode.BAD)
-				throw reason
+		await Promise.all(
+			this._availableStorage.map(st => {
+				st.handler
+					.init()
+					.then(() => {
+						this._logger.info(`Storage handler for "${st.id}" initialized.`)
+					})
+					.catch(reason => {
+						this.coreHandler.setProcessState(
+							st.id,
+							[`Could not set up storage handler "${st.id}": ${reason}`],
+							P.StatusCode.BAD
+						)
+						throw reason
+					})
 			})
-		}))
+		)
 		await this._dispatcher.init()
 
 		this._monitorManager.init(this.coreHandler)
@@ -164,19 +178,19 @@ export class MediaManager {
 
 		// Monitor for changes in settings:
 		this.coreHandler.onChanged(() => {
-			this.coreHandler.core.getPeripheralDevice()
-			.then((device) => {
-				if (device) {
-					const settings = device.settings
-					if (!_.isEqual(settings, this._monitorManager.settings)) {
-						this._monitorManager.onNewSettings(settings)
-						.catch(e => this._logger.error(e))
+			this.coreHandler.core
+				.getPeripheralDevice()
+				.then(device => {
+					if (device) {
+						const settings = device.settings
+						if (!_.isEqual(settings, this._monitorManager.settings)) {
+							this._monitorManager.onNewSettings(settings).catch(e => this._logger.error(e))
+						}
 					}
-				}
-			})
-			.catch(() => {
-				this._logger.error(`coreHandler.onChanged: Could not get peripheral device`)
-			})
+				})
+				.catch(() => {
+					this._logger.error(`coreHandler.onChanged: Could not get peripheral device`)
+				})
 		})
 	}
 }
