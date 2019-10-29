@@ -276,7 +276,9 @@ export class MonitorQuantel extends Monitor {
 											mediaPath: clipData.ClipGUID,
 											mediaSize: 1,
 											mediaTime: 0,
-											// mediainfo?: MediaInfo,
+											mediainfo: {
+												name: clipData.Title || clipData.ClipGUID
+											},
 
 											thumbSize: 0,
 											thumbTime: 0,
