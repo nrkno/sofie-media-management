@@ -124,19 +124,19 @@
     "production"
   ],
   "dependencies": {
-    "chokidar": "^2.0.4",
+    "chokidar": "^3.2.3",
     "class-transformer": "^0.2.0",
-    "fs-extra": "^7.0.1",
+    "fs-extra": "^8.1.0",
     "node-fetch": "^2.6.0",
     "pouchdb-find": "^7.0.0",
     "pouchdb-node": "^7.0.0",
     "promise-sequence": "^0.3.1",
     "reflect-metadata": "^0.1.12",
-    "request-promise-native": "^1.0.5",
+    "request-promise-native": "^1.0.7",
     "tslib": "^1.9.2",
     "tv-automation-server-core-integration": "1.2.0",
     "underscore": "^1.9.1",
-    "windows-network-drive": "^2.1.1",
+    "windows-network-drive": "^3.0.0",
     "winston": "^2.4.2",
     "xml2js": "^0.4.19"
   }
