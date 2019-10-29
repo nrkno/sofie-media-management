@@ -376,7 +376,7 @@ export class MonitorMediaScanner extends Monitor {
 		if (err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET') {
 			// TODO: try to reconnect
 			this.logger.warn('MediaScanner: ' + err.code)
-		} else if (err instanceof SyntaxError || err instanceof FetchError) {
+		} else if (err instanceof SyntaxError || err instanceof FetchError || err.type === 'invalid-json') {
 			this.logger.warn('MediaScanner: Connection terminated (' + err.message + ')') // most likely
 			this._restartChangesStream(true)
 			return // restart silently, since PouchDB connections can drop from time to time and are not a very big issue
