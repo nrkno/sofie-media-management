@@ -54,14 +54,14 @@
     "docs:publish": "yarn docs:html && gh-pages -d docs",
     "changelog": "standard-version",
     "release": "yarn reset && yarn test && yarn docs:publish && yarn changelog",
+    "prepareChangelog": "standard-version --prerelease",
     "reset": "git clean -dfx && git reset --hard && yarn",
     "ci": "yarn test",
     "inspect": "node --inspect dist/index.js",
     "start": "node dist/index.js",
     "unlinkall": "yarn unlink tv-automation-server-core-integration timeline-state-resolver && yarn --check-files",
     "validate:dependencies": "yarn audit && yarn license-validate",
-    "license-validate": "node-license-validator -p -d --allow-licenses MIT BSD BSD-3-Clause ISC Apache WTFPL Unlicense --allow-packages cycle",
-    "prerelease": "standard-version --prerelease"
+    "license-validate": "node-license-validator -p -d --allow-licenses MIT BSD BSD-3-Clause ISC Apache WTFPL Unlicense --allow-packages cycle"
   },
   "scripts-info": {
     "info": "Display information about the scripts",
