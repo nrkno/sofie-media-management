@@ -32,8 +32,7 @@
     "build:main": "tsc -p tsconfig.json",
     "generate-deps-metadata": "node generate-deps-metadata.js",
     "build-win32": "trash deploy & mkdir deploy && yarn build && nexe dist/index.js -o deploy/media-manager.exe && node copy-natives.js",
-    "lint": "tslint --project tsconfig.jest.json --config tslint.json && prettier --check \"src/**/*.ts\"",
-    "lint-fix": "tslint --project tsconfig.json --config tslint.json --fix && prettier --write \"src/**/*.ts\"",
+    "lint": "tslint --project tsconfig.jest.json --config tslint.json",
     "unit": "jest",
     "test": "yarn lint && yarn unit",
     "test:integration": "yarn lint && jest --config=jest-integration.config.js",
@@ -89,7 +88,8 @@
     "trash-cli": "^3.0.0",
     "ts-jest": "^24.0.0",
     "tslint": "^5.11.0",
-    "tslint-config-standard": "^8.0.1",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-plugin-prettier": "^2.0.1",
     "typescript": "~3.3.3333"
   },
   "keywords": [
