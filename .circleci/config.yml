@@ -20,8 +20,8 @@ jobs:
           key: yarn-cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
           paths: [node_modules]
 
-      # - run: yarn test
-      # - run: yarn send-coverage
+      - run: yarn test
+      - run: yarn send-coverage
 
       - persist_to_workspace:
           root: .
@@ -115,9 +115,10 @@ workflows:
       - build-windows:
           requires:
             - test
-      - build-linux:
-          requires:
-            - test
+      # Linux is completely untested and unsupported at the moment
+      # - build-linux:
+      #     requires:
+      #       - test
       # TODO - is this wanted?
       # - release:
       #     requires:
