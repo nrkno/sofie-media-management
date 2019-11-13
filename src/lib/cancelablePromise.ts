@@ -28,6 +28,9 @@ export class CancelablePromise<T> implements Promise<T> {
 	): Promise<T | TResult> {
 		return this._basePromise.catch(onrejected)
 	}
+	finally(onfinally?: (() => void) | null | undefined): Promise<T> {
+		return this._basePromise.finally(onfinally)
+	}
 	[Symbol.toStringTag]: 'Promise'
 
 	cancel(): void {
