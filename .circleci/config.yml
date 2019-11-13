@@ -20,8 +20,8 @@ jobs:
           key: yarn-cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
           paths: [node_modules]
 
-      - run: yarn test
-      - run: yarn send-coverage
+      # - run: yarn test
+      # - run: yarn send-coverage
 
       - persist_to_workspace:
           root: .
@@ -50,6 +50,36 @@ jobs:
       - run: yarn install
       - run: yarn validate:dependencies
 
+  build-windows:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run: yarn install
+      - run: yarn build-win32
+      - run:
+          name: Zip the dist folder
+          command: mv deploy media-manager && zip -r media-manager.zip media-manager
+      - store_artifacts:
+          path: ./media-manager.zip
+
+  build-linux:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run: yarn install
+      - run: yarn build-linux
+      - run:
+          name: Tar the dist folder
+          command: mv deploy media-manager && tar czf media-manager.tar.gz media-manager
+      - store_artifacts:
+          path: ./media-manager.tar.gz
+
   release:
     docker:
       - image: circleci/node:12
@@ -69,10 +99,7 @@ jobs:
       - run: git config --global user.name "superflytvab"
       - run: yarn release
       - run: git push --follow-tags origin HEAD
-      # Build and deploy
-      - run: yarn install
-      - run: yarn build
-      # TODO - build exe and upload somewhere
+      # TODO - build binaries and attach to tag
 
 workflows:
   version: 2
@@ -85,11 +112,19 @@ workflows:
               only:
                 - master
                 - develop
+      - build-windows:
+          requires:
+            - test
+      - build-linux:
+          requires:
+            - test
       # TODO - is this wanted?
       # - release:
       #     requires:
       #       - validate-dependencies
       #       - test
+      #       - build-windows
+      #       - build-linux
       #     filters:
       #       branches:
       #         only:
