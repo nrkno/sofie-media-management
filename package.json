@@ -1,5 +1,6 @@
 {
   "name": "tv-automation-media-management",
+  "private": true,
   "version": "0.0.0-develop",
   "description": "Connect to Core, synchronize media",
   "main": "dist/index.js",
@@ -39,7 +40,7 @@
     "watch": "jest --watch",
     "cov": "jest; open-cli coverage/lcov-report/index.html",
     "cov-open": "open-cli coverage/lcov-report/index.html",
-    "send-coverage": "jest && codecov",
+    "send-coverage": "codecov",
     "changelog": "standard-version",
     "release": "yarn reset && yarn test && yarn changelog",
     "prepareChangelog": "standard-version --prerelease",
@@ -64,7 +65,7 @@
     "release": "Clean, build, test, and prepare release (a one-step publish process)"
   },
   "engines": {
-    "node": ">=8"
+    "node": ">=12.12"
   },
   "devDependencies": {
     "@types/chokidar": "^2.1.3",
