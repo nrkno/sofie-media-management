@@ -314,7 +314,10 @@ export class Dispatcher extends EventEmitter {
 							i.doc.modified &&
 							i.doc.modified > getCurrentTime() - 15 * 60 * 1000
 					)
-					if (unfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
+					const oldUnfinishedWorkFlows = unfinishedWorkFlows.filter(
+						i => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
+					)
+					if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
 						this._coreHandler.setProcessState(
 							PROCESS_NAME,
 							[`No WorkFlow has finished in the last 15 minutes`],
