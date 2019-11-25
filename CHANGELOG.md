@@ -1,6 +1,14 @@
-# Change Log
+# Changelog
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+
+### [1.0.2-0](https://github.com/nrkno/tv-automation-media-management/compare/v1.0.1...v1.0.2-0) (2019-11-25)
+
+
+### Bug Fixes
+
+* **media scanner:** sometimes the PouchDB restart (caused by JSON syntax error) would be registered as disconnection instead of just restarting the PouchDB stream ([b858458](https://github.com/nrkno/tv-automation-media-management/commit/b858458a2b73ad7ddeff234f3bd1d289f60ee9b1))
+* **watchdog:** issue with "No WorkFlow has finished in the last 15 minutes" ([655c47f](https://github.com/nrkno/tv-automation-media-management/commit/655c47fbc312fa8492b0ce9ef82bebfdc1114385))
 
 <a name="1.0.1"></a>
 ## [1.0.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.0.1-0...v1.0.1) (2019-10-29)
