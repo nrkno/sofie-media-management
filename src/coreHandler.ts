@@ -11,6 +11,7 @@ import { DeviceConfig } from './mediaManager'
 const depsVersions = require('./deps-metadata.json')
 import { Process } from './process'
 import { Monitor } from './monitors/_monitor'
+import { MEDIA_MANAGER_CONFIG_MANIFEST } from './configManifest'
 
 export interface CoreConfig {
 	host: string
@@ -178,7 +179,9 @@ export class CoreHandler {
 			deviceSubType: subType || P.SUBTYPE_PROCESS,
 
 			deviceName: name,
-			watchDog: this._coreConfig ? this._coreConfig.watchdog : true
+			watchDog: this._coreConfig ? this._coreConfig.watchdog : true,
+
+			configManifest: MEDIA_MANAGER_CONFIG_MANIFEST
 		}
 		options.versions = this._getVersions()
 		return options
