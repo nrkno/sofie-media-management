@@ -136,7 +136,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return new Promise<void>((resolve, reject) => {
 			setTimeout(() => {
 				if (this._initialized) {
-					this._watcher.close()
+					this._watcher.close().catch(reject)
 					resolve()
 					return
 				}

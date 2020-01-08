@@ -2,14 +2,17 @@
  * This file contains the manifest to be used by server-core for displaying the
  * config UI.
  */
-import { SubDeviceConfigManifest,
+import {
+	SubDeviceConfigManifest,
 	SubDeviceConfigManifestEntry,
 	ConfigManifestEntryType,
 	DeviceConfigManifest,
 	TableConfigManifestEntry
 } from 'tv-automation-server-core-integration'
 
-export function literal<T> (o: T) { return o }
+export function literal<T>(o: T) {
+	return o
+}
 
 export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
@@ -37,9 +40,7 @@ const MEDIA_MANAGER_STORAGE_COMMON: SubDeviceConfigManifestEntry[] = [
 	}
 ]
 const MEDIA_MANAGER_STORAGE_CONFIG: SubDeviceConfigManifest['config'] = {}
-MEDIA_MANAGER_STORAGE_CONFIG[StorageType.UNKNOWN] = [
-	...MEDIA_MANAGER_STORAGE_COMMON
-]
+MEDIA_MANAGER_STORAGE_CONFIG[StorageType.UNKNOWN] = [...MEDIA_MANAGER_STORAGE_COMMON]
 MEDIA_MANAGER_STORAGE_CONFIG[StorageType.FILE_SHARE] = [
 	...MEDIA_MANAGER_STORAGE_COMMON,
 	{
@@ -69,7 +70,7 @@ MEDIA_MANAGER_STORAGE_CONFIG[StorageType.FILE_SHARE] = [
 	},
 	{
 		id: 'options.onlySelectedFiles',
-		name: 'Don\'t Scan Entire Storage',
+		name: "Don't Scan Entire Storage",
 		type: ConfigManifestEntryType.BOOLEAN
 	}
 ]
@@ -107,9 +108,7 @@ const MEDIA_MANAGER_MEDIAFLOW_COMMON: SubDeviceConfigManifestEntry[] = [
 	}
 ]
 const MEDIA_MANAGER_MEDIAFLOW_CONFIG: SubDeviceConfigManifest['config'] = {}
-MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.UNKNOWN] = [
-	...MEDIA_MANAGER_MEDIAFLOW_COMMON
-]
+MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.UNKNOWN] = [...MEDIA_MANAGER_MEDIAFLOW_COMMON]
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.WATCH_FOLDER] = [
 	...MEDIA_MANAGER_MEDIAFLOW_COMMON,
 	{
@@ -118,9 +117,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.WATCH_FOLDER] = [
 		type: ConfigManifestEntryType.STRING // dropdown
 	}
 ]
-MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.LOCAL_INGEST] = [
-	...MEDIA_MANAGER_MEDIAFLOW_COMMON
-]
+MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.LOCAL_INGEST] = [...MEDIA_MANAGER_MEDIAFLOW_COMMON]
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
 	...MEDIA_MANAGER_MEDIAFLOW_COMMON,
 	{
@@ -213,7 +210,6 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			id: 'mediaScanner.host',
 			name: 'Media Scanner Host',
 			type: ConfigManifestEntryType.STRING
-
 		},
 		{
 			id: 'mediaScanner.port',
