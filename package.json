@@ -1,6 +1,6 @@
 {
   "name": "tv-automation-media-management",
-  "version": "1.0.2",
+  "version": "1.1.0-0",
   "description": "Connect to Core, synchronize media",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
