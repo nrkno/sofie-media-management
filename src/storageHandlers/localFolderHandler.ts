@@ -424,7 +424,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 									} else if (stats.isDirectory()) {
 										resolve(this.traverseFolder(entryUrl, path.join(accumulatedPath || '', entry)))
 									} else {
-										resolve(null)
+										resolve()
 									}
 								},
 								err => reject(err)
