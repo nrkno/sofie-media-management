@@ -21,8 +21,8 @@ describe('FileShareHandler', () => {
 			}
 		})
 		try {
-			await fsh0.init()
 			fsh0.on('error', err => fail(err))
+			await fsh0.init()
 			done()
 		} catch (e) {
 			fail(e)
