@@ -113,7 +113,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.WATCH_FOLDER] = [
 	...MEDIA_MANAGER_MEDIAFLOW_COMMON,
 	{
 		id: 'targetId',
-		name: 'TargetStorage',
+		name: 'Target Storage',
 		type: ConfigManifestEntryType.STRING // dropdown
 	}
 ]
@@ -122,7 +122,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
 	...MEDIA_MANAGER_MEDIAFLOW_COMMON,
 	{
 		id: 'targetId',
-		name: 'TargetStorage',
+		name: 'Target Storage',
 		type: ConfigManifestEntryType.STRING // dropdown
 	}
 ]
