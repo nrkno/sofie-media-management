@@ -134,19 +134,13 @@ export enum MediaMonitorType {
 }
 const MEDIA_MANAGER_MEDIAMONITOR_COMMON: SubDeviceConfigManifestEntry[] = [
 	{
-		id: 'id',
-		name: 'Monitor ID',
-		columnName: 'Monitor ID',
-		type: ConfigManifestEntryType.STRING
-	},
-	{
 		id: 'storageId',
 		name: 'Storage ID',
 		type: ConfigManifestEntryType.STRING // is actually a dropdown of storages
 	}
 ]
 const MEDIA_MANAGER_MEDIAMONITOR_CONFIG: SubDeviceConfigManifest['config'] = {}
-MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaMonitorType.NULL] = []
+MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.NULL] = []
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.MEDIA_SCANNER] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
@@ -160,7 +154,7 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.MEDIA_SCANNER] = [
 		type: ConfigManifestEntryType.STRING
 	}
 ]
-MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaFlowType.WATCH_FOLDER] = [
+MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
 		id: 'gatewayUrl',
