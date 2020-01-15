@@ -136,7 +136,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return new Promise<void>((resolve, reject) => {
 			setTimeout(() => {
 				if (this._initialized) {
-					this._watcher.close()
+					this._watcher.close().catch(reject)
 					resolve()
 					return
 				}
@@ -424,7 +424,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 									} else if (stats.isDirectory()) {
 										resolve(this.traverseFolder(entryUrl, path.join(accumulatedPath || '', entry)))
 									} else {
-										resolve(null)
+										resolve()
 									}
 								},
 								err => reject(err)
