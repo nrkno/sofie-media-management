@@ -16,16 +16,16 @@ module.exports = {
 	],
 	testPathIgnorePatterns: [
 		'integrationTests'
-	],	
+	],
 	testEnvironment: 'node',
 	coverageThreshold: {
 		global: {
-		  branches: 100,
-		  functions: 100,
-		  lines: 100,
-		  statements: 100
+			branches: 100,
+			functions: 100,
+			lines: 100,
+			statements: 100
 		}
 	},
 	coverageDirectory: "./coverage/",
-	collectCoverage: true
+	collectCoverage: false
 }
