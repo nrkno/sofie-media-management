@@ -26,6 +26,5 @@ module.exports = {
 			statements: 100
 		}
 	},
-	coverageDirectory: "./coverage/",
-	collectCoverage: false
+	coverageDirectory: "./coverage/"
 }
