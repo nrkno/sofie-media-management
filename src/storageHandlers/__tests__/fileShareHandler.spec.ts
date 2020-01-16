@@ -15,11 +15,9 @@ jest.mock('chokidar')
 })
 ;(networkDrive as any).mount = jest.fn().mockResolvedValue(true)
 ;(networkDrive as any).find = function() {
-	debugger
 	return Promise.resolve([])
 }
 ;(networkDrive as any).list = function() {
-	debugger
 	return Promise.resolve({})
 }
 
