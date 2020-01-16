@@ -880,8 +880,8 @@ export class Dispatcher extends EventEmitter {
 								const isFinished = result.docs.reduce<boolean>((pV, workStep) => {
 									return (
 										pV &&
-										(workStep.status !== WorkStepStatus.WORKING &&
-											workStep.status !== WorkStepStatus.IDLE)
+										workStep.status !== WorkStepStatus.WORKING &&
+										workStep.status !== WorkStepStatus.IDLE
 									)
 								}, true)
 
@@ -1003,38 +1003,41 @@ export class Dispatcher extends EventEmitter {
 				})
 				tasks = tasks.concat(
 					_.compact(
-						_.map(allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views), doc => {
-							const docId = doc.id
+						_.map(
+							allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views),
+							doc => {
+								const docId = doc.id
 
-							if (doc.value.deleted) {
-								if (coreObjRevisions[docId]) {
-									// deleted
-								}
-								return null // handled later
-							} else if (
-								!coreObjRevisions[docId] || // created
-								coreObjRevisions[docId] !== doc.value.rev // changed
-							) {
-								delete coreObjRevisions[docId]
+								if (doc.value.deleted) {
+									if (coreObjRevisions[docId]) {
+										// deleted
+									}
+									return null // handled later
+								} else if (
+									!coreObjRevisions[docId] || // created
+									coreObjRevisions[docId] !== doc.value.rev // changed
+								) {
+									delete coreObjRevisions[docId]
 
-								return () => {
-									return this._workFlows
-										.get(doc.id)
-										.then(doc => {
-											return this.pushWorkFlowToCore(doc._id, doc)
-										})
-										.then(() => {
-											return new Promise(resolve => {
-												setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+									return () => {
+										return this._workFlows
+											.get(doc.id)
+											.then(doc => {
+												return this.pushWorkFlowToCore(doc._id, doc)
 											})
-										})
+											.then(() => {
+												return new Promise(resolve => {
+													setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+												})
+											})
+									}
+								} else {
+									delete coreObjRevisions[docId]
+									// identical
+									return null
 								}
-							} else {
-								delete coreObjRevisions[docId]
-								// identical
-								return null
 							}
-						})
+						)
 					)
 				)
 				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
@@ -1075,38 +1078,41 @@ export class Dispatcher extends EventEmitter {
 				})
 				tasks = tasks.concat(
 					_.compact(
-						_.map(allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views), doc => {
-							const docId = doc.id
+						_.map(
+							allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views),
+							doc => {
+								const docId = doc.id
 
-							if (doc.value.deleted) {
-								if (coreObjRevisions[docId]) {
-									// deleted
-								}
-								return null // handled later
-							} else if (
-								!coreObjRevisions[docId] || // created
-								coreObjRevisions[docId] !== doc.value.rev // changed
-							) {
-								delete coreObjRevisions[docId]
+								if (doc.value.deleted) {
+									if (coreObjRevisions[docId]) {
+										// deleted
+									}
+									return null // handled later
+								} else if (
+									!coreObjRevisions[docId] || // created
+									coreObjRevisions[docId] !== doc.value.rev // changed
+								) {
+									delete coreObjRevisions[docId]
 
-								return () => {
-									return this._workSteps
-										.get(doc.id)
-										.then(doc => {
-											return this.pushWorkStepToCore(doc._id, doc)
-										})
-										.then(() => {
-											return new Promise(resolve => {
-												setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+									return () => {
+										return this._workSteps
+											.get(doc.id)
+											.then(doc => {
+												return this.pushWorkStepToCore(doc._id, doc)
 											})
-										})
+											.then(() => {
+												return new Promise(resolve => {
+													setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
+												})
+											})
+									}
+								} else {
+									delete coreObjRevisions[docId]
+									// identical
+									return null
 								}
-							} else {
-								delete coreObjRevisions[docId]
-								// identical
-								return null
 							}
-						})
+						)
 					)
 				)
 				// The ones left in coreObjRevisions have not been touched, ie they should be deleted

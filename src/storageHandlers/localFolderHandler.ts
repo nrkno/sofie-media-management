@@ -316,7 +316,10 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	deleteFile(file: File): Promise<void> {
 		if (!this._writable) throw Error('This storage is not writable.')
 		return new Promise((resolve, reject) => {
-			fs.unlink(file.url).then(() => resolve(), err => reject(err))
+			fs.unlink(file.url).then(
+				() => resolve(),
+				err => reject(err)
+			)
 		})
 	}
 

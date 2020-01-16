@@ -1,4 +1,4 @@
-import { buildStorageHandler } from '../../storageHandlers/storageHandler'
+import { buildStorageHandler } from '../../storageHandlers/storageHandlerFactory'
 import { StorageType, LocalFolderStorage, FileShareStorage } from '../../api'
 import { literal } from '../../lib/lib'
 import { LocalFolderHandler } from '../localFolderHandler'
