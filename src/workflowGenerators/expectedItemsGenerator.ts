@@ -17,7 +17,8 @@ import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../medi
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection, Observer } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
-import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
+import { FileWorkStep, ScannerWorkStep, StreamWorkStep } from '../work/workStep'
+import { QuantelHTTPFile, isQuantelFile } from '../storageHandlers/quantelHttpHandler'
 
 /**
  * Monitors the expected items from Core and generates workflows needed to make it so
@@ -653,6 +654,32 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		]
 	}
 
+	protected generateNewStreamWorkSteps(file: QuantelHTTPFile, st: StorageObject): WorkStep[] {
+		return [
+			new StreamWorkStep({
+				action: WorkStepAction.GENERATE_METADATA,
+				file,
+				target: st,
+				priority: 1,
+				status: WorkStepStatus.IDLE
+			}),
+			new StreamWorkStep({
+				action: WorkStepAction.GENERATE_THUMBNAIL,
+				file,
+				target: st,
+				priority: 0.5,
+				status: WorkStepStatus.IDLE
+			}),
+			new StreamWorkStep({
+				action: WorkStepAction.GENERATE_PREVIEW,
+				file,
+				target: st,
+				priority: 0.3,
+				status: WorkStepStatus.IDLE
+			})
+		]
+	}
+
 	protected emitCopyWorkflow(
 		file: File,
 		targetStorage: StorageObject,
@@ -669,7 +696,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				finished: false,
 				priority: 1,
 				source: WorkFlowSource.EXPECTED_MEDIA_ITEM,
-				steps: this.generateNewFileWorkSteps(file, targetStorage),
+				steps: isQuantelFile(file) ? 
+					this.generateNewStreamWorkSteps(file, targetStorage) :
+					this.generateNewFileWorkSteps(file, targetStorage),
 				created: getCurrentTime(),
 				success: false
 			}),

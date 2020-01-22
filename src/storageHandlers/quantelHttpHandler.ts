@@ -9,16 +9,22 @@ import { literal, atomicPromise } from '../lib/lib'
 import { QuantelGateway } from '../lib/quantelGateway'
 import { CancelablePromise } from '../lib/cancelablePromise'
 
-function getHTTPProperties(gateway: QuantelGateway, url: string): Promise<FileProperties> {
+interface QuantelFileProperties extends FileProperties {
+	/** Streaming interfaces need to know the clipID of the content. */
+	clipID: number
+}
+
+function getHTTPProperties(gateway: QuantelGateway, url: string): Promise<QuantelFileProperties> {
 	if (!gateway.initialized) throw Error(`Quantel Gateway not initialized`)
 	const query = parseQuantelUrl(url)
 	return gateway.searchClip(query).then(result => {
 		if (result.length > 0) {
 			const clip = result[0]
-			return literal<FileProperties>({
+			return literal<QuantelFileProperties>({
 				created: new Date(clip.Created).getTime(),
 				modified: new Date(clip.Created).getTime(),
-				size: parseInt(clip.Frames, 10)
+				size: parseInt(clip.Frames, 10),
+				clipID: clip.ClipID
 			})
 		} else {
 			throw Error(`Clip not found in Quantel ISA`)
@@ -55,6 +61,10 @@ interface QuantelGatewayTombstone {
 }
 
 let QuantelGatewaySingleton: QuantelGateway
+
+export function isQuantelFile (file: File): file is QuantelHTTPFile {
+	return file.source === StorageType.QUANTEL_HTTP
+}
 
 export class QuantelHTTPFile implements File {
 	source = StorageType.QUANTEL_HTTP

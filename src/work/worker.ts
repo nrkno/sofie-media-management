@@ -2,7 +2,8 @@ import { EventEmitter } from 'events'
 import { literal, LogEvents, getID, updateDB, getCurrentTime } from '../lib/lib'
 
 import { WorkStepStatus, WorkStepAction, DeviceSettings, Time } from '../api'
-import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
+import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep,
+	StreamWorkStep, isStreamWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
 import { CancelHandler } from '../lib/cancelablePromise'
@@ -215,7 +216,15 @@ export class Worker extends EventEmitter {
 		})
 	}
 
-	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
+	private async doGenerateThumbnail(step: ScannerWorkStep | StreamWorkStep): Promise<WorkResult> {
+		if (isStreamWorkStep(step)) {
+			return this.doGenerateThumbnailStream(step)
+		} else {
+			return this.doGenerateThumbnailScanner(step)
+		}
+	}
+
+	private async doGenerateThumbnailScanner(step: ScannerWorkStep): Promise<WorkResult> {
 		try {
 			if (!this._config.mediaScanner.host) {
 				return literal<WorkResult>({
@@ -250,6 +259,10 @@ export class Worker extends EventEmitter {
 		} catch (e) {
 			return this.failStep(e)
 		}
+	}
+
+	private async doGenerateThumbnailStream(step: StreamWorkStep): Promise<WorkResult> {
+		return Promise.resolve()
 	}
 
 	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {

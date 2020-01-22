@@ -2,9 +2,9 @@ import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
 import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
-import { QuantelHTTPFile } from '../storageHandlers/quantelHttpHandler'
+import { QuantelHTTPFile, isQuantelFile } from '../storageHandlers/quantelHttpHandler'
 
-export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
+export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep | StreamWorkStep) & WorkStepDB
 
 /**
  * The object that's stored in the DB
@@ -55,6 +55,7 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 		super(init)
 	}
 }
+
 export interface ScannerWorkStepInitial extends WorkStepInitial {
 	action:
 		| WorkStepAction.GENERATE_METADATA
@@ -65,6 +66,18 @@ export interface ScannerWorkStepInitial extends WorkStepInitial {
 	target: StorageObject
 }
 export interface ScannerWorkStepInitialConstr extends ScannerWorkStepInitial {
+	status: WorkStepStatus.IDLE
+}
+
+export interface StreamWorkStepInitial extends WorkStepInitial {
+	action:
+		| WorkStepAction.GENERATE_METADATA
+		| WorkStepAction.GENERATE_PREVIEW
+		| WorkStepAction.GENERATE_THUMBNAIL
+	file: QuantelHTTPFile
+	target: StorageObject
+}
+export interface StreamWorkStepInitialConstr extends StreamWorkStepInitial {
 	status: WorkStepStatus.IDLE
 }
 /**
@@ -95,6 +108,31 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 	target: StorageObject
 
 	constructor(init?: ScannerWorkStepInitialConstr) {
+		super(init)
+	}
+}
+
+export function isStreamWorkStep (workStep: WorkStep): workStep is StreamWorkStep {
+	return workStep.hasOwnProperty('file') &&
+		isQuantelFile((workStep as ScannerWorkStep | StreamWorkStep).file)
+}
+
+export class StreamWorkStep extends WorkStep {
+	action:
+		| WorkStepAction.GENERATE_METADATA
+		| WorkStepAction.GENERATE_PREVIEW
+		| WorkStepAction.GENERATE_THUMBNAIL
+	priority = this.priority === undefined ? 1 : this.priority
+
+	// code annotations for class-transformer to automate serialization and deserialization
+	@Type(() => QuantelHTTPFile)
+	file: QuantelHTTPFile
+
+	@Transform((value: StorageObject) => value.id, { toPlainOnly: true })
+	@Transform((value: string) => value, { toClassOnly: true })
+	target: StorageObject
+
+	constructor(init?: StreamWorkStepInitialConstr) {
 		super(init)
 	}
 }
