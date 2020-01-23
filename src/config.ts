@@ -58,6 +58,34 @@ const config: Config = {
 		port: port,
 		watchdog: !disableWatchdog,
 		ssl: ssl
+	},
+	paths: {
+		ffmpeg: process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+		ffprobe: process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
+	},
+	thumbnails: {
+		width: 256,
+		height: -1
+	},
+	metadata: {
+		fieldOrder: false, // This is an expensive check, as it requires decoding the beginning of the video
+		fieldOrderScanDuration: 200, // Frames. Note: Needs sufficient motion (Not titlecard)
+		scenes: false,
+		sceneThreshold: 0.4,
+		freezeDetection: false,
+		freezeNoise: 0.001,
+		freezeDuration: '2s',
+		blackDetection: false,
+		blackDuration: 2.0,
+		blackRatio: 0.98,
+		blackThreshold: 0.1,
+		mergeBlacksAndFreezes: true
+	},
+	previews: {
+		enable: false,
+		width: 160,
+		height: -1,
+		bitrate: '40k'
 	}
 }
 

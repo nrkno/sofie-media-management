@@ -24,6 +24,10 @@ export interface Config {
 	process: ProcessConfig
 	device: DeviceConfig
 	core: CoreConfig
+	paths: PathConfig
+	thumbnails: ThumbnailConfig
+	metadata: MetadataConfig
+	previews: PreviewConfig
 }
 export interface ProcessConfig {
 	/** Will cause the Node applocation to blindly accept all certificates. Not recommenced unless in local, controlled networks. */
@@ -34,6 +38,65 @@ export interface ProcessConfig {
 export interface DeviceConfig {
 	deviceId: string
 	deviceToken: string
+}
+export interface PathConfig {
+	/** Command to run FFmpeg. */
+	ffmpeg: string
+	/** Command to run FFprobe. */
+	ffprobe: string
+}
+export interface ThumbnailConfig {
+	/** Number of pixels wide for the thumbnail. */
+	width: number
+	/** Height of the thumbnail. Set to `-1` to scale in proportion to width. */
+	height: number
+}
+export interface MetadataConfig {
+	/** Enable the field order check. Note that his is an expensive check, as it
+	 *  requires decoding the beginning of the video. */
+	fieldOrder: boolean
+	/** Number of frames to scane to determine field order. Needs sufficient motion,
+	 *  i.e. not a titlecard. */
+	fieldOrderScanDuration: number
+
+	/** Enable scene change detection. */
+	scenes: boolean
+	/** Scene change detection threshhold - how much does the frame differ from the
+	    previous one? A value between `0.0` and `1.0`. */
+	sceneThreshold: number
+
+	/** Enable freeze frame detection. */
+	freezeDetection: boolean
+	/** Noise tolerence.  Can be specified in dB (sting with "dB" is appended to the
+	 *  specified value) or as a difference ratio between `0.0` and `1.0`. */
+	freezeNoise: number | string
+	/** Set length of freeze before notification. Example and default: `2s`. */
+	freezeDuration: string
+
+	/** Enable black frame detection. */
+	blackDetection: boolean
+	/** Minimum detected black duration in seconds. Non-negative floating point value. */
+	blackDuration: number
+	/** Threshold for considering a picture black, e.g. the minimum total number of
+	    pixels that must be black before the whole picture is considered black. */
+	blackRatio: number
+	/** Threshold for considering that a single pixel is black. Accounts for full
+	 *  range and non-full range YUV formats. */
+	blackThreshold: number
+
+	/** Merge the results of blacks and freezes, as all sequences of black frames
+	 *  are also freezes. The merge removes the overlapping freezes. */
+	mergeBlacksAndFreezes: true
+}
+export interface PreviewConfig {
+	/** Enable preview generation. */
+	enable: false,
+	/** Width of a preview video in pixels. */
+	width: 160,
+	/** Height of a preview video. Set to `-1` for proportional scaling. */
+	height: -1,
+	/* Target bitrate for the preview video. */
+	bitrate: '40k'
 }
 export class MediaManager {
 	private coreHandler: CoreHandler
