@@ -1,6 +1,5 @@
 import * as PouchDB from 'pouchdb-node'
 import * as _ from 'underscore'
-import * as PromiseSequence from 'promise-sequence'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import * as request from 'request-promise-native'
 import { Monitor } from './_monitor'
@@ -69,6 +68,7 @@ export class MonitorMediaScanner extends Monitor {
 
 				const baseUrl = 'http://' + this._settings.host + ':' + this._settings.port
 
+				// TODO - never replicating ... and not using remove pouchdb media server any more
 				if (this._doReplication) {
 					this._db = new PouchDB('local')
 					this._remote = new PouchDB(`${baseUrl}/db/_media`)
@@ -100,7 +100,7 @@ export class MonitorMediaScanner extends Monitor {
 				const allDocsResponse = r[1]
 				const dbInfo = r[2]
 
-				this.logger.info('MediaScanner: synk objectlists', coreObjRevisions.length, allDocsResponse.total_rows)
+				this.logger.info('MediaScanner: sync object lists', coreObjRevisions.length, allDocsResponse.total_rows)
 
 				const tasks: Array<() => Promise<any>> = _.compact(
 					_.map(allDocsResponse.rows, doc => {
@@ -144,7 +144,12 @@ export class MonitorMediaScanner extends Monitor {
 						await this._sendRemoved(id)
 					})
 				})
-				await PromiseSequence(tasks)
+
+				let allTasks = Promise.resolve()
+				for ( let task of tasks ) {
+					allTasks = allTasks.then(task)
+				}
+				await allTasks
 
 				this.logger.info('MediaScanner: Done file sync init')
 			} else {

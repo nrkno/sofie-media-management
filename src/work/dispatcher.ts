@@ -2,7 +2,6 @@ import * as _ from 'underscore'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
-import * as PromiseSequence from 'promise-sequence'
 import * as request from 'request-promise-native'
 import { EventEmitter } from 'events'
 
@@ -1045,7 +1044,11 @@ export class Dispatcher extends EventEmitter {
 						return this.pushWorkFlowToCore(id, null)
 					})
 				})
-				return PromiseSequence(tasks)
+				let allTasks = Promise.resolve()
+				for ( let task of tasks ) {
+					allTasks = allTasks.then(task)
+				}
+				return allTasks
 			})
 			.then(() => {
 				this._coreHandler.logger.info('WorkFlows: Done objects sync init')
@@ -1117,7 +1120,12 @@ export class Dispatcher extends EventEmitter {
 						return this.pushWorkStepToCore(id, null)
 					})
 				})
-				return PromiseSequence(tasks)
+
+				let allTasks = Promise.resolve()
+				for ( let task of tasks ) {
+					allTasks = allTasks.then(task)
+				}
+				return allTasks
 			})
 			.then(() => {
 				this._coreHandler.logger.info('WorkSteps: Done objects sync init')
