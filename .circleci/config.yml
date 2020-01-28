@@ -1,12 +1,9 @@
-defaults: &defaults
-  docker:
-    - image: circleci/node:8
-  working_directory: ~/project
-
 version: 2
 jobs:
-  Checkout Code:
-    <<: *defaults
+  test:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
     steps:
       - checkout
       - attach_workspace:
@@ -16,34 +13,19 @@ jobs:
             - yarn-cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
             - yarn-cache-{{ .Branch }}
             - yarn-cache-
+
       - run: yarn install
+
       - save_cache:
           key: yarn-cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
           paths: [node_modules]
+
+      - run: yarn test
+      - run: yarn send-coverage
+
       - persist_to_workspace:
           root: .
           paths: [.]
-  Check for vulnerabilities:
-    <<: *defaults
-    steps:
-      - attach_workspace:
-          at: ~/project
-      - run: yarn install
-      - run: yarn validate:dependencies
-  Test node-8:
-    <<: *defaults
-    steps:
-      - attach_workspace:
-          at: ~/project
-      - run: yarn install
-      - run: yarn ci
-  Send Coverage:
-    <<: *defaults
-    steps:
-      - attach_workspace:
-          at: ~/project
-      - run: yarn install
-      - run: yarn send-coverage
       - store_artifacts:
           path: ./coverage/clover.xml
           prefix: tests
@@ -53,93 +35,98 @@ jobs:
       - store_test_results:
           path: ./coverage/clover.xml
 
-  Build:
-    <<: *defaults
+  validate-dependencies:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - yarn-cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
+            - yarn-cache-{{ .Branch }}
+            - yarn-cache-
+            
+      - run: yarn install
+      - run: yarn validate:dependencies
+
+  build-windows:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
     steps:
       - attach_workspace:
           at: ~/project
+      - run: yarn install
+      - run: yarn build-win32
       - run:
-          name: Install and build
-          command: yarn install && yarn build
-      - persist_to_workspace:
-          root: .
-          paths: [.]
+          name: Zip the dist folder
+          command: mv deploy media-manager && zip -r media-manager.zip media-manager
+      - store_artifacts:
+          path: ./media-manager.zip
 
-  Git Release:
-    <<: *defaults
+  build-linux:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run: yarn install
+      - run: yarn build-linux
+      - run:
+          name: Tar the dist folder
+          command: mv deploy media-manager && tar czf media-manager.tar.gz media-manager
+      - store_artifacts:
+          path: ./media-manager.tar.gz
+
+  release:
+    docker:
+      - image: circleci/node:12
+    working_directory: ~/project
     steps:
       - attach_workspace:
           at: ~/project
       - add_ssh_keys:
           fingerprints:
             - "eb:2b:60:6a:0d:87:f1:1f:8d:45:4f:99:be:0b:9e:6f"
-      - run: yarn install
       - run: mkdir -p ~/.ssh
       - run:
           name: Keyscan Github
           command: ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+      # Clean working tree, tag, and push
       - run: git config --global user.email "info@superfly.tv"
       - run: git config --global user.name "superflytvab"
       - run: yarn release
       - run: git push --follow-tags origin HEAD
-      - persist_to_workspace:
-          root: .
-          paths: [.]
-  Deploy to NPM:
-    <<: *defaults
-    steps:
-      - attach_workspace:
-          at: ~/project
-      - run:
-          name: Write NPM Token to ~/.npmrc
-          command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-      - run:
-          name: Publish to NPM with yarn
-          command: NEW_VERSION=$(node -p "require('./package.json').version") && yarn publish --access=public --new-version=$NEW_VERSION --network-timeout 100000
-      # I have read that some people are experiencing problems with yars publish. Change to npm publish, as below, if that happens.
-      # - deploy:
-      #     name: Publish to NPM with npm
-      #     command: npm publish --access=public
-      #
+      # TODO - build binaries and attach to tag
 
 workflows:
   version: 2
-  Test build and deploy(master only):
+  build-test-publish:
     jobs:
-      - Checkout Code
-      - Check for vulnerabilities:
-          requires:
-            - Checkout Code
-      - Test node-8:
-          requires:
-            - Checkout Code
-      - Send Coverage:
-          requires:
-            - Check for vulnerabilities
-            - Test node-8
+      - test
+      - validate-dependencies:
           filters:
             branches:
               only:
                 - master
-      - Git Release:
+                - develop
+      - build-windows:
           requires:
-            - Send Coverage
-          filters:
-            branches:
-              only:
-                - master
-      - Build:
-          requires:
-            - Send Coverage
-            - Git Release
-          filters:
-            branches:
-              only:
-                - master
-      - Deploy to NPM:
-          requires:
-            - Build
-          filters:
-            branches:
-              only:
-                - master
+            - test
+      # Linux is completely untested and unsupported at the moment
+      # - build-linux:
+      #     requires:
+      #       - test
+      # TODO - is this wanted?
+      # - release:
+      #     requires:
+      #       - validate-dependencies
+      #       - test
+      #       - build-windows
+      #       - build-linux
+      #     filters:
+      #       branches:
+      #         only:
+      #           - master
