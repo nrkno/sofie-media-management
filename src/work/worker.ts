@@ -7,6 +7,7 @@ import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep,
 import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
 import { CancelHandler } from '../lib/cancelablePromise'
+import { config } from '../config'
 
 const escapeUrlComponent = encodeURIComponent
 
@@ -262,10 +263,62 @@ export class Worker extends EventEmitter {
 	}
 
 	private async doGenerateThumbnailStream(step: StreamWorkStep): Promise<WorkResult> {
-		return Promise.resolve()
+		const tmpPath = path.join(os.tmpdir(), Math.random().toString(16)) + '.png'
+
+		const args = [
+			// TODO (perf) Low priority process?
+			config.paths.ffmpeg,
+			'-hide_banner',
+			'-i', `"${doc.mediaPath}"`, // TODO create Transformer stream path
+			'-frames:v 1',
+			`-vf thumbnail,scale=${config.thumbnails.width}:${config.thumbnails.height}`,
+			'-threads 1',
+			`"${tmpPath}"`
+		]
+
+		await mkdirp(path.dirname(tmpPath))
+		await new Promise((resolve, reject) => {
+			if (runningThumbnailProcess) {
+				console.error('runningThumbnailProcess already exists')
+			}
+			runningThumbnailProcess = ChildProcess.exec(args.join(' '), (err, stdout, stderr) => err ? reject(err) : resolve())
+			runningThumbnailProcess.on('exit', function () {
+				runningThumbnailProcess = null
+			})
+		})
+
+		const modifier = {}
+
+		const thumbStat = await statAsync(tmpPath)
+		modifier.thumbSize = thumbStat.size
+		modifier.thumbTime = thumbStat.mtime.getTime()
+		modifier.tinf = [
+			`"${getId(config.paths.media, doc.mediaPath)}"`,
+			moment(doc.thumbTime).format('YYYYMMDDTHHmmss'),
+			// TODO (fix) Binary or base64 size?
+			doc.thumbSize
+		].join(' ') + '\r\n'
+
+		modifier._attachments = {
+			'thumb.png': {
+				content_type: 'image/png',
+				data: (await readFileAsync(tmpPath))
+			}
+		}
+		await unlinkAsync(tmpPath)
+		_.merge(doc, modifier)
+		return modifier
 	}
 
-	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {
+	private async doGeneratePreview(step: ScannerWorkStep | StreamWorkStep) {
+		if (isStreamWorkStep(step)) {
+			return this.doGeneratePreviewStream(step)
+		} else {
+			return this.doGeneratePreviewScanner(step)
+		}
+	}
+
+	private async doGeneratePreviewScanner(step: ScannerWorkStep): Promise<WorkResult> {
 		try {
 			if (!this._config.mediaScanner.host) {
 				return literal<WorkResult>({
@@ -301,6 +354,76 @@ export class Worker extends EventEmitter {
 		} catch (e) {
 			return this.failStep(e)
 		}
+	}
+
+	private async doGeneratePreviewStream(step: StreamWorkStep): Promise<WorkResult> {
+		try {
+			const destPath = path.join('_previews', mediaId) + '.webm'
+			const doc = await db.get(mediaId)
+
+			if (doc.mediaPath.match(/_watchdogIgnore_/)) {
+				return // ignore watchdog file
+			}
+
+			if (doc.previewTime === doc.mediaTime && await fileExists(destPath)) {
+				return
+			}
+
+			isCurrentlyScanning = true
+			const mediaLogger = logger.child({
+				id: mediaId,
+				path: doc.mediaPath
+			})
+
+			const tmpPath = destPath + '.new'
+
+			const args = [
+				'-hide_banner',
+				'-y',
+				'-threads 1',
+				'-i', `"${doc.mediaPath}"`,
+				'-f', 'webm',
+				'-an',
+				'-c:v', 'libvpx',
+				'-b:v', config.previews.bitrate,
+				'-auto-alt-ref', '0',
+				`-vf scale=${config.previews.width}:${config.previews.height}`,
+				'-deadline realtime',
+				`"${tmpPath}"`
+			]
+
+			await mkdirp(path.dirname(tmpPath))
+			mediaLogger.info('Starting preview generation')
+
+			await ProcessLimiter('previewFfmpeg', config.paths.ffmpeg, args,
+				() => {
+					lastProgressReportTimestamp = new Date()
+				},
+				() => {
+					lastProgressReportTimestamp = new Date()
+				})
+
+			const previewStat = await statAsync(tmpPath)
+			const modifier = {}
+			modifier.previewSize = previewStat.size
+			modifier.previewTime = doc.mediaTime
+			modifier.previewPath = destPath
+
+			await renameAsync(tmpPath, destPath)
+
+			let updateDoc = await db.get(mediaId)
+			updateDoc = _.merge(updateDoc, modifier)
+
+			db.put(updateDoc)
+
+			mediaLogger.info('Finished preview generation')
+
+			return modifier
+		} catch (err) {
+			logger.error({ name: 'generatePreview', err })
+			logger.error(err.stack)
+		}
+		isCurrentlyScanning = false
 	}
 
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {

@@ -5,6 +5,7 @@ import * as _ from 'underscore'
 import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
 import { putToDBUpsert } from './lib/lib'
+import { noTryAsync } from 'no-try'
 
 export interface TrackedMediaItem {
 	_id: string
@@ -40,6 +41,10 @@ export class TrackedMediaItems extends EventEmitter {
 		this._db = new PrefixedPouchDB('trackedMediaItems', {
 			adapter: dbAdapter
 		})
+		this.createDBsWithThen()
+	}
+
+	private async createDBsWithThen(): Promise<void> {
 		this._db
 			.compact()
 			.then(() =>
@@ -60,6 +65,44 @@ export class TrackedMediaItems extends EventEmitter {
 				// Index created
 			})
 			.catch(e => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', e))
+	}
+
+	private async createDbsWithAwait(): Promise<void> {
+		try {
+			await this._db.compact()
+			await this._db.createIndex({
+				index: {
+					fields: ['sourceStorageId']
+				}
+			})
+			await this._db.createIndex({
+				index: {
+					fields: ['mediaFlowId']
+				}
+			})
+		} catch (err) {
+			this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', err)
+		}
+	}
+
+	private async createDbsWithNoTry() {
+		const { error } = await noTryAsync(async () => {
+			await this._db.compact()
+			await this._db.createIndex({
+				index: {
+					fields: ['sourceStorageId']
+				}
+			})
+			await this._db.createIndex({
+				index: {
+					fields: ['mediaFlowId']
+				}
+			})
+		})
+
+		if (error) {
+			this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', error)
+		}
 	}
 
 	/**

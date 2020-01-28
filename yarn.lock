@@ -4576,6 +4576,11 @@ nlf@^1.4.2:
     glob-all "3.1.0  "
     read-installed "4.0.3"
 
+no-try@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/no-try/-/no-try-1.0.1.tgz#bfe9996b9480d64fa2e1ab260e58b5b48092f4b6"
+  integrity sha512-zeDWxLm/JItEq2Re8bFzOtt41KG8YMY8MX2wysa5M9nuy3RXU+j0L8OCJo/xFpXpd/qLp1eIZ9UnSJ7NtUwCcQ==
+
 node-fetch@2.4.1:
   version "2.4.1"
   resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.4.1.tgz#b2e38f1117b8acbedbe0524f041fb3177188255d"
