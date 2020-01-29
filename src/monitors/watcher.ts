@@ -189,18 +189,19 @@ export class Watcher extends EventEmitter {
 	  this.retrying = true
 	  let redoRetry = false
 	  for (const fileObject of Object.values(this.filesToScan)) {
-			await this.scanFile(
-			  fileObject.mediaPath,
-			  fileObject.mediaId,
-			  fileObject.mediaStat,
-			  fileObject.generateInfo)
+			const { error } = await noTryAsync(async () => {
+				await this.scanFile(
+			  	fileObject.mediaPath,
+			  	fileObject.mediaId,
+				  fileObject.mediaStat)
 
-	    delete this.filesToScan[fileObject.mediaId]
-
+				delete this.filesToScan[fileObject.mediaId]
+			})
+			if (error) { redoRetry = true }
 	  }
-	  retrying = false
+	  this.retrying = false
 	  if (redoRetry) {
-	    retryScan()
+			this.retryScan()
 	  }
 	}
 
@@ -211,7 +212,7 @@ export class Watcher extends EventEmitter {
 		while (true) {
 			const deleted: Array<PouchDB.Core.PutDocument<{}>> = []
 
-			const { rows } = await this._db.allDocs({
+			const { rows } = await this.db.allDocs({
 				include_docs: true,
 				startkey,
 				limit
