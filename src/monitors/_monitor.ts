@@ -64,8 +64,8 @@ export abstract class Monitor extends EventEmitter {
 			])
 		} catch (e) {
 			// @ts-ignore
-			this.logger.info('MediaScanner: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
-			this.logger.error('MediaScanner: Error while updating changed Media object', e)
+			this.logger.info('Media scanning: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
+			this.logger.error('Media scanning: error while updating changed Media object', e)
 		}
 	}
 	/** To be triggered whenever a MediaObject is removed */
@@ -77,7 +77,7 @@ export abstract class Monitor extends EventEmitter {
 				null
 			])
 		} catch (e) {
-			this.logger.error('MediaScanner: Error while updating deleted Media object', e)
+			this.logger.error('Media scanning: error while updating deleted Media object', e)
 		}
 	}
 	protected hashId(id: string): string {

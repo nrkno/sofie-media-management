@@ -1,0 +1,248 @@
+import { EventEmitter } from 'events'
+import * as path from 'path'
+import * as PouchDB from 'pouchdb-node'
+import * as chokidar from 'chokidar'
+import { noTryAsync } from 'no-try'
+import { MonitorSettingsMediaScanner } from '../api'
+import { promisify } from 'util'
+import { exec as execCB } from 'child_process'
+import { LoggerInstance } from 'winston'
+import { Stats, stat } from 'fs-extra'
+import { literal } from '../lib/lib'
+const exec = promisify(execCB)
+
+/** Convert filename to Caspar-style name. */
+function getId (fileDir: string, filePath: string): string {
+	return path
+	.relative(fileDir, filePath)
+	.replace(/\.[^/.]+$/, '')
+	.replace(/\\+/g, '/')
+	.toUpperCase()
+}
+
+const fileExists = async (destPath: string) => {
+	const { result, error } = await noTryAsync(() => stat(destPath))
+	if (error) return false
+	return result.isFile()
+}
+
+interface FileToScan {
+	mediaPath: string
+	mediaId: string
+	mediaStat: Stats
+  // generateInfoWhenFound: boolean
+}
+
+interface MediaDocument extends PouchDB.Core.IdMeta, PouchDB.Core.GetMeta {
+	mediaPath?: string
+	mediaSize?: number
+	mediaTime?: number
+}
+
+/**
+ *  Replacement for the core scanning capability of media scanner - watching
+ *  for file changes.
+ */
+export class Watcher extends EventEmitter {
+	private db: PouchDB.Database
+	private watcher: chokidar.FSWatcher
+	private scanning: boolean = false
+	private scanId: number = 1
+	private filesToScan: { [mediaId: string] : FileToScan } = {}
+	private filesToScanFail: { [mediaId: string] : number } = {}
+	private retrying: boolean = false
+
+	constructor(
+		// private deviceId: string,
+		private settings: MonitorSettingsMediaScanner,
+		private logger: LoggerInstance
+	) {
+		super()
+	}
+
+  public init() {
+		this.db = new PouchDB(`db/_media`)
+
+		this.watcher = chokidar.watch(this.settings.paths, Object.assign({
+			alwaysStat: true,
+			awaitWriteFinish: {
+				stabilityThreshold: 4000,
+				pollInterval: 1000
+			}
+		}, this.settings.scanner))
+		this.watcher.on('add', (path: string, stat: Stats): void => {
+			const mediaId = getId(settings.paths.media, path)
+			this.scanFile(path, mediaId, stat, false)
+				.catch(error => { this.logger.error(error) })
+		})
+		this.watcher.on('change', (path, stat: Stats) => {
+			const mediaId = getId(settings.paths.media, path)
+			this.scanFile(path, mediaId, stat, false)
+				.catch(error => { this.logger.error(error) })
+		})
+		this.watcher.on('unlink', (path, stat) => {
+			const mediaId = getId(settings.paths.media, path)
+			this.db.get(mediaId)
+				.then(this.db.remove.bind(this))
+				.catch(error => { this.logger.error(error) })
+		})
+		this.watcher.on('ready', () => {
+			this.logger.info('Media scanning: Watcher ready!')
+		})
+		this.watcher.on('error', (err) => {
+			if (err) {
+				this.logger.error(`Media scanner: error from watcher: ${err.message}`, err)
+			}
+		})
+
+	  this.cleanDeleted()
+	}
+
+	private async scanFile (
+		mediaPath: string,
+		mediaId: string,
+		mediaStat: Stats //,
+		// generateInfoWhenFound: boolean
+	) {
+		const { error } = await noTryAsync(async () => {
+			if (!mediaId || mediaStat.isDirectory()) {
+			  return
+			}
+			this.filesToScan[mediaId] = literal<FileToScan>({
+			  mediaPath, mediaId, mediaStat
+			})
+			if (this.scanning) {
+			  return
+			}
+			this.scanning = true
+			this.scanId++
+			// lastProgressReportTimestamp = new Date()
+
+			const doc: MediaDocument = await this.db
+			  .get<MediaDocument>(mediaId)
+			  .catch(() => ({ _id: mediaId } as MediaDocument))
+
+			// TODO - WTF did this do
+			const mediaLogger = (level: string, message: string): void => {
+				this.logger[level](`Media scanning: scanning ${({
+					id: mediaId,
+					path: mediaPath,
+					size: mediaStat.size,
+					mtime: mediaStat.mtime.toISOString()
+				})}: ${message}`)
+			}
+
+			if (doc.mediaPath && doc.mediaPath !== mediaPath) {
+				mediaLogger('info', 'skipped - matching path')
+				delete this.filesToScanFail[mediaId]
+			  delete this.filesToScan[mediaId]
+			  this.scanning = false
+			  return
+			}
+
+			// Database file and file on disk are likely the same ... no change
+			if (doc.mediaSize === mediaStat.size &&
+					doc.mediaTime === mediaStat.mtime.getTime()
+			) {
+				mediaLogger('info', 'skipped - matching size and time')
+			  this.scanning = false
+			  delete this.filesToScanFail[mediaId]
+			  delete this.filesToScan[mediaId]
+			  return
+			}
+
+			doc.mediaPath = mediaPath
+			doc.mediaSize = mediaStat.size
+			doc.mediaTime = mediaStat.mtime.getTime()
+
+			// Assuming generateInfoWhenFound is always false - use work steps
+			// if (generateInfoWhenFound) { // Check if basic file probe should be run in manualMode
+			//   await generateInfo(doc).catch(err => {
+			//     mediaLogger.error({ err }, 'Info Failed')
+			//   })
+			// }
+
+			await this.db.put(doc)
+			delete this.filesToScanFail[mediaId]
+			delete this.filesToScan[mediaId]
+			this.scanning = false
+			mediaLogger('info', 'scanned')
+			this.retryScan()
+	  })
+		if (error) {
+			this.scanning = false
+			this.filesToScanFail[mediaId] = (this.filesToScanFail[mediaId] || 0) + 1
+			if (this.filesToScanFail[mediaId] >= this.settings.scanner.retryLimit) {
+			  this.logger.error(`Media scanner: skipping file. Too many retries for '${mediaId}'`)
+			  delete this.filesToScanFail[mediaId]
+			  delete this.filesToScan[mediaId]
+			}
+			this.retryScan()
+			throw error
+		}
+	}
+
+	async retryScan () {
+	  if (this.retrying) {
+			return
+	  }
+	  this.retrying = true
+	  let redoRetry = false
+	  for (const fileObject of Object.values(this.filesToScan)) {
+			await this.scanFile(
+			  fileObject.mediaPath,
+			  fileObject.mediaId,
+			  fileObject.mediaStat,
+			  fileObject.generateInfo)
+
+	    delete this.filesToScan[fileObject.mediaId]
+
+	  }
+	  retrying = false
+	  if (redoRetry) {
+	    retryScan()
+	  }
+	}
+
+	private async cleanDeleted() {
+		this.logger.info('Media scanning: checking for dead media')
+		const limit = 256
+		let startkey: string | undefined = undefined
+		while (true) {
+			const deleted: Array<PouchDB.Core.PutDocument<{}>> = []
+
+			const { rows } = await this._db.allDocs({
+				include_docs: true,
+				startkey,
+				limit
+			})
+			await Promise.all(rows.map(async ({ doc }) => {
+				const { error } = await noTryAsync(async () => {
+					const mediaFolder = path.normalize(_settings.scanner.paths)
+					const mediaPath = path.normalize(doc.mediaPath)
+					if (mediaPath.indexOf(mediaFolder) === 0 && await fileExists(doc.mediaPath)) {
+						return
+					}
+
+					deleted.push({
+						_id: doc._id,
+						_rev: doc._rev,
+						_deleted: true
+					})
+				})
+				if (error) {
+					this.logger.error(`Media scanning: failed to `, error, doc)
+				}
+			}))
+
+			await this._db.bulkDocs(deleted)
+
+			if (rows.length < limit) {
+				break
+			}
+			startkey = rows[rows.length - 1].doc._id
+		}
+
+		this.logger.info(`Media scanning: finished check for dead media`)
+	}
+}

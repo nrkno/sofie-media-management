@@ -1,4 +1,5 @@
 export * from './api/mediaObject'
+import { WatchOptions } from 'chokidar'
 
 /** The settings in Core (that's gonna be in the UI) */
 export interface DeviceSettings {
@@ -261,9 +262,13 @@ export interface MonitorSettingsNull extends MonitorSettingsBase {
 export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
 	type: MonitorSettingsType.MEDIA_SCANNER
 	/** Host of the media-scanner PouchDB server */
-	host: string
-	port: number
+	// host: string
+	// port: number
+	paths: string | Array<string>
+	// See https://www.npmjs.com/package/chokidar#api
+	scanner: WatchOptions
 }
+
 export interface MonitorSettingsQuantel extends MonitorSettingsBase {
 	type: MonitorSettingsType.QUANTEL
 

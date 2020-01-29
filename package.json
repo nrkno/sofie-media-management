@@ -23,7 +23,12 @@
       "name": "Johan Nyman",
       "email": "johan@superfly.tv",
       "url": "http://superfly.tv"
-    }
+    },
+		{
+			"name": "Richard Cartwright",
+			"email": "spark@superfly.tv",
+			"url": "http://superfly.tv"
+		}
   ],
   "scripts": {
     "info": "npm-scripts-info",
