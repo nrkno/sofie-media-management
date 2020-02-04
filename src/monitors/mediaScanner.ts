@@ -8,37 +8,44 @@ import { LoggerInstance } from 'winston'
 import { FetchError } from 'node-fetch'
 import { promisify } from 'util'
 import { exec as execCB } from 'child_process'
+import { Watcher } from './watcher'
 const exec = promisify(execCB)
 
 export class MonitorMediaScanner extends Monitor {
-	protected _settings: MonitorSettingsMediaScanner
+	private db: PouchDB.Database
 
-	private _db: PouchDB.Database
+	private changes: PouchDB.Core.Changes<MediaObject>
+	private triggerupdateFsStatsTimeout?: NodeJS.Timer
+	private checkFsStatsInterval?: NodeJS.Timer
 
-	private _changes: PouchDB.Core.Changes<MediaObject>
-	private _triggerupdateFsStatsTimeout?: NodeJS.Timer
-	private _checkFsStatsInterval?: NodeJS.Timer
+	private lastSequenceNr: number = 0
 
-	private _lastSequenceNr: number = 0
+	private monitorConnectionTimeout: NodeJS.Timer | null = null
 
-	private _monitorConnectionTimeout: NodeJS.Timer | null = null
-
-	private _statusDisk: PeripheralDeviceAPI.StatusObject = {
-		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
-		messages: []
-	}
-	private _statusConnection: PeripheralDeviceAPI.StatusObject = {
+	private statusDisk: PeripheralDeviceAPI.StatusObject = {
 		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
 		messages: []
 	}
 
-	private _isDestroyed: boolean = false
-	private _initialized: boolean = false
+	private statusConnection: PeripheralDeviceAPI.StatusObject = {
+		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
+		messages: []
+	}
 
-	constructor(deviceId: string, _settings: MonitorSettingsMediaScanner, logger: LoggerInstance) {
-		super(deviceId, _settings, logger)
+	private isDestroyed: boolean = false
+	private initialized: boolean = false
 
-		this._updateStatus()
+	private watcher: Watcher
+
+	constructor(
+		deviceId: string,
+		public settings: MonitorSettingsMediaScanner,
+		logger: LoggerInstance
+	) {
+		super(deviceId, settings, logger)
+
+		this.watcher = new Watcher(settings, logger)
+		this.updateStatus()
 	}
 
 	get deviceInfo(): MonitorDevice {
@@ -51,35 +58,37 @@ export class MonitorMediaScanner extends Monitor {
 			deviceSubType: 'mediascanner'
 		}
 	}
+
 	public async restart(): Promise<void> {
 		throw Error('Media scanning restart not implemented yet')
 	}
+
 	public async init(): Promise<void> {
 		try {
-			this.logger.info(`Initializing media scanning monitor`, this._settings)
+			this.logger.info(`Initializing media scanning monitor`, this.settings)
 
-			if (!this._settings.disable) {
+			if (!this.settings.disable) {
 				this.logger.info('Media scanning init')
 
-				this._db = new PouchDB(`db/_media`)
+				this.db = new PouchDB(`db/_media`)
 
-				this._restartChangesStream()
+				this.restartChangesStream()
 
 				this.logger.info('Media scanning: start syncing media files')
 
 				// Check disk usage now
-				this._updateFsStats()
-				this._checkFsStatsInterval = setInterval(() => {
-					this._triggerupdateFsStats()
+				this.updateFsStats()
+				this.checkFsStatsInterval = setInterval(() => {
+					this.triggerupdateFsStats()
 				}, 30 * 1000) // Run a check every 30 seconds
 
 				const [ coreObjRevisions, allDocsResponse, dbInfo ] = await Promise.all([
 					this.getAllCoreObjRevisions(),
-					this._db.allDocs({
+					this.db.allDocs({
 						include_docs: true,
 						attachments: true
 					}),
-					this._db.info()
+					this.db.info()
 				])
 
 				this.logger.info('Media scanning: sync object lists', coreObjRevisions.length, allDocsResponse.total_rows)
@@ -98,11 +107,11 @@ export class MonitorMediaScanner extends Monitor {
 					) {
 						delete coreObjRevisions[docId]
 
-						let doc2 = await this._db.get<MediaObject>(doc.id, {
+						let doc2 = await this.db.get<MediaObject>(doc.id, {
 							attachments: true
 						})
 						doc2.mediaId = doc2._id
-						await this._sendChanged(doc2)
+						await this.sendChanged(doc2)
 
 						await new Promise(resolve => {
 							setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
@@ -114,18 +123,18 @@ export class MonitorMediaScanner extends Monitor {
 				}
 
 				if (parseInt(dbInfo.update_seq + '', 10)) {
-					this._lastSequenceNr = parseInt(dbInfo.update_seq + '', 10)
+					this.lastSequenceNr = parseInt(dbInfo.update_seq + '', 10)
 				}
 				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
 				for ( let id in coreObjRevisions) {
-					await this._sendRemoved(id)
+					await this.sendRemoved(id)
 				}
 
 				this.logger.info('Media scanning: done file sync init')
 			} else {
 				this.logger.info('Media scanning disabled')
 			}
-			this._initialized = true
+			this.initialized = true
 		} catch (e) {
 			this.logger.error('Media scanning: error initializing media scanning', e)
 		}
@@ -134,25 +143,28 @@ export class MonitorMediaScanner extends Monitor {
 	public async dispose(): Promise<void> {
 		await super.dispose()
 
-		this._isDestroyed = true
-		if (this._checkFsStatsInterval) {
-			clearInterval(this._checkFsStatsInterval)
-			this._checkFsStatsInterval = undefined
+		this.isDestroyed = true
+		if (this.checkFsStatsInterval) {
+			clearInterval(this.checkFsStatsInterval)
+			this.checkFsStatsInterval = undefined
 		}
-		if (this._changes) {
-			this._changes.cancel()
+		if (this.changes) {
+			this.changes.cancel()
 		}
-		await this._db.close()
+		await this.db.close()
+		await this.watcher.dispose()
 	}
-	private _triggerupdateFsStats(): void {
-		if (!this._triggerupdateFsStatsTimeout) {
-			this._triggerupdateFsStatsTimeout = setTimeout(() => {
-				this._triggerupdateFsStatsTimeout = undefined
-				this._updateFsStats()
+
+	private triggerupdateFsStats(): void {
+		if (!this.triggerupdateFsStatsTimeout) {
+			this.triggerupdateFsStatsTimeout = setTimeout(() => {
+				this.triggerupdateFsStatsTimeout = undefined
+				this.updateFsStats()
 			}, 5000)
 		}
 	}
-	private async _updateFsStats(): Promise<void> {
+
+	private async updateFsStats(): Promise<void> {
 		try {
 			let disks: Array<DiskInfo> = []
 			let cmd = ''
@@ -233,9 +245,9 @@ export class MonitorMediaScanner extends Monitor {
 					status = diskStatus
 				}
 			}
-			this._statusDisk.statusCode = status
-			this._statusDisk.messages = messages
-			this._updateAndSendStatus()
+			this.statusDisk.statusCode = status
+			this.statusDisk.messages = messages
+			this.updateAndSendStatus()
 		} catch(e) {
 			this.logger.warn('Media scanning: it was not possible to determine disk usage stats.')
 			// Removed - not making a network request
@@ -243,58 +255,50 @@ export class MonitorMediaScanner extends Monitor {
 			// 	this.logger.warn('Error in _updateFsStats', e.message || e.stack || e)
 			// }
 
-			this._statusDisk.statusCode = PeripheralDeviceAPI.StatusCode.WARNING_MAJOR
-			this._statusDisk.messages = [`Media scanning: error when trying to determine disk usage stats.`]
-			this._updateAndSendStatus()
+			this.statusDisk.statusCode = PeripheralDeviceAPI.StatusCode.WARNING_MAJOR
+			this.statusDisk.messages = [`Media scanning: error when trying to determine disk usage stats.`]
+			this.updateAndSendStatus()
 		}
 	}
 
 	private getChangesOptions() {
 		return {
-			since: this._lastSequenceNr || 'now',
+			since: this.lastSequenceNr || 'now',
 			include_docs: true,
 			live: true,
 			attachments: true
 		}
 	}
-	private _setConnectionStatus(connected: boolean) {
+
+	private setConnectionStatus(connected: boolean) {
 		let status = connected ? PeripheralDeviceAPI.StatusCode.GOOD : PeripheralDeviceAPI.StatusCode.BAD
 		let messages = connected ? [] : ['MediaScanner not connected']
-		if (status !== this._statusConnection.statusCode) {
-			this._statusConnection.statusCode = status
-			this._statusConnection.messages = messages
-			this._updateAndSendStatus()
+		if (status !== this.statusConnection.statusCode) {
+			this.statusConnection.statusCode = status
+			this.statusConnection.messages = messages
+			this.updateAndSendStatus()
 		}
 	}
-	private _updateStatus(): PeripheralDeviceAPI.StatusObject {
+
+	private updateStatus(): PeripheralDeviceAPI.StatusObject {
 		let statusCode: PeripheralDeviceAPI.StatusCode = PeripheralDeviceAPI.StatusCode.GOOD
 		let messages: Array<string> = []
 
 		let statusSettings: PeripheralDeviceAPI.StatusObject = { statusCode: PeripheralDeviceAPI.StatusCode.GOOD }
 
-		if (!this._settings.host) {
-			statusSettings = {
-				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Settings parameter "host" not set']
-			}
-		} else if (!this._settings.port) {
-			statusSettings = {
-				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Settings parameter "port" not set']
-			}
-		} else if (!this._settings.storageId) {
+		if (!this.settings.storageId) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 				messages: ['Settings parameter "storageId" not set']
 			}
-		} else if (!this._initialized) {
+		} else if (!this.initialized) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 				messages: ['Not initialized']
 			}
 		}
 
-		_.each([statusSettings, this._statusConnection, this._statusDisk], s => {
+		_.each([statusSettings, this.statusConnection, this.statusDisk], s => {
 			if (s.statusCode > statusCode) {
 				messages = s.messages || []
 				statusCode = s.statusCode
@@ -309,55 +313,62 @@ export class MonitorMediaScanner extends Monitor {
 			messages
 		}
 	}
-	private _updateAndSendStatus() {
-		const status = this._updateStatus()
 
-		if (this._status.statusCode !== status.statusCode || !_.isEqual(this._status.messages, status.messages)) {
-			this._status = {
+	private updateAndSendStatus() {
+		const status = this.updateStatus()
+
+		if (
+			this.status.statusCode !== status.statusCode
+			|| !_.isEqual(this.status.messages, status.messages)
+		) {
+			this.status = {
 				statusCode: status.statusCode,
 				messages: status.messages
 			}
-			this.emit('connectionChanged', this._status)
+			this.emit('connectionChanged', this.status)
 		}
 	}
 
-	private _triggerMonitorConnection() {
-		if (!this._monitorConnectionTimeout) {
-			this._monitorConnectionTimeout = setTimeout(() => {
-				this._monitorConnectionTimeout = null
-				this._monitorConnection()
+	private triggerMonitorConnection() {
+		if (!this.monitorConnectionTimeout) {
+			this.monitorConnectionTimeout = setTimeout(() => {
+				this.monitorConnectionTimeout = null
+				this.monitorConnection()
 			}, 10 * 1000)
 		}
 	}
-	private _monitorConnection() {
-		if (this._isDestroyed) return
 
-		if (this._statusConnection.statusCode === PeripheralDeviceAPI.StatusCode.BAD) {
-			this._restartChangesStream(true)
+	private monitorConnection() {
+		if (this.isDestroyed) return
 
-			this._triggerMonitorConnection()
+		if (this.statusConnection.statusCode === PeripheralDeviceAPI.StatusCode.BAD) {
+			this.restartChangesStream(true)
+
+			this.triggerMonitorConnection()
 		}
 	}
-	private _restartChangesStream(rewindSequence?: boolean) {
+
+	private restartChangesStream(rewindSequence?: boolean) {
 		if (rewindSequence) {
-			if (this._lastSequenceNr > 0) {
-				this._lastSequenceNr--
+			if (this.lastSequenceNr > 0) {
+				this.lastSequenceNr--
 			}
 		}
 		// restart the changes stream
-		if (this._changes) {
-			this._changes.cancel()
+		if (this.changes) {
+			this.changes.cancel()
 		}
 		const opts = this.getChangesOptions()
 		this.logger.info(`Media scanning: restarting changes stream (since ${opts.since})`)
-		this._changes = this._db
+		this.changes = this.db
 			.changes<MediaObject>(opts)
-			.on('change', changes => this._changeHandler(changes))
-			.on('error', error => this._errorHandler(error))
+			.on('change', changes => this.changeHandler(changes))
+			.on('error', error => this.errorHandler(error))
 	}
-	private _changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
+
+	private changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
 		const newSequenceNr: string | number = changes.seq
-		if (_.isNumber(newSequenceNr)) this._lastSequenceNr = newSequenceNr
+		if (_.isNumber(newSequenceNr)) this.lastSequenceNr = newSequenceNr
 		else this.logger.warn(`Expected changes.seq to be number, got "${newSequenceNr}"`)
 
 		if (changes.deleted) {
@@ -365,7 +376,7 @@ export class MonitorMediaScanner extends Monitor {
 				// Ignore watchdog file changes
 
 				this.logger.debug('Media scanning: deleteMediaObject', changes.id, newSequenceNr)
-				this._sendRemoved(changes.id).catch(e => {
+				this.sendRemoved(changes.id).catch(e => {
 					this.logger.error('Media scanning: error sending deleted doc', e)
 				})
 			}
@@ -376,27 +387,28 @@ export class MonitorMediaScanner extends Monitor {
 
 				this.logger.debug('Media scanning: updateMediaObject', newSequenceNr, md._id, md.mediaId)
 				md.mediaId = md._id
-				this._sendChanged(md).catch(e => {
+				this.sendChanged(md).catch(e => {
 					this.logger.error('Media scanning: error sending changed doc', e)
 				})
 			}
 		}
 
-		this._setConnectionStatus(true)
+		this.setConnectionStatus(true)
 
-		this._triggerupdateFsStats()
+		this.triggerupdateFsStats()
 	}
-	private _errorHandler(err) {
+
+	private errorHandler(err) {
 		if (err instanceof SyntaxError || err instanceof FetchError || err.type === 'invalid-json') {
 			this.logger.warn('Media scanning: terminated (' + err.message + ')') // not a connection issue
-			this._restartChangesStream(true)
+			this.restartChangesStream(true)
 			return // restart silently, since PouchDB connections can drop from time to time and are not a very big issue
 		} else {
 			this.logger.error('MediaScanner: Error', err)
 		}
 
-		this._setConnectionStatus(false)
+		this.setConnectionStatus(false)
 
-		this._triggerMonitorConnection()
+		this.triggerMonitorConnection()
 	}
 }

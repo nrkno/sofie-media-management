@@ -264,9 +264,21 @@ export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
 	/** Host of the media-scanner PouchDB server */
 	// host: string
 	// port: number
+	
 	paths: string | Array<string>
-	// See https://www.npmjs.com/package/chokidar#api
+	/** See https://www.npmjs.com/package/chokidar#api */
 	scanner: WatchOptions
+	/** Properties specific to CasparCG configuration and file location. */
+	caspar: {
+		config: string
+		templatePath: string
+		mediaPath: string
+		fontPath: string
+	}
+	/** Maximum number of times to try and scan a file. */
+	retryLimit: number
+	// ffmpeg: string //process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+	// ffprobe: string // process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
 }
 
 export interface MonitorSettingsQuantel extends MonitorSettingsBase {

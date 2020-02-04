@@ -4,12 +4,9 @@ import * as PouchDB from 'pouchdb-node'
 import * as chokidar from 'chokidar'
 import { noTryAsync } from 'no-try'
 import { MonitorSettingsMediaScanner } from '../api'
-import { promisify } from 'util'
-import { exec as execCB } from 'child_process'
 import { LoggerInstance } from 'winston'
 import { Stats, stat } from 'fs-extra'
 import { literal } from '../lib/lib'
-const exec = promisify(execCB)
 
 /** Convert filename to Caspar-style name. */
 function getId (fileDir: string, filePath: string): string {
@@ -70,24 +67,24 @@ export class Watcher extends EventEmitter {
 				pollInterval: 1000
 			}
 		}, this.settings.scanner))
-		this.watcher.on('add', (path: string, stat: Stats): void => {
-			const mediaId = getId(settings.paths.media, path)
-			this.scanFile(path, mediaId, stat, false)
+		this.watcher.on('add', (localPath: string, stat: Stats): void => {
+			const mediaId = getId(this.settings.caspar.mediaPath, localPath)
+			this.scanFile(localPath, mediaId, stat)
 				.catch(error => { this.logger.error(error) })
 		})
-		this.watcher.on('change', (path, stat: Stats) => {
-			const mediaId = getId(settings.paths.media, path)
-			this.scanFile(path, mediaId, stat, false)
+		this.watcher.on('change', (localPath: string, stat: Stats) => {
+			const mediaId = getId(this.settings.caspar.mediaPath, localPath)
+			this.scanFile(localPath, mediaId, stat)
 				.catch(error => { this.logger.error(error) })
 		})
-		this.watcher.on('unlink', (path, stat) => {
-			const mediaId = getId(settings.paths.media, path)
+		this.watcher.on('unlink', (localPath: string, _stat: Stats) => {
+			const mediaId = getId(this.settings.caspar.mediaPath, localPath)
 			this.db.get(mediaId)
-				.then(this.db.remove.bind(this))
+				.then((doc) => this.db.remove(doc))
 				.catch(error => { this.logger.error(error) })
 		})
 		this.watcher.on('ready', () => {
-			this.logger.info('Media scanning: Watcher ready!')
+			this.logger.info('Media scanning: watcher ready!')
 		})
 		this.watcher.on('error', (err) => {
 			if (err) {
@@ -96,6 +93,12 @@ export class Watcher extends EventEmitter {
 		})
 
 	  this.cleanDeleted()
+	}
+
+	public async dispose(): Promise<void> {
+		await this.db.close()
+		await this.watcher.close()
+		this.logger.info('Media scanner: watcher stopped')
 	}
 
 	private async scanFile (
@@ -122,7 +125,6 @@ export class Watcher extends EventEmitter {
 			  .get<MediaDocument>(mediaId)
 			  .catch(() => ({ _id: mediaId } as MediaDocument))
 
-			// TODO - WTF did this do
 			const mediaLogger = (level: string, message: string): void => {
 				this.logger[level](`Media scanning: scanning ${({
 					id: mediaId,
@@ -172,7 +174,7 @@ export class Watcher extends EventEmitter {
 		if (error) {
 			this.scanning = false
 			this.filesToScanFail[mediaId] = (this.filesToScanFail[mediaId] || 0) + 1
-			if (this.filesToScanFail[mediaId] >= this.settings.scanner.retryLimit) {
+			if (this.filesToScanFail[mediaId] >= this.settings.retryLimit) {
 			  this.logger.error(`Media scanner: skipping file. Too many retries for '${mediaId}'`)
 			  delete this.filesToScanFail[mediaId]
 			  delete this.filesToScan[mediaId]
@@ -219,7 +221,7 @@ export class Watcher extends EventEmitter {
 			})
 			await Promise.all(rows.map(async ({ doc }) => {
 				const { error } = await noTryAsync(async () => {
-					const mediaFolder = path.normalize(_settings.scanner.paths)
+					const mediaFolder = path.normalize(Array.isArray(this.settings.paths) ? this.settings.paths[0] : this.settings.paths)
 					const mediaPath = path.normalize(doc.mediaPath)
 					if (mediaPath.indexOf(mediaFolder) === 0 && await fileExists(doc.mediaPath)) {
 						return
@@ -232,11 +234,11 @@ export class Watcher extends EventEmitter {
 					})
 				})
 				if (error) {
-					this.logger.error(`Media scanning: failed to `, error, doc)
+					this.logger.error(`Media scanning: failed `, error, doc)
 				}
 			}))
 
-			await this._db.bulkDocs(deleted)
+			await this.db.bulkDocs(deleted)
 
 			if (rows.length < limit) {
 				break
@@ -246,4 +248,6 @@ export class Watcher extends EventEmitter {
 
 		this.logger.info(`Media scanning: finished check for dead media`)
 	}
+
+	getCurrentScanId = () => this.scanning ? this.scanId : false
 }

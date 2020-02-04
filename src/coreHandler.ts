@@ -441,7 +441,7 @@ export class CoreMonitorHandler {
 		await this.core.init(this._coreParentHandler.core)
 
 		if (!this._hasGottenStatusChange) {
-			await this.core.setStatus(this.monitor.status)
+			await this.core.setStatus(this.monitor.getStatus())
 		}
 		await this.setupSubscriptionsAndObservers()
 	}
