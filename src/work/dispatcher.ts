@@ -4,6 +4,8 @@ import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
 import * as request from 'request-promise-native'
 import { EventEmitter } from 'events'
+import { noTryAsync } from 'no-try'
+import { LoggerInstance } from 'winston'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
@@ -41,254 +43,220 @@ enum MMPDMethods {
 const PROCESS_NAME = 'Dispatcher'
 
 /**
- * The dispatcher connects the storages to the workflow generators
- * And then dispathes the work to the workers
+ * The dispatcher connects the storages to the workflow generators.
+ * Then it dispathes the work to the workers.
  */
-export class Dispatcher extends EventEmitter {
-	generators: BaseWorkFlowGenerator[]
+export class Dispatcher {
+	private workers: Worker[] = []
 
-	private _workers: Worker[] = []
+	private workFlows: PouchDB.Database<WorkFlowDB>
+	private workSteps: PouchDB.Database<WorkStepDB>
 
-	private _workFlows: PouchDB.Database<WorkFlowDB>
-	private _workSteps: PouchDB.Database<WorkStepDB>
-	private _availableStorage: StorageObject[]
-	private _tmi: TrackedMediaItems
-	private _config: DeviceSettings
-	private _coreHandler: CoreHandler
+	private bestEffort: NodeJS.Timer | undefined = undefined
+	private cronJobInterval: NodeJS.Timer | undefined = undefined
+	private watchdogInterval: NodeJS.Timer | undefined = undefined
 
-	private _bestEffort: NodeJS.Timer | undefined = undefined
-	private _cronJobInterval: NodeJS.Timer | undefined = undefined
-	private _watchdogInterval: NodeJS.Timer | undefined = undefined
+	private cronJobTime: number
+	private watchdogTime: number = 5 * 60 * 1000
+	private watchdogRunning: boolean = false
 
-	private _cronJobTime: number
-	private _watchdogTime: number = 5 * 60 * 1000
-	private _workFlowLingerTime: number
-	private _watchdogRunning: boolean = false
-
-	private _warningWFQueueLength: number
-	private _warningTaskWorkingTime: number
-
-	on(type: LogEvents, listener: (e: string) => void): this {
-		return super.on(type, listener)
-	}
+	private warningWFQueueLength: number
+	private warningTaskWorkingTime: number
 
 	constructor(
-		generators: BaseWorkFlowGenerator[],
-		availableStorage: StorageObject[],
-		tmi: TrackedMediaItems,
-		config: DeviceSettings,
+		private generators: BaseWorkFlowGenerator[],
+		private availableStorage: StorageObject[],
+		private tmi: TrackedMediaItems,
+		private config: DeviceSettings,
 		workersCount: number,
-		workFlowLingerTime: number,
-		coreHandler: CoreHandler
+		private workFlowLingerTime: number,
+		private coreHandler: CoreHandler,
+		private logger: LoggerInstance
 	) {
-		super()
+		this.coreHandler.restartWorkflow = workflowId => this.actionRestartWorkflow(workflowId)
+		this.coreHandler.abortWorkflow = workflowId => this.actionAbortWorkflow(workflowId)
+		this.coreHandler.prioritizeWorkflow = workflowId => this.prioritizeWorkflow(workflowId)
+		this.coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
+		this.coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
 
-		this.generators = generators
-		this._tmi = tmi
-		this._config = config
-		this._coreHandler = coreHandler
+		this.cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
+		this.warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
+		this.warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
 
-		if (!this._config.mediaScanner) this._config.mediaScanner = { port: 80 } // tmp fix
+		for (let i = 0; i < workersCount; i++) {
+			this.workers.push(
+				new Worker(this.workSteps, this.tmi, this.config, this.logger, i))
+		}
+	}
 
-		this._coreHandler.restartWorkflow = workflowId => this.actionRestartWorkflow(workflowId)
-		this._coreHandler.abortWorkflow = workflowId => this.actionAbortWorkflow(workflowId)
-		this._coreHandler.prioritizeWorkflow = workflowId => this.prioritizeWorkflow(workflowId)
-		this._coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
-		this._coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
-		this.attachLogEvents('TrackedMediaItems', this._tmi)
-
-		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
-		this._workFlowLingerTime = workFlowLingerTime
-		this._warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
-		this._warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
-
-		fs.ensureDirSync('./db')
+	private async initDB(): Promise<void> {
 		PouchDB.plugin(PouchDBFind)
+		await fs.ensureDir('./db') // TODO this should be configurable?
 		const PrefixedPouchDB = PouchDB.defaults({
 			prefix: './db/'
 		} as any)
 
-		this._workFlows = new PrefixedPouchDB('workFlows')
-		this._workSteps = new PrefixedPouchDB('workSteps')
+		this.workFlows = new PrefixedPouchDB('workFlows')
+		this.workSteps = new PrefixedPouchDB('workSteps')
 
-		this._availableStorage = availableStorage
+		await Promise.all([ this.initWorkflowsDB(), this.initWorkStepsDB() ])
+	}
 
-		for (let i = 0; i < workersCount; i++) {
-			const newWorker = new Worker(this._workSteps, this._tmi, this._config)
-			this.attachLogEvents(`Worker ${i}`, newWorker)
-			this._workers.push(newWorker)
+	private async initWorkflowsDB(): Promise<void> {
+		const { error } = await noTryAsync(async () => {
+			await this.workFlows.createIndex({
+				index: {
+					fields: ['priority']
+				}
+			})
+			await this.workFlows.createIndex({
+				index: {
+					fields: ['finished']
+				}
+			})
+			await this.workFlows.createIndex({
+				index: {
+					fields: ['finished', 'created']
+				}
+			})
+			this.logger.debug(`Dispatcher: DB "workFlows" index "priority" succesfully created.`)
+		})
+		if (error) {
+		  throw new Error(`Dispatcher: could not initialize "workFlows" database: ${error.message}`)
+		}
+	}
+
+	private async initWorkStepsDB(): Promise<void> {
+		const { error } = await noTryAsync(async () => {
+			await this.workSteps.createIndex({
+				index: {
+					fields: ['workFlowId']
+				}
+			})
+			await this.workSteps.createIndex({
+				index: {
+					fields: ['status']
+				}
+			})
+			this.logger.debug(`Dispatcher: DB "workSteps" index "status" & "workFlowId" succesfully created.`)
+		})
+		if (error) {
+			throw new Error(`Dispatcher: could not initialize "workSteps" database: ${error.message}`)
 		}
 	}
 
 	async init(): Promise<void> {
-		return Promise.all([
-			this._workFlows
-				.createIndex({
-					index: {
-						fields: ['priority']
-					}
-				})
-				.then(() =>
-					this._workFlows.createIndex({
-						index: {
-							fields: ['finished']
-						}
-					})
-				)
-				.then(() =>
-					this._workFlows.createIndex({
-						index: {
-							fields: ['finished', 'created']
-						}
-					})
-				)
-				.then(() => {
-					this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
-				})
-				.catch(e => {
-					throw new Error(`Could not initialize "workFlows" database: ${e}`)
-				}),
-			this._workSteps
-				.createIndex({
-					index: {
-						fields: ['workFlowId']
-					}
-				})
-				.then(() =>
-					this._workSteps.createIndex({
-						index: {
-							fields: ['status']
-						}
-					})
-				)
-				.then(() => {
-					this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
-				})
-				.catch(e => {
-					throw new Error(`Could not initialize "workSteps" database: ${e}`)
-				})
-		])
-			.then(() => this.cleanupOldWorkflows())
-			.then(() => this.initialWorkFlowAndStepsSync())
-			.catch(e => {
-				this.emit('error', `Failed to synchronize with core`, e)
+		await this.initDB()
+		await this.cleanupOldWorkflows()
+		await noTryAsync(
+			() => this.initialWorkFlowAndStepsSync(),
+			e => {
+				this.logger.error(`Dispatcher: failed to synchronize with core`, e)
 				process.exit(1)
 				throw e
-			})
-			.then(() => {
-				// Maintain one-to-many relationship for the WorkFlows and WorkSteps
-				// Update WorkFlows and WorkSteps in Core
-				this._workFlows
-					.changes({
-						since: 'now',
-						live: true,
-						include_docs: true
-					})
-					.on('change', change => {
-						if (change.deleted) {
-							this._workSteps
-								.find({
-									selector: {
-										workFlowId: change.id
-									}
-								})
-								.then(value => {
-									return Promise.all(value.docs.map(i => this._workSteps.remove(i))).then(() =>
-										this.emit(
-											'debug',
-											`Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`
-										)
-									)
-								})
-								.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
-
-							this.pushWorkFlowToCore(change.id, null).catch(() => {})
-						} else if (change.doc) {
-							this.pushWorkFlowToCore(change.id, change.doc).catch(() => {})
+			}
+		)
+		// Maintain one-to-many relationship for the WorkFlows and WorkSteps
+		// Update WorkFlows and WorkSteps in Core
+		let workflowChanges = this.workFlows.changes({
+			since: 'now',
+			live: true,
+			include_docs: true
+		})
+		workflowChanges.on('change', async change => {
+			if (change.deleted) {
+				let { result } = await noTryAsync(
+					() => this.workSteps.find({
+						selector: {
+							workFlowId: change.id
 						}
-					})
-					.on('error', err => {
-						this.emit('error', `An error happened in the workFlow changes stream`, err)
-					})
-				this._workSteps
-					.changes({
-						since: 'now',
-						live: true,
-						include_docs: true
-					})
-					.on('change', change => {
-						if (change.deleted) {
-							this.pushWorkStepToCore(change.id, null).catch(() => {})
-						} else if (change.doc) {
-							this.pushWorkStepToCore(change.id, change.doc).catch(() => {})
-						}
-					})
-				// clean up old work-flows every now and then:
-				this._cronJobInterval = setInterval(() => {
-					this.cleanupOldWorkflows().catch(e =>
-						this.emit('error', 'Unhandled error in cleanupOldWorkflows', e)
-					)
-				}, this._cronJobTime)
-				this._watchdogInterval = setInterval(() => {
-					this.watchdog()
-				}, this._watchdogTime)
-			})
-			.then(() => {
-				if (this.useScanner()) {
-					return this.setScannerManualMode(true)
-				} else return Promise.resolve()
-			})
-			.then(
-				() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD),
-				e => {
-					this.emit('debug', `Could not place Media Scanner in manual mode`, e)
-					this._coreHandler.setProcessState(
-						'MediaScanner',
-						[
-							`Could not place Media Scanner in manual mode: ${this.convertMediaScannerExceptionToError(
-								e
-							)}`
-						],
-						P.StatusCode.WARNING_MAJOR
-					)
-
-					this.scannerManualModeBestEffort(true)
+					}),
+					(error: Error) => {
+						this.logger.error(`Dispatcher: could not find workflow with id "${change.id}" on change`, error)
+					}
+				)
+				let { error } = await noTryAsync(
+					() => Promise.all(result.docs.map(i => this.workSteps.remove(i))))
+				if (error) {
+					this.logger.error(`Dispatcher: could not remove orphaned WorkSteps`, error)
+				} else {
+					this.logger.debug(`Dispatcher: ` +
+						`removed ${result.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)
 				}
+				noTryAsync(
+					() => this.pushWorkFlowToCore(change.id, null),
+					err => this.logger.debug(`Dispatcher: failed to push WorkFlow delete change with ID "${change.id}" to core`, err))
+			} else if (change.doc) {
+				noTryAsync(
+					() => this.pushWorkFlowToCore(change.id, change.doc),
+					err => this.logger.debug(`Dispatcher: failed to push WorkFlow update change with ID "${change.id}" to core`, err))
+			}
+		})
+		workflowChanges.on('error', err => {
+			this.logger.error(`Dispatcher: an error happened in the WorkFlow changes stream`, err)
+		})
+
+		let workstepChanges = this.workSteps.changes({
+			since: 'now',
+			live: true,
+			include_docs: true
+		})
+		workstepChanges.on('change', change => {
+			if (change.deleted) {
+				noTryAsync(
+					() => this.pushWorkStepToCore(change.id, null),
+					err => this.logger.debug(`Dispatcher: failed to push WorkStep delete change with ID "${change.id}" to core`, err))
+			} else if (change.doc) {
+				noTryAsync(
+					() => this.pushWorkStepToCore(change.id, change.doc),
+					err => this.logger.debug(`Dispatcher: failed to push WorkStep delete change with ID "${change.id}" to core`, err))
+			}
+		})
+		workstepChanges.on('error', err => {
+			this.logger.error(`Dispatcher: an error happened in the WorkStep changes stream`, err)
+		})
+
+		// clean up old work-flows every now and then:
+		this.cronJobInterval = setInterval(() => {
+			noTryAsync(
+				() => this.cleanupOldWorkflows(),
+				e => this.logger.error(`Dispatcher: unhandled error in cleanupOldWorkflows`, e)
 			)
-			.then(() => Promise.all(this._availableStorage.map(st => this.attachLogEvents(st.id, st.handler))))
-			.then(() => Promise.all(this.generators.map(gen => this.attachLogEvents(gen.constructor.name, gen))))
-			.then(() => Promise.all(this.generators.map(gen => gen.init())))
-			.then(() => {
-				this.emit('debug', `Dispatcher initialized.`)
-			})
-			.then(() => {
-				this.generators.forEach(gen => {
-					gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
-					this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
-				})
-			})
-			.then(() => this.cancelLeftoverWorkSteps())
+		}, this.cronJobTime)
+		this.watchdogInterval = setInterval(() => {
+			this.watchdog()
+		}, this.watchdogTime)
+
+		this.coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD),
+
+		await Promise.all(this.availableStorage.map(st => this.attachLogEvents(st.id, st.handler)))
+		await Promise.all(this.generators.map(gen => this.attachLogEvents(gen.constructor.name, gen))))
+		await Promise.all(this.generators.map(gen => gen.init()))
+		this.logger.debug(`Dispatcher: initialized`)
+
+		this.generators.forEach(gen => {
+			gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
+			this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
+		})
+		await this.cancelLeftoverWorkSteps()
 	}
 
 	async destroy(): Promise<void> {
-		return Promise.all(this.generators.map(gen => gen.destroy()))
-			.then(() => this.emit('debug', 'WorkFlow generators destroyed'))
-			.then(() => {
-				if (this._cronJobInterval) clearInterval(this._cronJobInterval)
-				if (this._watchdogInterval) clearInterval(this._watchdogInterval)
-			})
-			.then(() => this.emit('debug', 'WorkFlow clean up task destroyed'))
-			.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
-			.then(() => this.emit('debug', 'Storage handlers destroyed'))
-			.then(() => {
-				if (this.useScanner()) {
-					return this.setScannerManualMode(false)
-				} else return Promise.resolve()
-			})
-			.catch(e => this.emit('error', `Error when disabling manual mode in scanner`, e))
-			.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
-			.then(() => this.emit('debug', `Dispatcher destroyed.`))
-			.then(() => {})
+		await noTryAsync(async () => {
+			await Promise.all(this.generators.map(gen => gen.destroy()))
+			this.logger.debug(`Dispatcher: workFlow generators destroyed`)
+		}, (error: Error) => {
+			this.logger.warn(`Dispatcher: failed to dispose of generator`, error)
+		})
+		if (this._cronJobInterval) { clearInterval(this._cronJobInterval) }
+		if (this._watchdogInterval) { clearInterval(this._watchdogInterval) }
+		this.logger.debug(`Dispatcher: WorkFlow clean up task destroyed`)
+		await noTryAsync(async () => {
+			await Promise.all(this.availableStorage.map(st => st.handler.destroy())).catch(e => {})
+			this.logger.debug('Dispatcher: storage handlers destroyed')
+		})
+		this.logger.debug(`Dispatcher: scanner placed back in automatic mode`)
+		this.logger.debug(`Dispatcher: destroyed`)
 	}
 
 	private watchdog() {
@@ -317,7 +285,7 @@ export class Dispatcher extends EventEmitter {
 						i => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
 					)
 					if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
-						this._coreHandler.setProcessState(
+						this.coreHandler.setProcessState(
 							PROCESS_NAME,
 							[`No WorkFlow has finished in the last 15 minutes`],
 							P.StatusCode.BAD
@@ -325,7 +293,7 @@ export class Dispatcher extends EventEmitter {
 						return
 					}
 					if (oldWorkFlows.length > 0) {
-						this._coreHandler.setProcessState(
+						this.coreHandler.setProcessState(
 							PROCESS_NAME,
 							[`Some WorkFlows have been waiting more than 3hrs to be completed`],
 							P.StatusCode.BAD
@@ -333,7 +301,7 @@ export class Dispatcher extends EventEmitter {
 						return
 					}
 					if (unfinishedWorkFlows.length > this._warningWFQueueLength) {
-						this._coreHandler.setProcessState(
+						this.coreHandler.setProcessState(
 							PROCESS_NAME,
 							[`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`],
 							P.StatusCode.WARNING_MAJOR
@@ -348,7 +316,7 @@ export class Dispatcher extends EventEmitter {
 							)
 						).length > 0
 					) {
-						this._coreHandler.setProcessState(
+						this.coreHandler.setProcessState(
 							PROCESS_NAME,
 							[
 								`Some workers have been working for more than ${Math.floor(
@@ -360,11 +328,11 @@ export class Dispatcher extends EventEmitter {
 						return
 					}
 					// no problems found, set status to GOOD
-					this._coreHandler.setProcessState(PROCESS_NAME, [], P.StatusCode.GOOD)
+					this.coreHandler.setProcessState(PROCESS_NAME, [], P.StatusCode.GOOD)
 				},
 				() => {
 					this.emit('error', `Watchdog: Could not list all WorkFlows, restarting.`)
-					this._coreHandler.killProcess(1)
+					this.coreHandler.killProcess(1)
 				}
 			)
 			.then(() => {
@@ -510,7 +478,7 @@ export class Dispatcher extends EventEmitter {
 		return this._workFlows
 			.find({
 				selector: {
-					created: { $lt: getCurrentTime() - this._workFlowLingerTime },
+					created: { $lt: getCurrentTime() - this.workFlowLingerTime },
 					finished: true
 				}
 			})
@@ -600,7 +568,7 @@ export class Dispatcher extends EventEmitter {
 		}
 		this.setScannerManualMode(manual).then(
 			() => {
-				this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
+				this.coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
 				this.emit('debug', `Scanner placed in manual mode`)
 			},
 			() => {
@@ -612,7 +580,7 @@ export class Dispatcher extends EventEmitter {
 		)
 	}
 	private useScanner(): boolean {
-		return !!this._config.mediaScanner.host
+		return false
 	}
 	/**
 	 * Try to place media-scanner in manual mode and reject promise if fails
@@ -623,7 +591,7 @@ export class Dispatcher extends EventEmitter {
 			this._bestEffort = undefined
 		}
 		return request(
-			`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${
+			`http://${this.config.mediaScanner.host}:${this.config.mediaScanner.port}/manualMode/${
 				manual ? 'true' : 'false'
 			}`
 		).promise()
@@ -709,7 +677,7 @@ export class Dispatcher extends EventEmitter {
 			})
 			.then(result => {
 				return (result.docs as object[]).map(item => {
-					return plainToWorkStep(item, this._availableStorage)
+					return plainToWorkStep(item, this.availableStorage)
 				})
 			})
 			.then(docs => {
@@ -981,14 +949,14 @@ export class Dispatcher extends EventEmitter {
 	 */
 	private initialWorkFlowAndStepsSync() {
 		return Promise.all([
-			this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
+			this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
 			this._workFlows.allDocs({
 				include_docs: true,
 				attachments: false
 			})
 		])
 			.then(([coreObjects, allDocsResponse]) => {
-				this._coreHandler.logger.info(
+				this.coreHandler.logger.info(
 					'WorkFlows: synchronizing objectlists',
 					coreObjects.length,
 					allDocsResponse.total_rows
@@ -1051,12 +1019,12 @@ export class Dispatcher extends EventEmitter {
 				return allTasks
 			})
 			.then(() => {
-				this._coreHandler.logger.info('WorkFlows: Done objects sync init')
+				this.coreHandler.logger.info('WorkFlows: Done objects sync init')
 				return
 			})
 			.then(() =>
 				Promise.all([
-					this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
+					this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
 					this._workSteps.allDocs({
 						include_docs: true,
 						attachments: false
@@ -1064,7 +1032,7 @@ export class Dispatcher extends EventEmitter {
 				])
 			)
 			.then(([coreObjects, allDocsResponse]) => {
-				this._coreHandler.logger.info(
+				this.coreHandler.logger.info(
 					'WorkSteps: synchronizing objectlists',
 					coreObjects.length,
 					allDocsResponse.total_rows
@@ -1128,14 +1096,14 @@ export class Dispatcher extends EventEmitter {
 				return allTasks
 			})
 			.then(() => {
-				this._coreHandler.logger.info('WorkSteps: Done objects sync init')
+				this.coreHandler.logger.info('WorkSteps: Done objects sync init')
 				return
 			})
 	}
 
 	private pushWorkFlowToCore = throttleOnKey(
 		(id: string, wf: WorkFlowDB | null) => {
-			return this._coreHandler.core
+			return this.coreHandler.core
 				.callMethod(MMPDMethods.updateMediaWorkFlow, [id, wf])
 				.then(() => {
 					this.emit('debug', `WorkFlow in core "${id}" updated`)
@@ -1150,7 +1118,7 @@ export class Dispatcher extends EventEmitter {
 
 	private pushWorkStepToCore = throttleOnKey(
 		(id: string, ws: WorkStepDB | null) => {
-			return this._coreHandler.core
+			return this.coreHandler.core
 				.callMethod(MMPDMethods.updateMediaWorkFlowStep, [id, ws])
 				.then(() => {
 					this.emit('debug', `Step in core "${id}" updated`)

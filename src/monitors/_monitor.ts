@@ -10,7 +10,8 @@ export abstract class Monitor extends EventEmitter {
 	public readonly deviceType: string
 	protected coreHandler: CoreMonitorHandler
 
-	protected status: PeripheralDeviceAPI.StatusObject = {
+	// Accessor
+	protected _status: PeripheralDeviceAPI.StatusObject = {
 		statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 		messages: ['Initializing...']
 	}
@@ -28,7 +29,7 @@ export abstract class Monitor extends EventEmitter {
 		this.coreHandler = coreHandler
 	}
 
-	public getStatus(): PeripheralDeviceAPI.StatusObject {
+	public get status(): PeripheralDeviceAPI.StatusObject {
 		return Object.assign(this.status)
 	}
 

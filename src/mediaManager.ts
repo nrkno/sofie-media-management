@@ -121,7 +121,7 @@ export class MediaManager {
 			})
 		})
 
-		this._trackedMedia = this._trackedMedia || new TrackedMediaItems()
+		this._trackedMedia = this._trackedMedia || new TrackedMediaItems(this._logger)
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
@@ -144,14 +144,9 @@ export class MediaManager {
 			settings,
 			settings.workers || DEFAULT_WORKERS,
 			settings.workFlowLingerTime || DEFAULT_WORKFLOW_LINGER_TIME,
-			this.coreHandler
+			this.coreHandler,
+			this._logger
 		)
-
-		this._dispatcher
-			.on('error', this._logger.error)
-			.on('warn', this._logger.warn)
-			.on('info', this._logger.info)
-			.on('debug', this._logger.debug)
 
 		await Promise.all(
 			this._availableStorage.map(st => {

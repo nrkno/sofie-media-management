@@ -321,7 +321,7 @@ export class MonitorMediaScanner extends Monitor {
 			this.status.statusCode !== status.statusCode
 			|| !_.isEqual(this.status.messages, status.messages)
 		) {
-			this.status = {
+			this._status = {
 				statusCode: status.statusCode,
 				messages: status.messages
 			}

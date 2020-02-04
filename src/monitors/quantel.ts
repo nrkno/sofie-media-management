@@ -421,7 +421,7 @@ export class MonitorQuantel extends Monitor {
 		const status = this._updateStatus()
 
 		if (this.status.statusCode !== status.statusCode || !_.isEqual(this.status.messages, status.messages)) {
-			this.status = {
+			this._status = {
 				statusCode: status.statusCode,
 				messages: status.messages
 			}
