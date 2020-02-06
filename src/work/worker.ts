@@ -2,7 +2,7 @@ import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
 import { WorkStepStatus, WorkStepAction, DeviceSettings, Time } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
-import { TrackedMediaItems, TrackedMediaItem } from '../mediaItemTracker'
+import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import * as request from 'request-promise-native'
 import { CancelHandler } from '../lib/cancelablePromise'
 
@@ -401,7 +401,7 @@ export class Worker {
 			p.then(() => {
 				this.logger.debug(`${this.ident} starting updating TMI on "${step.file.name}"`)
 				this.trackedMediaItems
-					.upsert(step.file.name, (tmi?: TrackedMediaItem) => {
+					.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
 						// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 						if (tmi) {
 							if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
@@ -441,7 +441,7 @@ export class Worker {
 			await step.target.handler.deleteFile(step.file)
 			try {
 				try {
-					await this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItem) => {
+					await this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
 						// if (!tmi) throw new Error(`Delete: Item not tracked: ${step.file.name}`)
 						if (tmi) {
 							const idx = tmi.targetStorageIds.indexOf(step.target.id)

@@ -5,6 +5,7 @@ import { LocalFolderHandler } from './localFolderHandler'
 import { FileShareHandler } from './fileShareHandler'
 import { QuantelHTTPHandler } from './quantelHttpHandler'
 import { CancelablePromise } from '../lib/cancelablePromise'
+import { LoggerInstance } from 'winston'
 
 export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage
 
@@ -164,12 +165,15 @@ export abstract class StorageHandler extends EventEmitter {
  * @param  {StorageSettings} storage
  * @return StorageHandler
  */
-export function buildStorageHandler(storage: GeneralStorageSettings): StorageHandler {
+export function buildStorageHandler(
+	storage: GeneralStorageSettings,
+	logger: LoggerInstance
+): StorageHandler {
 	switch (storage.type) {
 		case StorageType.LOCAL_FOLDER:
-			return new LocalFolderHandler(storage)
+			return new LocalFolderHandler(storage, logger)
 		case StorageType.FILE_SHARE:
-			return new FileShareHandler(storage)
+			return new FileShareHandler(storage, logger)
 		case StorageType.QUANTEL_HTTP:
 			return new QuantelHTTPHandler(storage)
 	}

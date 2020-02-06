@@ -5,6 +5,7 @@ export * from './baseWorkFlowGenerator'
 import { getCurrentTime, literal, randomId, getWorkFlowName } from '../lib/lib'
 import { WorkFlow, WorkFlowSource, WorkStepAction, WorkStep, MediaFlow, MediaFlowType, WorkStepStatus } from '../api'
 import { ScannerWorkStep } from '../work/workStep'
+import { LoggerInstance } from 'winston'
 
 export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	protected _availableStorage: StorageObject[]
@@ -13,15 +14,22 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 
 	private LOCAL_LINGER_TIME = 7 * 24 * 60 * 60 * 1000
 
-	constructor(availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[]) {
-		super()
+	protected ident: string = 'Local storage generator:'
+
+	constructor(
+		availableStorage: StorageObject[],
+		tracked: TrackedMediaItems,
+		flows: MediaFlow[],
+		protected logger: LoggerInstance
+	) {
+		super(logger)
 		this._availableStorage = availableStorage
 		this._tracked = tracked
 		this._flows = flows
 	}
 
 	async init(): Promise<void> {
-		this.emit('debug', `Initializing WorkFlow generator ${this.constructor.name}`)
+		this.logger.debug(`${this.ident} initializing WorkFlow generator ${this.constructor.name}`)
 		return Promise.resolve().then(() => {
 			this._flows.forEach(item => {
 				if (item.mediaFlowType === MediaFlowType.LOCAL_INGEST) {

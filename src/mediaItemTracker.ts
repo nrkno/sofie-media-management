@@ -71,7 +71,7 @@ export class TrackedMediaItems {
 	 */
 	async upsert(
 		id: string,
-		delta: (tmi?: TrackedMediaItem) => TrackedMediaItemDB | undefined
+		delta: (tmi?: TrackedMediaItemDB) => TrackedMediaItemDB | undefined
 	): Promise<TrackedMediaItem | undefined> {
 		return putToDBUpsert(
 			this.db,

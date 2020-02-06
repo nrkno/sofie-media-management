@@ -1,6 +1,7 @@
 import * as _ from 'underscore'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 export * from './baseWorkFlowGenerator'
+import { LoggerInstance } from 'winston'
 
 import { CoreHandler } from '../coreHandler'
 import {
@@ -61,15 +62,18 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	private _cachedStudioId: string | undefined = undefined
 
+	private ident: String = 'Expected media items generator:'
+
 	constructor(
 		availableStorage: StorageObject[],
 		tracked: TrackedMediaItems,
 		flows: MediaFlow[],
 		coreHandler: CoreHandler,
+		private logger: LoggerInstance,
 		lingerTime?: number,
 		cronJobTime?: number
 	) {
-		super()
+		super(logger)
 		this._allStorages = availableStorage
 		this._coreHandler = coreHandler
 		this._trackedItems = tracked
@@ -84,7 +88,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			if (item.mediaFlowType === MediaFlowType.EXPECTED_ITEMS) {
 				const storage = this._allStorages.find(i => i.id === item.sourceId)
 				if (!storage) {
-					this.emit('debug', `Storage "${item.sourceId}" could not be found among available storage.`)
+					this.logger.debug(`${this.ident} ` +
+						`storage "${item.sourceId}" could not be found among available storage.`)
 					return
 				}
 
@@ -225,8 +230,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			return
 		}
 
-		const baseObj: TrackedMediaItem = {
+		const baseObj: TrackedMediaItemDB = {
 			_id: fileName,
+			_rev: '', // Empty string has some effect as not provided
 			name: fileName,
 			comment: item.label,
 			expectedMediaItemId: [item._id],
@@ -236,7 +242,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			targetStorageIds: [flow.destinationId]
 		}
 		this._trackedItems
-			.upsert(baseObj._id, (tmi?: TrackedMediaItem) => {
+			.upsert(baseObj._id, (tmi?: TrackedMediaItemDB) => {
 				if (tmi) {
 					baseObj.lastSeen = Math.max(baseObj.lastSeen, tmi.lastSeen)
 					baseObj.lingerTime = Math.max(baseObj.lingerTime, tmi.lingerTime)
@@ -245,6 +251,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						tmi.expectedMediaItemId || []
 					)
 					baseObj.targetStorageIds = _.union(baseObj.targetStorageIds || [], tmi.targetStorageIds || [])
+					baseObj._rev = tmi._rev
 				}
 				return baseObj
 			})

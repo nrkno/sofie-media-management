@@ -5,12 +5,20 @@ import { LocalStorageGenerator, WorkFlowGeneratorEventType } from './localStorag
 import { File, StorageObject, StorageEvent, StorageEventType } from '../storageHandlers/storageHandler'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import { FileWorkStep } from '../work/workStep'
+import { LoggerInstance } from 'winston'
 
 export class WatchFolderGenerator extends LocalStorageGenerator {
 	private _storageMapping: _.Dictionary<string> = {}
 
-	constructor(availableStorage: StorageObject[], tracked: TrackedMediaItems, flows: MediaFlow[]) {
-		super(availableStorage, tracked, flows)
+	protected ident: string = 'Watch folder generator:'
+
+	constructor(
+		availableStorage: StorageObject[],
+		tracked: TrackedMediaItems,
+		flows: MediaFlow[],
+		protected logger: LoggerInstance
+	) {
+		super(availableStorage, tracked, flows, logger)
 	}
 
 	async init(): Promise<void> {
@@ -22,10 +30,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 
 					if (srcStorage && dstStorage) {
 						if (srcStorage.options.onlySelectedFiles) {
-							this.emit(
-								'error',
-								`${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`
-							)
+							this.logger.error(`${this.ident} ${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`)
 							return
 						}
 						this.registerStoragePair(srcStorage, dstStorage)

@@ -117,7 +117,7 @@ export class MediaManager {
 
 		this._availableStorage = _.map(settings.storages || [], item => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
-				handler: buildStorageHandler(item as GeneralStorageSettings)
+				handler: buildStorageHandler(item as GeneralStorageSettings, this._logger)
 			})
 		})
 
@@ -125,13 +125,14 @@ export class MediaManager {
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
-			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || []),
-			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || []),
+			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this._logger),
+			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this._logger),
 			new ExpectedItemsGenerator(
 				this._availableStorage,
 				this._trackedMedia,
 				settings.mediaFlows || [],
 				this.coreHandler,
+				this._logger,
 				settings.lingerTime,
 				settings.cronJobTime
 			)
