@@ -27,14 +27,56 @@ export interface DeviceSettings {
 	warningTaskWorkingTime?: number
 
 	/** Connection details for the media scanner */
-	mediaScanner: {
-		host?: string
-		port: number
-	}
+	// mediaScanner: {
+	// 	host?: string
+	// 	port: number
+	// }
 	/** A list of Monitors, which will monitor media statuses */
 	monitors?: {
 		[monitorId: string]: MonitorSettings
 	}
+
+	paths?: {
+		ffmpeg: string //process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+		ffprobe: string // process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
+	}
+
+	/** Configuration of thumbnail size. */
+	thumbnails?: {
+		width: number
+		/** Set height to `-1` for proportional scaling */
+		height: number
+	},
+
+	/** Configuration for various kinds of advanced metadata generation. */
+	metadata?: {
+		/** Enable field order detection. */
+		fieldOrder: boolean // This is an expensive check, as it requires decoding the beginning of the video
+		fieldOrderScanDuration: number // Frames. Note: Needs sufficient motion (Not titlecard)
+		/** Enable scene detection */
+		scenes: boolean
+		sceneThreshold: number // default 0.4
+		/** Enable freeze frame detection */
+		freezeDetection: boolean
+		freezeNoise: number // default0.001
+		freezeDuration: string // default '2s',
+		/** Enable black frame detection. */
+		blackDetection: boolean
+		blackDuration: string // default '2.0'
+		blackRatio: number // default 0.98
+		blackThreshold: number // default 0.1
+		mergeBlacksAndFreezes: boolean // default true
+	},
+
+	/** Configuration of _hover-scrub_ preview generation. */
+	previews?: {
+		/** Enable preview generation */
+		enable: boolean // default false
+		width: number // default 160
+		height: number // default -1 for scale in proportion
+		bitrate: string // default '40k'
+	},
+
 }
 
 export type Time = number // Timestamp, unix time in ms
@@ -264,7 +306,7 @@ export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
 	/** Host of the media-scanner PouchDB server */
 	// host: string
 	// port: number
-	
+
 	paths: string | Array<string>
 	/** See https://www.npmjs.com/package/chokidar#api */
 	scanner: WatchOptions
@@ -277,8 +319,6 @@ export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
 	}
 	/** Maximum number of times to try and scan a file. */
 	retryLimit: number
-	// ffmpeg: string //process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-	// ffprobe: string // process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
 }
 
 export interface MonitorSettingsQuantel extends MonitorSettingsBase {
