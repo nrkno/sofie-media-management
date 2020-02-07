@@ -74,14 +74,14 @@ export interface Anomaly {
 	end: number
 }
 
-export interface MediaAttachment {
-	digest: string
-	content_type: string
+export interface MediaAttachment extends PouchDB.Core.FullAttachment {
+	// digest: string - from parent
+	// content_type: string - fromt parent
 	revpos: number
-	data?: string // base64
+	data: string // base64
 }
 
-export interface MediaObject {
+export interface MediaObject extends PouchDB.Core.IdMeta, PouchDB.Core.GetMeta {
 	/** The playable reference (CasparCG clip name, quantel GUID, etc) */
 	mediaId: string
 
@@ -109,11 +109,7 @@ export interface MediaObject {
 	cinf: string // useless to us
 	tinf: string // useless to us
 
-	_attachments: {
-		[key: string]: MediaAttachment // add more here
-	}
-	_id: string
-	_rev: string
+	// _attachments, _id and _rev come from PouchDB types
 }
 
 export interface DiskInfo {

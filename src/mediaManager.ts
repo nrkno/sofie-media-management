@@ -3,7 +3,7 @@ import * as _ from 'underscore'
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
-import { StorageSettings, DeviceSettings } from './api'
+import { StorageSettings, DeviceSettings, MediaObject } from './api'
 import { GeneralStorageSettings, StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
 import { TrackedMediaItems } from './mediaItemTracker'
 import { Dispatcher } from './work/dispatcher'
@@ -13,6 +13,7 @@ import { LocalStorageGenerator } from './workflowGenerators/localStorageGenerato
 import { ExpectedItemsGenerator } from './workflowGenerators/expectedItemsGenerator'
 import { Process } from './process'
 import { MonitorManager } from './monitors/manager'
+import * as PouchDB from 'pouchdb-node'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -45,7 +46,8 @@ export class MediaManager {
 	private _workFlowGenerators: BaseWorkFlowGenerator[]
 	private _process: Process
 
-	private _monitorManager: MonitorManager = new MonitorManager()
+	private mediaDB: PouchDB.Database<MediaObject>
+	private _monitorManager: MonitorManager
 
 	constructor(logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -55,6 +57,11 @@ export class MediaManager {
 		this._config = config
 
 		try {
+			this._logger.info(`Initialising media database`)
+			this.mediaDB = new PouchDB('_media')
+			this._monitorManager = new MonitorManager(this.mediaDB)
+			this._logger.info(`Database initialized`)
+
 			this._logger.info('Initializing Process...')
 			this.initProcess()
 			this._logger.info('Process initialized')
@@ -89,8 +96,13 @@ export class MediaManager {
 				if (this.coreHandler) {
 					this.coreHandler.destroy().catch(this._logger.error)
 				}
-			} catch (e1) {
+			} catch (e1) { // TODO this catch does nothing
 				this._logger.error(e1)
+			}
+			try {
+				await this.mediaDB.close()
+			} catch (e2) {
+				this._logger.error(e2)
 			}
 			this._logger.info('Shutting down in 10 seconds!')
 			setTimeout(() => {
@@ -113,7 +125,8 @@ export class MediaManager {
 		this._logger.debug('Initializing Media Manager with the following settings:')
 		this._logger.debug(JSON.stringify(settings))
 
-		// TODO: Initialize Media Manager
+		// TODO: Initialize Media Manager (?)
+		// TODO: resources created here should be disposed of from here
 
 		this._availableStorage = _.map(settings.storages || [], item => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
@@ -139,6 +152,7 @@ export class MediaManager {
 		)
 
 		this._dispatcher = new Dispatcher(
+			this.mediaDB,
 			this._workFlowGenerators,
 			this._availableStorage,
 			this._trackedMedia,
@@ -189,4 +203,6 @@ export class MediaManager {
 				})
 		})
 	}
+
+	// FIXME need a way to shut down and close database etc.. dispatcher.destroy() is not called
 }

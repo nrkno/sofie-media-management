@@ -1,4 +1,3 @@
-import * as PouchDB from 'pouchdb-node'
 import * as _ from 'underscore'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Monitor } from './_monitor'
@@ -12,8 +11,6 @@ import { Watcher } from './watcher'
 const exec = promisify(execCB)
 
 export class MonitorMediaScanner extends Monitor {
-	private db: PouchDB.Database
-
 	private changes: PouchDB.Core.Changes<MediaObject>
 	private triggerupdateFsStatsTimeout?: NodeJS.Timer
 	private checkFsStatsInterval?: NodeJS.Timer
@@ -39,12 +36,13 @@ export class MonitorMediaScanner extends Monitor {
 
 	constructor(
 		deviceId: string,
+		private db: PouchDB.Database<MediaObject>,
 		public settings: MonitorSettingsMediaScanner,
 		logger: LoggerInstance
 	) {
 		super(deviceId, settings, logger)
 
-		this.watcher = new Watcher(settings, logger)
+		this.watcher = new Watcher(db, settings, logger)
 		this.updateStatus()
 	}
 
@@ -69,8 +67,6 @@ export class MonitorMediaScanner extends Monitor {
 
 			if (!this.settings.disable) {
 				this.logger.info('Media scanning init')
-
-				this.db = new PouchDB(`db/_media`)
 
 				this.restartChangesStream()
 
@@ -151,7 +147,7 @@ export class MonitorMediaScanner extends Monitor {
 		if (this.changes) {
 			this.changes.cancel()
 		}
-		await this.db.close()
+		// await this.db.close()
 		await this.watcher.dispose()
 	}
 

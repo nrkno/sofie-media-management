@@ -1,5 +1,5 @@
 import { Monitor } from './_monitor'
-import { DeviceSettings, MonitorSettings, MonitorSettingsType } from '../api'
+import { DeviceSettings, MonitorSettings, MonitorSettingsType, MediaObject } from '../api'
 import * as _ from 'underscore'
 import { MonitorMediaScanner } from './mediaScanner'
 import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
@@ -13,7 +13,7 @@ export class MonitorManager {
 
 	public settings: DeviceSettings
 
-	constructor() {}
+	constructor(private mediaDB: PouchDB.Database<MediaObject>) {}
 
 	init(coreHandler) {
 		this._coreHandler = coreHandler
@@ -60,7 +60,7 @@ export class MonitorManager {
 		}
 		const monitor: Monitor | null =
 			settings.type === MonitorSettingsType.MEDIA_SCANNER
-				? new MonitorMediaScanner(deviceId, settings, this._coreHandler.logger)
+				? new MonitorMediaScanner(deviceId, this.mediaDB, settings, this._coreHandler.logger)
 				: settings.type === MonitorSettingsType.QUANTEL
 				? new MonitorQuantel(deviceId, settings, this._coreHandler.logger)
 				: null

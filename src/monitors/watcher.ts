@@ -1,9 +1,8 @@
 import { EventEmitter } from 'events'
 import * as path from 'path'
-import * as PouchDB from 'pouchdb-node'
 import * as chokidar from 'chokidar'
 import { noTryAsync } from 'no-try'
-import { MonitorSettingsMediaScanner } from '../api'
+import { MonitorSettingsMediaScanner, MediaObject } from '../api'
 import { LoggerInstance } from 'winston'
 import { Stats, stat } from 'fs-extra'
 import { literal } from '../lib/lib'
@@ -30,18 +29,11 @@ interface FileToScan {
   // generateInfoWhenFound: boolean
 }
 
-interface MediaDocument extends PouchDB.Core.IdMeta, PouchDB.Core.GetMeta {
-	mediaPath?: string
-	mediaSize?: number
-	mediaTime?: number
-}
-
 /**
  *  Replacement for the core scanning capability of media scanner - watching
  *  for file changes.
  */
 export class Watcher extends EventEmitter {
-	private db: PouchDB.Database
 	private watcher: chokidar.FSWatcher
 	private scanning: boolean = false
 	private scanId: number = 1
@@ -50,7 +42,7 @@ export class Watcher extends EventEmitter {
 	private retrying: boolean = false
 
 	constructor(
-		// private deviceId: string,
+		private db: PouchDB.Database<MediaObject>,
 		private settings: MonitorSettingsMediaScanner,
 		private logger: LoggerInstance
 	) {
@@ -58,8 +50,6 @@ export class Watcher extends EventEmitter {
 	}
 
   public init() {
-		this.db = new PouchDB(`db/_media`)
-
 		this.watcher = chokidar.watch(this.settings.paths, Object.assign({
 			alwaysStat: true,
 			awaitWriteFinish: {
@@ -96,7 +86,7 @@ export class Watcher extends EventEmitter {
 	}
 
 	public async dispose(): Promise<void> {
-		await this.db.close()
+		// await this.db.close()
 		await this.watcher.close()
 		this.logger.info('Media scanner: watcher stopped')
 	}
@@ -121,9 +111,9 @@ export class Watcher extends EventEmitter {
 			this.scanId++
 			// lastProgressReportTimestamp = new Date()
 
-			const doc: MediaDocument = await this.db
-			  .get<MediaDocument>(mediaId)
-			  .catch(() => ({ _id: mediaId } as MediaDocument))
+			const doc: MediaObject = await this.db
+			  .get(mediaId)
+			  .catch(() => ({ _id: mediaId } as MediaObject))
 
 			const mediaLogger = (level: string, message: string): void => {
 				this.logger[level](`Media scanning: scanning ${({
@@ -212,7 +202,7 @@ export class Watcher extends EventEmitter {
 		const limit = 256
 		let startkey: string | undefined = undefined
 		while (true) {
-			const deleted: Array<PouchDB.Core.PutDocument<{}>> = []
+			const deleted: Array<PouchDB.Core.PutDocument<MediaObject>> = []
 
 			const { rows } = await this.db.allDocs({
 				include_docs: true,
@@ -227,11 +217,11 @@ export class Watcher extends EventEmitter {
 						return
 					}
 
-					deleted.push({
+					deleted.push(literal<PouchDB.Core.PutDocument<MediaObject>>({
 						_id: doc._id,
 						_rev: doc._rev,
 						_deleted: true
-					})
+					} as MediaObject & PouchDB.Core.ChangesMeta))
 				})
 				if (error) {
 					this.logger.error(`Media scanning: failed `, error, doc)

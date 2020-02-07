@@ -1,12 +1,10 @@
 import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
-import { WorkStepStatus, WorkStepAction, DeviceSettings, Time } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
-import * as request from 'request-promise-native'
 import { CancelHandler } from '../lib/cancelablePromise'
-
-const escapeUrlComponent = encodeURIComponent
+import { noTryAsync } from 'no-try'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -27,7 +25,8 @@ export class Worker {
 	private ident: string
 
 	constructor(
-		private db: PouchDB.Database<WorkStepDB>,
+		private workStepDB: PouchDB.Database<WorkStepDB>,
+		private mediaDB: PouchDB.Database<MediaObject>,
 		private trackedMediaItems: TrackedMediaItems,
 		private config: DeviceSettings,
 		private logger: LoggerInstance,
@@ -63,24 +62,18 @@ export class Worker {
 		}
 	}
 
+	private async unBusyAndFailStep (p: Promise<WorkResult>) {
+		const { result, error } = await noTryAsync(() => p)
+		this.notBusyAnymore()
+		return error ? this.failStep(error.toString()) : result
+	}
+
 	/**
-	 * Receive work from the Dispatcher
+	 *  Receive work from the Dispatcher
 	 */
 	async doWork(step: GeneralWorkStepDB): Promise<WorkResult> {
 		const progressReportFailed = e => {
 			this.logger.warn(`${this.ident} could not report progress`, e)
-		}
-
-		const unBusyAndFailStep = (p: Promise<WorkResult>) => {
-			return p
-				.then((result: WorkResult) => {
-					this._notBusyAnymore()
-					return result
-				})
-				.catch(e => {
-					this._notBusyAnymore()
-					return this.failStep(e)
-				})
 		}
 
 		if (!this._warmingUp) throw new Error(`${this.ident} tried to start worker without warming up`)
@@ -94,7 +87,7 @@ export class Worker {
 
 		switch (step.action) {
 			case WorkStepAction.COPY:
-				return unBusyAndFailStep(
+				return this.unBusyAndFailStep(
 					this.doCompositeCopy(
 						step,
 						progress =>
@@ -105,15 +98,15 @@ export class Worker {
 					)
 				)
 			case WorkStepAction.DELETE:
-				return unBusyAndFailStep(this.doDelete(step))
+				return this.unBusyAndFailStep(this.doDelete(step))
 			case WorkStepAction.SCAN:
-				return unBusyAndFailStep(this.doGenerateMetadata(step))
+				return this.unBusyAndFailStep(this.doGenerateMetadata(step))
 			case WorkStepAction.GENERATE_METADATA:
-				return unBusyAndFailStep(this.doGenerateAdvancedMetadata(step))
+				return this.unBusyAndFailStep(this.doGenerateAdvancedMetadata(step))
 			case WorkStepAction.GENERATE_PREVIEW:
-				return unBusyAndFailStep(this.doGeneratePreview(step))
+				return this.unBusyAndFailStep(this.doGeneratePreview(step))
 			case WorkStepAction.GENERATE_THUMBNAIL:
-				return unBusyAndFailStep(this.doGenerateThumbnail(step))
+				return this.unBusyAndFailStep(this.doGenerateThumbnail(step))
 		}
 	}
 
@@ -142,7 +135,7 @@ export class Worker {
 		}
 	}
 
-	private _notBusyAnymore() {
+	private notBusyAnymore() {
 		this._busy = false
 		this.finishPromises.forEach(fcn => {
 			fcn()
@@ -161,6 +154,7 @@ export class Worker {
 			messages: [reason.toString()]
 		})
 	}
+
 	/**
 	 * Report on the progress of a work step
 	 * @param step
@@ -172,195 +166,215 @@ export class Worker {
 		if (!this._busy) return // Don't report on progress unless we're busy
 		progress = Math.max(0, Math.min(1, progress)) // sanitize progress value
 
-		return updateDB(this.db, step._id, obj => {
-			const currentProgress = obj.progress || 0
-			if (currentProgress < progress) {
-				// this.emit('debug', `${step._id}: Higher progress won: ${currentProgress}`),
-				obj.progress = progress
-			}
-			return obj
-		}).then(() => {
-			// nothing
-		})
+		await noTryAsync(
+			() => updateDB(this.workStepDB, step._id, obj => {
+				const currentProgress = obj.progress || 0
+				if (currentProgress < progress) {
+					// this.logger.debug(`Worker: ${step._id}: Higher progress won: ${currentProgress}`),
+					obj.progress = progress
+				}
+				return obj
+			}),
+			error => this.logger.error(`Worker: error updating progress in database`, error))
 	}
 
-	private async metaLoopUntilDone(name: string, uri: string) {
-		// It was queued, we need to loop with a GET to see if it is done:
-		let notDone = true
-		let queryRes
-		while (notDone) {
-			queryRes = await request({
-				method: 'GET',
-				uri: uri
-			}).promise()
-			let responseString = (queryRes || '') as string
-			if (responseString.startsWith(`202 ${name} OK`)) {
-				notDone = false
-				return literal<WorkResult>({
-					status: WorkStepStatus.DONE
-				})
-			}
-			if (responseString.startsWith('500') || responseString.startsWith('404')) {
-				notDone = false
-				return literal<WorkResult>({
-					status: WorkStepStatus.ERROR,
-					messages: [queryRes + '']
-				})
-			}
-			// wait a bit, then retry
-			if (responseString.startsWith(`203 ${name} IN PROGRESS`)) {
-				await new Promise(resolve => {
-					setTimeout(resolve, 1000)
-				})
-			}
-		}
-		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR,
-			messages: [queryRes + '']
-		})
-	}
+	// private async metaLoopUntilDone(name: string, uri: string) {
+	// 	// It was queued, we need to loop with a GET to see if it is done:
+	// 	let notDone = true
+	// 	let queryRes
+	// 	while (notDone) {
+	// 		queryRes = await request({
+	// 			method: 'GET',
+	// 			uri: uri
+	// 		}).promise()
+	// 		let responseString = (queryRes || '') as string
+	// 		if (responseString.startsWith(`202 ${name} OK`)) {
+	// 			notDone = false
+	// 			return literal<WorkResult>({
+	// 				status: WorkStepStatus.DONE
+	// 			})
+	// 		}
+	// 		if (responseString.startsWith('500') || responseString.startsWith('404')) {
+	// 			notDone = false
+	// 			return literal<WorkResult>({
+	// 				status: WorkStepStatus.ERROR,
+	// 				messages: [queryRes + '']
+	// 			})
+	// 		}
+	// 		// wait a bit, then retry
+	// 		if (responseString.startsWith(`203 ${name} IN PROGRESS`)) {
+	// 			await new Promise(resolve => {
+	// 				setTimeout(resolve, 1000)
+	// 			})
+	// 		}
+	// 	}
+	// 	return literal<WorkResult>({
+	// 		status: WorkStepStatus.ERROR,
+	// 		messages: [queryRes + '']
+	// 	})
+	// }
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
-		try {
-			let fileId = getID(step.file.name)
-			if (step.target.options && step.target.options.mediaPath) {
-				fileId = step.target.options.mediaPath + '/' + fileId
-			}
-			const res = await request({
-				method: 'POST',
-				uri: `http://${this.config.mediaScanner.host}:${
-					this.config.mediaScanner.port
-				}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
-			}).promise()
-			const resString = (res || '') as string
-			if (resString.startsWith('202') || resString.startsWith('203')) {
-				return this.metaLoopUntilDone(
-					'THUMBNAIL GENERATE',
-					`http://${this.config.mediaScanner.host}:${
-						this.config.mediaScanner.port
-					}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
-				)
-			} else {
-				return literal<WorkResult>({
-					status: WorkStepStatus.ERROR,
-					messages: [res + '']
-				})
-			}
-		} catch (e) {
-			return this.failStep(e)
-		}
+		this.mediaDB.get(getID(step.file.name))
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR,
+			messages: ['thumbnail generation not implemented!' + this.config.cronJobTime]
+		})
+		// try {
+		// 	let fileId = getID(step.file.name)
+		// 	if (step.target.options && step.target.options.mediaPath) {
+		// 		fileId = step.target.options.mediaPath + '/' + fileId
+		// 	}
+		// 	const res = await request({
+		// 		method: 'POST',
+		// 		uri: `http://${this.config.mediaScanner.host}:${
+		// 			this.config.mediaScanner.port
+		// 		}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
+		// 	}).promise()
+		// 	const resString = (res || '') as string
+		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
+		// 		return this.metaLoopUntilDone(
+		// 			'THUMBNAIL GENERATE',
+		// 			`http://${this.config.mediaScanner.host}:${
+		// 				this.config.mediaScanner.port
+		// 			}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
+		// 		)
+		// 	} else {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.ERROR,
+		// 			messages: [res + '']
+		// 		})
+		// 	}
+		// } catch (e) {
+		// 	return this.failStep(e)
+		// }
 	}
 
 	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {
-		try {
-			if (!this.config.mediaScanner.host) {
-				return literal<WorkResult>({
-					status: WorkStepStatus.SKIPPED,
-					messages: ['Media-scanner host not set']
-				})
-			}
-
-			let fileId = getID(step.file.name)
-			if (step.target.options && step.target.options.mediaPath) {
-				fileId = step.target.options.mediaPath + '/' + fileId
-			}
-			const res = await request({
-				method: 'POST',
-				uri: `http://${this.config.mediaScanner.host}:${
-					this.config.mediaScanner.port
-				}/preview/generateAsync/${escapeUrlComponent(fileId)}`
-			}).promise()
-			const resString = (res || '') as string
-			if (resString.startsWith('202') || resString.startsWith('203')) {
-				return this.metaLoopUntilDone(
-					'PREVIEW GENERATE',
-					`http://${this.config.mediaScanner.host}:${
-						this.config.mediaScanner.port
-					}/preview/generateAsync/${escapeUrlComponent(fileId)}`
-				)
-			} else {
-				return literal<WorkResult>({
-					status: WorkStepStatus.ERROR,
-					messages: [res + '']
-				})
-			}
-		} catch (e) {
-			return this.failStep(e)
-		}
+		this.mediaDB.get(getID(step.file.name))
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR,
+			messages: ['preview generation not implemented!']
+		})
+		// try {
+		// 	if (!this.config.mediaScanner.host) {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.SKIPPED,
+		// 			messages: ['Media-scanner host not set']
+		// 		})
+		// 	}
+		//
+		// 	let fileId = getID(step.file.name)
+		// 	if (step.target.options && step.target.options.mediaPath) {
+		// 		fileId = step.target.options.mediaPath + '/' + fileId
+		// 	}
+		// 	const res = await request({
+		// 		method: 'POST',
+		// 		uri: `http://${this.config.mediaScanner.host}:${
+		// 			this.config.mediaScanner.port
+		// 		}/preview/generateAsync/${escapeUrlComponent(fileId)}`
+		// 	}).promise()
+		// 	const resString = (res || '') as string
+		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
+		// 		return this.metaLoopUntilDone(
+		// 			'PREVIEW GENERATE',
+		// 			`http://${this.config.mediaScanner.host}:${
+		// 				this.config.mediaScanner.port
+		// 			}/preview/generateAsync/${escapeUrlComponent(fileId)}`
+		// 		)
+		// 	} else {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.ERROR,
+		// 			messages: [res + '']
+		// 		})
+		// 	}
+		// } catch (e) {
+		// 	return this.failStep(e)
+		// }
 	}
 
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		try {
-			if (!this.config.mediaScanner.host) {
-				return literal<WorkResult>({
-					status: WorkStepStatus.SKIPPED,
-					messages: ['Media-scanner host not set']
-				})
-			}
-			let fileId = getID(step.file.name)
-			if (step.target.options && step.target.options.mediaPath) {
-				fileId = step.target.options.mediaPath + '/' + fileId
-			}
-			const res = await request({
-				method: 'POST',
-				uri: `http://${this.config.mediaScanner.host}:${
-					this.config.mediaScanner.port
-				}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
-			}).promise()
-			const resString = (res || '') as string
-			if (resString.startsWith('202') || resString.startsWith('203')) {
-				return this.metaLoopUntilDone(
-					'METADATA',
-					`http://${this.config.mediaScanner.host}:${
-						this.config.mediaScanner.port
-					}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
-				)
-			} else {
-				return literal<WorkResult>({
-					status: WorkStepStatus.ERROR,
-					messages: [res + '']
-				})
-			}
-		} catch (e) {
-			return this.failStep(e)
-		}
+		this.mediaDB.get(getID(step.file.name))
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR,
+			messages: ['advanced metadata generation not implemented!']
+		})
+		// try {
+		// 	if (!this.config.mediaScanner.host) {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.SKIPPED,
+		// 			messages: ['Media-scanner host not set']
+		// 		})
+		// 	}
+		// 	let fileId = getID(step.file.name)
+		// 	if (step.target.options && step.target.options.mediaPath) {
+		// 		fileId = step.target.options.mediaPath + '/' + fileId
+		// 	}
+		// 	const res = await request({
+		// 		method: 'POST',
+		// 		uri: `http://${this.config.mediaScanner.host}:${
+		// 			this.config.mediaScanner.port
+		// 		}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
+		// 	}).promise()
+		// 	const resString = (res || '') as string
+		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
+		// 		return this.metaLoopUntilDone(
+		// 			'METADATA',
+		// 			`http://${this.config.mediaScanner.host}:${
+		// 				this.config.mediaScanner.port
+		// 			}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
+		// 		)
+		// 	} else {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.ERROR,
+		// 			messages: [res + '']
+		// 		})
+		// 	}
+		// } catch (e) {
+		// 	return this.failStep(e)
+		// }
 	}
 
 	private async doGenerateMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		try {
-			if (!this.config.mediaScanner.host) {
-				return literal<WorkResult>({
-					status: WorkStepStatus.SKIPPED,
-					messages: ['Media-scanner host not set']
-				})
-			}
-			let fileName = step.file.name.replace('\\', '/')
-			if (step.target.options && step.target.options.mediaPath) {
-				fileName = step.target.options.mediaPath + '/' + fileName
-			}
-			const res = await request({
-				method: 'POST',
-				uri: `http://${this.config.mediaScanner.host}:${
-					this.config.mediaScanner.port
-				}/media/scanAsync/${escapeUrlComponent(fileName)}`
-			}).promise()
-			const resString = (res || '') as string
-			if (resString.startsWith('202') || resString.startsWith('203')) {
-				return this.metaLoopUntilDone(
-					'MEDIA INFO',
-					`http://${this.config.mediaScanner.host}:${
-						this.config.mediaScanner.port
-					}/media/scanAsync/${escapeUrlComponent(fileName)}`
-				)
-			} else {
-				return literal<WorkResult>({
-					status: WorkStepStatus.ERROR,
-					messages: [res + '']
-				})
-			}
-		} catch (e) {
-			return this.failStep(e)
-		}
+		this.mediaDB.get(getID(step.file.name))
+		return literal<WorkResult>({
+			status: WorkStepStatus.ERROR,
+			messages: ['metadata generation not implemented!']
+		})
+		// try {
+		// 	if (!this.config.mediaScanner.host) {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.SKIPPED,
+		// 			messages: ['Media-scanner host not set']
+		// 		})
+		// 	}
+		// 	let fileName = step.file.name.replace('\\', '/')
+		// 	if (step.target.options && step.target.options.mediaPath) {
+		// 		fileName = step.target.options.mediaPath + '/' + fileName
+		// 	}
+		// 	const res = await request({
+		// 		method: 'POST',
+		// 		uri: `http://${this.config.mediaScanner.host}:${
+		// 			this.config.mediaScanner.port
+		// 		}/media/scanAsync/${escapeUrlComponent(fileName)}`
+		// 	}).promise()
+		// 	const resString = (res || '') as string
+		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
+		// 		return this.metaLoopUntilDone(
+		// 			'MEDIA INFO',
+		// 			`http://${this.config.mediaScanner.host}:${
+		// 				this.config.mediaScanner.port
+		// 			}/media/scanAsync/${escapeUrlComponent(fileName)}`
+		// 		)
+		// 	} else {
+		// 		return literal<WorkResult>({
+		// 			status: WorkStepStatus.ERROR,
+		// 			messages: [res + '']
+		// 		})
+		// 	}
+		// } catch (e) {
+		// 	return this.failStep(e)
+		// }
 	}
 
 	private async doCompositeCopy(

@@ -18,7 +18,7 @@ import {
 	updateDB,
   wait
 } from '../lib/lib'
-import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
+import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings, MediaObject } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
 import { StorageObject } from '../storageHandlers/storageHandler'
@@ -61,6 +61,7 @@ export class Dispatcher {
 	private warningTaskWorkingTime: number
 
 	constructor(
+		private mediaDB: PouchDB.Database<MediaObject>,
 		private generators: BaseWorkFlowGenerator[],
 		private availableStorage: StorageObject[],
 		private tmi: TrackedMediaItems,
@@ -82,7 +83,7 @@ export class Dispatcher {
 
 		for (let i = 0; i < workersCount; i++) {
 			this.workers.push(
-				new Worker(this.workSteps, this.tmi, this.config, this.logger, i))
+				new Worker(this.workSteps, this.mediaDB, this.tmi, this.config, this.logger, i))
 		}
 	}
 
@@ -245,6 +246,7 @@ export class Dispatcher {
 		await this.cancelLeftoverWorkSteps()
 	}
 
+	// FIXME nothing calls this
 	async destroy(): Promise<void> {
 		const { error: genError } = await noTryAsync(
 			() => Promise.all(this.generators.map(gen => gen.destroy())))
