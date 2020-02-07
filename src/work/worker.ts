@@ -5,6 +5,10 @@ import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
 import { noTryAsync } from 'no-try'
+import * as path from 'path'
+import * as os from 'os'
+import { exec } from 'child_process'
+import * as fs from 'fs-extra'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -65,7 +69,7 @@ export class Worker {
 	private async unBusyAndFailStep (p: Promise<WorkResult>) {
 		const { result, error } = await noTryAsync(() => p)
 		this.notBusyAnymore()
-		return error ? this.failStep(error.toString()) : result
+		return error ? this.failStep(error) : result
 	}
 
 	/**
@@ -147,8 +151,8 @@ export class Worker {
 	 * Return a "failed" workResult
 	 * @param reason
 	 */
-	private async failStep(reason: string): Promise<WorkResult> {
-		this.logger.error(`${this.ident} ${reason}`)
+	private async failStep(reason: string | Error, action?: WorkStepAction, cause?: Error): Promise<WorkResult> {
+		this.logger.error(`${this.ident}${action ? ' ' + action + ':' : ''} ${reason.toString()}`, cause ? cause : reason)
 		return literal<WorkResult>({
 			status: WorkStepStatus.ERROR,
 			messages: [reason.toString()]
@@ -215,39 +219,80 @@ export class Worker {
 	// }
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
-		this.mediaDB.get(getID(step.file.name))
+		let fileId = getID(step.file.name)
+		if (step.target.options && step.target.options.mediaPath) {
+			fileId = step.target.options.mediaPath + '/' + fileId
+		}
+		let { result: doc, error: getError } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError) {
+			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
+		}
+
+		const tmpPath = path.join(os.tmpdir(), `${Math.random().toString(16)}.png`)
+		const args = [ // TODO (perf) Low priority process?
+			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+			'-hide_banner',
+			'-i', `"${doc.mediaPath}"`,
+			'-frames:v 1',
+			`-vf thumbnail,scale=${this.config.thumbnails && this.config.thumbnails.width || 256}:` +
+				`${this.config.thumbnails && this.config.thumbnails.width || -1}`,
+			'-threads 1',
+			`"${tmpPath}"`
+	  ]
+
+		// Not necessary ... just checking that /tmp or Windows equivalent exists
+		// await fs.mkdirp(path.dirname(tmpPath))
+	  const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
+			exec(args.join(' '), (err, stdout, stderr) => {
+				this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
+				if (err) {
+					return reject(err)
+				}
+				resolve()
+			})
+	  }))
+		if (execError) {
+			return this.failStep(`external process to generate thumbnail for "${fileId}" failed`, step.action, execError)
+		}
+		this.logger.info(`Worker: thumbnail generate: generated thumbnail for "${fileId}" at path "${tmpPath}"`)
+
+		const { result: thumbStat, error: statError } = await noTryAsync(() => fs.stat(tmpPath))
+		if (statError) {
+			return this.failStep(`failed to stat generated thumbmail for "${fileId}"`, step.action, statError)
+		}
+
+		const { result: data, error: readError } = await noTryAsync(() => fs.readFile(tmpPath))
+		if (readError) {
+			return this.failStep(`failed to read data from thumbnail file "${tmpPath}"`, step.action, readError)
+		}
+
+		// Read document again ... might have been updated while we were busy working
+		let { result: doc2, error: getError2 } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError2) {
+			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+		}
+
+		doc2.thumbSize = thumbStat.size
+		doc2.thumbTime = thumbStat.mtime.getTime()
+		doc2._attachments = {
+			'thumb.png': {
+				content_type: 'image/png',
+				data
+			}
+		}
+		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
+		if (putError) {
+			return this.failStep(`failed to write thumbnail to database for "${fileId}"`, step.action, putError)
+		}
+		await noTryAsync(
+			() => fs.unlink(tmpPath),
+			error => this.logger.warn(`Worked: thumbnail generate: failed to delete temporary file "${tmpPath}"`, error))
+
 		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR,
-			messages: ['thumbnail generation not implemented!' + this.config.cronJobTime]
+			status: WorkStepStatus.DONE
 		})
-		// try {
-		// 	let fileId = getID(step.file.name)
-		// 	if (step.target.options && step.target.options.mediaPath) {
-		// 		fileId = step.target.options.mediaPath + '/' + fileId
-		// 	}
-		// 	const res = await request({
-		// 		method: 'POST',
-		// 		uri: `http://${this.config.mediaScanner.host}:${
-		// 			this.config.mediaScanner.port
-		// 		}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
-		// 	}).promise()
-		// 	const resString = (res || '') as string
-		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
-		// 		return this.metaLoopUntilDone(
-		// 			'THUMBNAIL GENERATE',
-		// 			`http://${this.config.mediaScanner.host}:${
-		// 				this.config.mediaScanner.port
-		// 			}/thumbnail/generateAsync/${escapeUrlComponent(fileId)}`
-		// 		)
-		// 	} else {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.ERROR,
-		// 			messages: [res + '']
-		// 		})
-		// 	}
-		// } catch (e) {
-		// 	return this.failStep(e)
-		// }
 	}
 
 	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {
