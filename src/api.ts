@@ -58,7 +58,7 @@ export interface DeviceSettings {
 		sceneThreshold: number // default 0.4
 		/** Enable freeze frame detection */
 		freezeDetection: boolean
-		freezeNoise: number // default0.001
+		freezeNoise: number // default 0.001
 		freezeDuration: string // default '2s',
 		/** Enable black frame detection. */
 		blackDetection: boolean

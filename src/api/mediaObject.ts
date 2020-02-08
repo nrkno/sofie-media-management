@@ -57,12 +57,15 @@ export enum FieldOrder {
 	BFF = 'bff'
 }
 
-export interface MediaInfo {
-	name: string
-	field_order?: FieldOrder
-	scenes?: number[]
+export interface Metadata {
+	scenes?: Array<number>
 	blacks?: Array<Anomaly>
 	freezes?: Array<Anomaly>
+}
+
+export interface MediaInfo extends Metadata {
+	name: string
+	field_order?: FieldOrder
 	streams?: MediaStream[]
 	format?: MediaFormat
 	timebase?: number

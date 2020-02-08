@@ -1,13 +1,13 @@
 import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
-import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject, FieldOrder, Anomaly, Metadata } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
 import { noTryAsync } from 'no-try'
 import * as path from 'path'
 import * as os from 'os'
-import { exec } from 'child_process'
+import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import * as fs from 'fs-extra'
 
 export interface WorkResult {
@@ -338,8 +338,174 @@ export class Worker {
 		// }
 	}
 
+	private static readonly fieldRegex = /Multi frame detection: TFF:\s+(\d+)\s+BFF:\s+(\d+)\s+Progressive:\s+(\d+)/
+
+	private async getFieldOrder (doc: MediaObject): Promise<FieldOrder> {
+	  if (this.config.metadata && !this.config.metadata.fieldOrder) {
+	  	return FieldOrder.Unknown
+	  }
+
+		const args = [ // TODO (perf) Low priority process?
+			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+			'-hide_banner',
+			'-filter:v', 'idet',
+			'-frames:v', this.config.metadata && this.config.metadata.fieldOrderScanDuration || 200,
+			'-an',
+			'-f', 'rawvideo',
+			'-y', (process.platform === 'win32' ? 'NUL' : '/dev/null'),
+			// '-threads 1', // Not needed. This is very quick even for big files.
+			'-i', `"${doc.mediaPath}"`
+		]
+
+		const { error: execError, result } = await noTryAsync(() => new Promise((resolve, reject) => {
+			exec(args.join(' '), (err, stdout, stderr) => {
+				this.logger.debug(`Worker: field order detect: output (stdout, stderr)`, stdout, stderr)
+				if (err) {
+					return reject(err)
+				}
+				resolve(stderr)
+			})
+		}))
+		if (execError) {
+			this.logger.error(`${this.ident}: external process to detect field order for "${doc.mediaPath}" failed`, execError)
+			return FieldOrder.Unknown
+		}
+		this.logger.info(`Worker: field order detect: generated field order for "${doc.mediaPath}"`)
+
+	  const res = Worker.fieldRegex.exec(result)
+		if (res === null) {
+			return FieldOrder.Unknown
+		}
+
+ 		const tff = parseInt(res[1])
+		const bff = parseInt(res[2])
+		const fieldOrder =
+			tff <= 10 && bff <= 10 ?
+				FieldOrder.Progressive :
+				(tff > bff ? FieldOrder.TFF : FieldOrder.BFF)
+
+		return fieldOrder
+	}
+
+	private static readonly sceneRegex = /Parsed_showinfo_(.*)pts_time:([\d.]+)\s+/g
+	private static readonly blackDetectRegex = /(black_start:)(\d+(.\d+)?)( black_end:)(\d+(.\d+)?)( black_duration:)(\d+(.\d+))?/g
+	private static readonly freezeDetectStart = /(lavfi\.freezedetect\.freeze_start: )(\d+(.\d+)?)/g
+	private static readonly freezeDetectDuration = /(lavfi\.freezedetect\.freeze_duration: )(\d+(.\d+)?)/g
+	private static readonly freezeDetectEnd = /(lavfi\.freezedetect\.freeze_end: )(\d+(.\d+)?)/g
+
+	private async getMetadata (doc: MediaObject): Promise<Metadata> {
+		const metaconf = this.config.metadata
+		if (!metaconf || (!metaconf.scenes && !metaconf.freezeDetection && !metaconf.blackDetection)) {
+			return {}
+		}
+
+		if (!doc.mediainfo || !doc.mediainfo.format || !doc.mediainfo.format.duration) {
+			throw new Error('Worker: get metadata: running getMetadata requires the presence of basic file data first.')
+		}
+
+		let filterString = ''
+		if (metaconf.blackDetection) {
+			filterString+= `blackdetect=d=${metaconf.blackDuration || '2.0'}:` +
+				`pic_th=${metaconf.blackRatio || 0.98}:` +
+				`pix_th=${metaconf.blackThreshold || 0.1}`
+		}
+
+		if (metaconf.freezeDetection) {
+			if (filterString) {
+				filterString += ','
+			}
+			filterString += `freezedetect=n=${metaconf.freezeNoise || 0.001}:` +
+				`d=${metaconf.freezeDuration || '2s'}`
+		}
+
+		if (metaconf.scenes) {
+			if (filterString) {
+				filterString += ','
+			}
+			filterString += `"select='gt(scene,${metaconf.sceneThreshold || 0.4})',showinfo"`
+		}
+
+		const args = [
+			'-hide_banner',
+			'-i', `"${doc.mediaPath}"`,
+			'-filter:v', filterString,
+			'-an',
+			'-f', 'null',
+			'-threads', '1',
+			'-'
+		]
+
+		let infoProcess: ChildProcessWithoutNullStreams = spawn(
+			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+			args,
+			{ shell: true }
+		)
+		let [ scenes, freezes, blacks ] =
+			[ [] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly> ]
+		// current frame is not read
+		// let currentFrame = 0
+
+		// TODO consider is progress reporting required?
+		// infoProcess.stdout.on('data', () => { lastProgressReportTimestamp = new Date() })
+		infoProcess.stderr.on('data', (data: any) => {
+			let stringData = data.toString()
+			if (typeof stringData !== 'string') return
+			let frameMatch = stringData.match(/^frame= +\d+/)
+			if (frameMatch) {
+				// currentFrame = Number(frameMatch[0].replace('frame=', ''))
+				return
+			}
+
+			let res: RegExpExecArray | null
+			while ((res = Worker.sceneRegex.exec(stringData)) !== null) {
+				scenes.push(parseFloat(res[2]))
+			}
+
+			while ((res = Worker.blackDetectRegex.exec(stringData)) !== null) {
+				blacks.push(literal<Anomaly>({
+					start: parseFloat(res[2]),
+					duration: parseFloat(res[8]),
+					end: parseFloat(res[5])
+				}))
+			}
+
+			while ((res = Worker.freezeDetectStart.exec(stringData)) !== null) {
+				freezes.push(literal<Anomaly>({
+					start: parseFloat(res[2]),
+					duration: 0.0,
+					end: 0.0
+				}))
+			}
+
+			let i = 0
+			while ((res = Worker.freezeDetectDuration.exec(stringData)) !== null) {
+				freezes[i++].duration = parseFloat(res[2])
+			}
+
+			i = 0
+			while ((res = Worker.freezeDetectEnd.exec(stringData)) !== null) {
+				freezes[i++].end = parseFloat(res[2])
+			}
+		})
+
+		return { scenes, blacks, freezes }
+	}
+
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		this.mediaDB.get(getID(step.file.name))
+		let fileId = getID(step.file.name)
+		if (step.target.options && step.target.options.mediaPath) {
+			fileId = step.target.options.mediaPath + '/' + fileId
+		}
+		let { result: doc, error: getError } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError) {
+			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
+		}
+
+		const fieldOrder: FieldOrder = await this.getFieldOrder(doc)
+		const metadata: Metadata = await this.getMetadata(doc)
+
+
 		return literal<WorkResult>({
 			status: WorkStepStatus.ERROR,
 			messages: ['advanced metadata generation not implemented!']
