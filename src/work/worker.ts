@@ -488,7 +488,28 @@ export class Worker {
 			}
 		})
 
-		return { scenes, blacks, freezes }
+		let resolver: (m: Metadata) => void
+		let rejecter: (err: Error) => void
+
+		infoProcess.on('close', (code) => {
+			if (code === 0) { // success
+				// if freeze frame is the end of video, it is not detected fully
+				if (freezes[freezes.length - 1] && !freezes[freezes.length - 1].end &&
+						doc.mediainfo && doc.mediainfo.format && typeof doc.mediainfo.format.duration === 'number') {
+					freezes[freezes.length - 1].end = doc.mediainfo.format.duration
+					freezes[freezes.length - 1].duration = doc.mediainfo.format.duration - freezes[freezes.length - 1].start
+				}
+				resolver({ scenes, freezes, blacks })
+			} else {
+				this.logger.error(`Worker: get metadata: FFmpeg failed with code ${code}`)
+				rejecter(new Error(`Worker: get metadata: FFmpeg failed with code ${code}`))
+			}
+		})
+
+		return new Promise((resolve, reject) => {
+			resolver = resolve
+			rejecter = reject
+		})
 	}
 
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {
@@ -505,7 +526,7 @@ export class Worker {
 		const fieldOrder: FieldOrder = await this.getFieldOrder(doc)
 		const metadata: Metadata = await this.getMetadata(doc)
 
-
+		// NEXT!
 		return literal<WorkResult>({
 			status: WorkStepStatus.ERROR,
 			messages: ['advanced metadata generation not implemented!']
