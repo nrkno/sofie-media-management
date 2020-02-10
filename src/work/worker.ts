@@ -1,6 +1,6 @@
 import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
-import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject, FieldOrder, Anomaly, Metadata } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject, FieldOrder, Anomaly, Metadata, MediaInfo } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
@@ -526,10 +526,59 @@ export class Worker {
 		const fieldOrder: FieldOrder = await this.getFieldOrder(doc)
 		const metadata: Metadata = await this.getMetadata(doc)
 
-		// NEXT!
+		if (this.config.metadata && this.config.metadata.mergeBlacksAndFreezes) {
+			if (
+				metadata.blacks &&
+				metadata.blacks.length &&
+				metadata.freezes &&
+				metadata.freezes.length
+			) {
+				// blacks are subsets of freezes, so we can remove the freeze frame warnings during a black
+				// in order to do this we create a linear timeline:
+				let tl = []
+				for (const black of metadata.blacks) {
+					tl.push({ time: black.start, type: 'start', isBlack: true })
+					tl.push({ time: black.end, type: 'end', isBlack: true })
+				}
+				for (const freeze of metadata.freezes) {
+					tl.push({ time: freeze.start, type: 'start', isBlack: false })
+					tl.push({ time: freeze.end, type: 'end', isBlack: false })
+				}
+				// then we sort it for time, if black & freeze start at the same time make sure black is inside the freeze
+				tl = sortBlackFreeze(tl)
+
+				// now we add freezes that aren't coinciding with blacks
+				metadata.freezes = updateFreezeStartEnd(tl)
+			}
+	  }
+
+
+		// Read document again ... might have been updated while we were busy working
+		let { result: doc2, error: getError2 } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError2) {
+			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+		}
+
+		doc2.mediainfo = Object.assign(doc2.mediainfo, {
+			name: doc2._id,
+			path: doc2.mediaPath,
+			size: doc.mediaSize,
+			time: doc.mediaTime,
+
+			field_order: fieldOrder,
+			scenes: metadata.scenes,
+			freezes: metadata.freezes,
+			blacks: metadata.blacks
+		} as MediaInfo)
+
+		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
+		if (putError) {
+			return this.failStep(`failed to write media information to database for "${fileId}"`, step.action, putError)
+		}
+
 		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR,
-			messages: ['advanced metadata generation not implemented!']
+			status: WorkStepStatus.DONE
 		})
 		// try {
 		// 	if (!this.config.mediaScanner.host) {
@@ -566,6 +615,7 @@ export class Worker {
 		// 	return this.failStep(e)
 		// }
 	}
+
 
 	private async doGenerateMetadata(step: ScannerWorkStep): Promise<WorkResult> {
 		this.mediaDB.get(getID(step.file.name))
