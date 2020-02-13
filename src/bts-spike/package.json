@@ -1,0 +1,33 @@
+{
+  "name": "bts-spike",
+  "version": "0.0.0-develop",
+  "description": "Extracting juicy bits from Quantel",
+  "main": "index.ts",
+  "author": "Richard Cartwright",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "@koa/cors": "^3.0.0",
+    "@types/koa-cors": "^0.0.0",
+    "@types/koa__cors": "^3.0.1",
+    "@types/node": "12",
+    "fs-extra": "^8.1.0",
+    "koa": "^2.11.0",
+    "koa-range": "^0.3.0",
+    "koa-router": "^8.0.7",
+    "koa-send": "^5.0.0",
+    "request": "^2.88.0",
+    "request-promise-native": "^1.0.8",
+    "xml2js": "^0.4.23"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^8.0.1",
+    "@types/koa": "^2.11.1",
+    "@types/koa-range": "^0.3.2",
+    "@types/koa-router": "^7.4.0",
+    "@types/koa-send": "^4.1.2",
+    "@types/request-promise-native": "^1.0.17",
+    "@types/xml2js": "^0.4.5",
+    "typescript": "^3.7.5"
+  }
+}
