@@ -664,45 +664,120 @@ export class Worker {
 
 
 	private async doGenerateMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		this.mediaDB.get(getID(step.file.name))
-		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR,
-			messages: ['metadata generation not implemented!']
+		let fileId = getID(step.file.name.replace('\\', '/'))
+		if (step.target.options && step.target.options.mediaPath) {
+			fileId = step.target.options.mediaPath + '/' + fileId
+		}
+		let { result: doc, error: getError } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError) {
+			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
+		}
+
+		const args = [ 			// TODO (perf) Low priority process?
+			this.config.paths && this.config.paths.ffprobe || process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe',
+			'-hide_banner',
+			'-i', `"${doc.mediaPath}"`,
+			'-show_streams',
+			'-show_format',
+			'-print_format', 'json'
+		]
+
+		const { result: probeData, error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
+			exec(args.join(' '), (err, stdout, stderr) => {
+				this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
+				if (err) {
+					return reject(err)
+				}
+				const json: any = JSON.parse(stdout)
+				if (!json.streams || !json.streams[0]) {
+					return reject(new Error('not media'))
+				}
+				resolve(json)
+			})
+		}))
+		if (execError) {
+			return this.failStep(`external process to generate metadata for "${fileId}" failed`, step.action, execError)
+		}
+		this.logger.info(`Worker: metadata generate: generated metadata for "${fileId}"`)
+		this.logger.debug(`Worker: metadata generate: generated metadata details`, probeData)
+
+		let newInfo = literal<MediaInfo>({
+			name: doc._id,
+			//path: doc.mediaPath,
+			//size: doc.mediaSize,
+			//time: doc.mediaTime,
+			// type,
+			// field_order: FieldOrder.Unknown,
+			// scenes: [],
+			// freezes: [],
+			// blacks: [],
+
+			streams: probeData.streams.map((s: any) => ({
+				codec: {
+					long_name: s.codec_long_name,
+					type: s.codec_type,
+					time_base: s.codec_time_base,
+					tag_string: s.codec_tag_string,
+					is_avc: s.is_avc
+				},
+
+				// Video
+				width: s.width,
+				height: s.height,
+				sample_aspect_ratio: s.sample_aspect_ratio,
+				display_aspect_ratio: s.display_aspect_ratio,
+				pix_fmt: s.pix_fmt,
+				bits_per_raw_sample: s.bits_per_raw_sample,
+
+				// Audio
+				sample_fmt: s.sample_fmt,
+				sample_rate: s.sample_rate,
+				channels: s.channels,
+				channel_layout: s.channel_layout,
+				bits_per_sample: s.bits_per_sample,
+
+				// Common
+				time_base: s.time_base,
+				start_time: s.start_time,
+				duration_ts: s.duration_ts,
+				duration: s.duration,
+
+				bit_rate: s.bit_rate,
+				max_bit_rate: s.max_bit_rate,
+				nb_frames: s.nb_frames
+			})),
+			format: {
+				name: probeData.format.format_name,
+				long_name: probeData.format.format_long_name,
+				// size: probeData.format.time, carried at a higher level
+
+				start_time: probeData.format.start_time,
+				duration: probeData.format.duration,
+				bit_rate: probeData.format.bit_rate,
+				max_bit_rate: probeData.format.max_bit_rate
+			}
 		})
-		// try {
-		// 	if (!this.config.mediaScanner.host) {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.SKIPPED,
-		// 			messages: ['Media-scanner host not set']
-		// 		})
-		// 	}
-		// 	let fileName = step.file.name.replace('\\', '/')
-		// 	if (step.target.options && step.target.options.mediaPath) {
-		// 		fileName = step.target.options.mediaPath + '/' + fileName
-		// 	}
-		// 	const res = await request({
-		// 		method: 'POST',
-		// 		uri: `http://${this.config.mediaScanner.host}:${
-		// 			this.config.mediaScanner.port
-		// 		}/media/scanAsync/${escapeUrlComponent(fileName)}`
-		// 	}).promise()
-		// 	const resString = (res || '') as string
-		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
-		// 		return this.metaLoopUntilDone(
-		// 			'MEDIA INFO',
-		// 			`http://${this.config.mediaScanner.host}:${
-		// 				this.config.mediaScanner.port
-		// 			}/media/scanAsync/${escapeUrlComponent(fileName)}`
-		// 		)
-		// 	} else {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.ERROR,
-		// 			messages: [res + '']
-		// 		})
-		// 	}
-		// } catch (e) {
-		// 	return this.failStep(e)
-		// }
+
+		// TODO not generating CINF - assuming not required
+
+		// Read document again ... might have been updated while we were busy working
+		let { result: doc2, error: getError2 } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError2) {
+			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+		}
+
+		doc2.mediainfo = Object.assign(doc2.mediainfo, newInfo)
+
+		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
+		if (putError) {
+			return this.failStep(`failed to write metadata to database for "${fileId}"`, step.action, putError)
+		}
+
+		return literal<WorkResult>({
+			status: WorkStepStatus.DONE
+		})
 	}
 
 	private async doCompositeCopy(
@@ -733,49 +808,52 @@ export class Worker {
 		}
 	}
 
-	private doCopy(
+	private async doCopy(
 		step: FileWorkStep,
 		reportProgress?: (progress: number) => void,
 		onCancel?: CancelHandler
 	): Promise<WorkResult> {
-		return new Promise(resolve => {
+		const { error: putFileError } = await noTryAsync(() => {
 			const p = step.target.handler.putFile(step.file, reportProgress)
-			p.then(() => {
-				this.logger.debug(`${this.ident} starting updating TMI on "${step.file.name}"`)
-				this.trackedMediaItems
-					.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
-						// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
-						if (tmi) {
-							if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
-								tmi.targetStorageIds.push(step.target.id)
-							}
-							return tmi
-						}
-						return undefined
-					})
-					.then(() => {
-						this.logger.debug(`${this.ident} finish updating TMI on "${step.file.name}"`)
-						resolve(
-							literal<WorkResult>({
-								status: WorkStepStatus.DONE
-							})
-						)
-					})
-					.catch(e => {
-						this.logger.debug(`${this.ident} failure updating TMI`, e)
-						resolve(this.failStep(e))
-					})
-			}).catch(e1 => {
-				resolve(this.failStep(e1))
-			})
-
 			if (onCancel) {
 				onCancel(() => {
 					p.cancel()
 					this.logger.warn(`${this.ident}: canceled copy operation on "${step.file.name}"`)
 				})
 			}
+			return p
 		})
+		if (putFileError) {
+			return this.failStep(`error copying file "${step.file.name}"`, step.action, putFileError)
+		}
+
+		this.logger.debug(`${this.ident} starting updating TMI on "${step.file.name}"`)
+		const { error: upsertError } = await noTryAsync(
+			() => this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
+				// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
+				if (tmi) {
+					if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
+						tmi.targetStorageIds.push(step.target.id)
+					}
+					return tmi
+				}
+				return undefined
+			})
+		)
+		if (upsertError) {
+			return this.failStep(`failure updating TMI for "${step.file.name}"`, step.action, upsertError)
+		}
+		this.logger.debug(`${this.ident} finish updating TMI on "${step.file.name}"`)
+
+		return literal<WorkResult>({
+			status: WorkStepStatus.DONE
+		})
+	}
+
+		}).catch(e1 => {
+			resolve(this.failStep(e1))
+		})
+
 	}
 
 	private async doDelete(step: FileWorkStep): Promise<WorkResult> {

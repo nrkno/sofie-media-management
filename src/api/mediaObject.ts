@@ -48,6 +48,7 @@ export interface MediaFormat {
 	start_time?: string
 	duration?: number
 	bit_rate?: number
+	max_bit_rate?: number
 }
 
 export enum FieldOrder {
