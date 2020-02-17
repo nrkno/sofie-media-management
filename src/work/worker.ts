@@ -850,49 +850,39 @@ export class Worker {
 		})
 	}
 
-		}).catch(e1 => {
-			resolve(this.failStep(e1))
-		})
-
-	}
-
 	private async doDelete(step: FileWorkStep): Promise<WorkResult> {
-		try {
-			await step.target.handler.deleteFile(step.file)
-			try {
-				try {
-					await this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
-						// if (!tmi) throw new Error(`Delete: Item not tracked: ${step.file.name}`)
-						if (tmi) {
-							const idx = tmi.targetStorageIds.indexOf(step.target.id)
-							if (idx >= 0) {
-								tmi.targetStorageIds.splice(idx, 1)
-							} else {
-								this.logger.warn(
-									`${this.ident}: asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`
-								)
-							}
-						}
-						return tmi
-					})
-				} catch (e) {
-					if (e.status === 404) {
-						this.logger.info(`${this.ident}: file "${step.file.name}" to be deleted was already removed from tracking database`)
-						return literal<WorkResult>({
-							status: WorkStepStatus.DONE
-						})
+		const { error: deleteError } = await noTryAsync(() => step.target.handler.deleteFile(step.file))
+		if (deleteError) {
+			return this.failStep(`failed to delete "${step.file.name}"`, step.action, deleteError)
+		}
+
+		const { error: upsertError } = await noTryAsync(
+			() => this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
+				// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
+				if (tmi) {
+					const idx = tmi.targetStorageIds.indexOf(step.target.id)
+					if (idx >= 0) {
+						tmi.targetStorageIds.splice(idx, 1)
 					} else {
-						throw e
+						this.logger.warn(
+							`${this.ident}: asked to delete file from storage "${step.target.id}", yet file was not tracked at this location.`
+						)
 					}
 				}
-				return literal<WorkResult>({
-					status: WorkStepStatus.DONE
-				})
-			} catch (e1) {
-				return this.failStep(e1)
+				return tmi
+			})
+		)
+		if (upsertError) {
+			if ((upsertError as any).status && (upsertError as any).status === 404) {
+				this.logger.info(`${this.ident}: file "${step.file.name}" to be deleted was already removed from tracking database`)
+			} else {
+				return this.failStep(`failure updating TMI for copy of "${step.file.name}"`, step.action, upsertError)
 			}
-		} catch (e2) {
-			return this.failStep(e2)
 		}
+		this.logger.debug(`${this.ident} finish updating TMI after delete of "${step.file.name}"`)
+
+		return literal<WorkResult>({
+			status: WorkStepStatus.DONE
+		})
 	}
 }

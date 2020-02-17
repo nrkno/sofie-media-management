@@ -26,11 +26,10 @@ export interface DeviceSettings {
 	/** When to warn that a worker is working too long */
 	warningTaskWorkingTime?: number
 
-	/** Connection details for the media scanner */
-	// mediaScanner: {
-	// 	host?: string
-	// 	port: number
-	// }
+	/** Connection details for the media access */
+	httpPort?: number
+	httpsPort?: number
+
 	/** A list of Monitors, which will monitor media statuses */
 	monitors?: {
 		[monitorId: string]: MonitorSettings
