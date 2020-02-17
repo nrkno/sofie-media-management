@@ -106,7 +106,7 @@ export interface MediaObject extends PouchDB.Core.IdMeta, PouchDB.Core.GetMeta {
 	previewSize?: number
 	/** Thumbnail last updated timestamp */
 	previewTime?: number
-	/** Preview location */
+	/** Preview location. Has to be truthy for hoverscrub and thumbnails to work. */
 	previewPath?: string
 
 	cinf: string // useless to us

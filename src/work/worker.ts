@@ -15,6 +15,13 @@ export interface WorkResult {
 	messages?: string[]
 }
 
+/** Used for sorting black frames and freezes. */
+interface SortMeta {
+	time: number
+	type: 'start' | 'end'
+	isBlack: boolean
+}
+
 /**
  * A worker is given a work-step, and will perform actions, using that step
  * The workers are kept by the dispatcher and given work from it
@@ -239,11 +246,11 @@ export class Worker {
 				`${this.config.thumbnails && this.config.thumbnails.width || -1}`,
 			'-threads 1',
 			`"${tmpPath}"`
-	  ]
+		]
 
 		// Not necessary ... just checking that /tmp or Windows equivalent exists
 		// await fs.mkdirp(path.dirname(tmpPath))
-	  const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
+		const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
 				this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
 				if (err) {
@@ -251,7 +258,7 @@ export class Worker {
 				}
 				resolve()
 			})
-	  }))
+		}))
 		if (execError) {
 			return this.failStep(`external process to generate thumbnail for "${fileId}" failed`, step.action, execError)
 		}
@@ -341,9 +348,9 @@ export class Worker {
 	private static readonly fieldRegex = /Multi frame detection: TFF:\s+(\d+)\s+BFF:\s+(\d+)\s+Progressive:\s+(\d+)/
 
 	private async getFieldOrder (doc: MediaObject): Promise<FieldOrder> {
-	  if (this.config.metadata && !this.config.metadata.fieldOrder) {
-	  	return FieldOrder.Unknown
-	  }
+		if (this.config.metadata && !this.config.metadata.fieldOrder) {
+			return FieldOrder.Unknown
+		}
 
 		const args = [ // TODO (perf) Low priority process?
 			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
@@ -372,12 +379,12 @@ export class Worker {
 		}
 		this.logger.info(`Worker: field order detect: generated field order for "${doc.mediaPath}"`)
 
-	  const res = Worker.fieldRegex.exec(result)
+		const res = Worker.fieldRegex.exec(result)
 		if (res === null) {
 			return FieldOrder.Unknown
 		}
 
- 		const tff = parseInt(res[1])
+		const tff = parseInt(res[1])
 		const bff = parseInt(res[2])
 		const fieldOrder =
 			tff <= 10 && bff <= 10 ?
@@ -512,6 +519,80 @@ export class Worker {
 		})
 	}
 
+	private static sortBlackFreeze (tl: Array<SortMeta>): Array<SortMeta> {
+		return tl.sort((a, b) => {
+			if (a.time > b.time) {
+				return 1
+			} else if (a.time === b.time) {
+				if ((a.isBlack && b.isBlack) || !(a.isBlack || b.isBlack)) {
+					return 0
+				} else {
+					if (a.isBlack && a.type === 'start') {
+						return 1
+					} else if (a.isBlack && a.type === 'end') {
+						return -1
+					} else {
+						return 0
+					}
+				}
+			} else {
+				return -1
+			}
+		})
+	}
+
+	private static updateFreezeStartEnd (tl: Array<SortMeta>): Array<Anomaly> {
+		let freeze: Anomaly | undefined
+		let interruptedFreeze = false
+		let freezes: Array<Anomaly> = []
+		const startFreeze = (t: number): void => {
+			freeze = { start: t, duration: -1, end: -1 }
+		}
+		const endFreeze = (t: number): void => {
+			if (freeze && t === freeze.start) {
+				freeze = undefined
+				return
+			}
+			if (!freeze) return
+			freeze.end = t
+			freeze.duration = t - freeze.start
+			freezes.push(freeze)
+			freeze = undefined
+		}
+
+		for (const ev of tl) {
+			if (ev.type === 'start') {
+				if (ev.isBlack) {
+					if (freeze) {
+						interruptedFreeze = true
+						endFreeze(ev.time)
+					}
+				} else {
+					startFreeze(ev.time)
+				}
+			} else {
+				if (ev.isBlack) {
+					if (interruptedFreeze) {
+						startFreeze(ev.time)
+						interruptedFreeze = false
+					}
+				} else {
+					if (freeze) {
+						endFreeze(ev.time)
+					} else {
+						const freeze = freezes[freezes.length - 1]
+						if (freeze) {
+							freeze.end = ev.time
+							freeze.duration = ev.time - freeze.start
+							interruptedFreeze = false
+						}
+					}
+				}
+			}
+		}
+		return freezes
+	}
+
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
 		if (step.target.options && step.target.options.mediaPath) {
@@ -535,7 +616,7 @@ export class Worker {
 			) {
 				// blacks are subsets of freezes, so we can remove the freeze frame warnings during a black
 				// in order to do this we create a linear timeline:
-				let tl = []
+				let tl: Array<SortMeta> = []
 				for (const black of metadata.blacks) {
 					tl.push({ time: black.start, type: 'start', isBlack: true })
 					tl.push({ time: black.end, type: 'end', isBlack: true })
@@ -545,13 +626,12 @@ export class Worker {
 					tl.push({ time: freeze.end, type: 'end', isBlack: false })
 				}
 				// then we sort it for time, if black & freeze start at the same time make sure black is inside the freeze
-				tl = sortBlackFreeze(tl)
+				tl = Worker.sortBlackFreeze(tl)
 
 				// now we add freezes that aren't coinciding with blacks
-				metadata.freezes = updateFreezeStartEnd(tl)
+				metadata.freezes = Worker.updateFreezeStartEnd(tl)
 			}
-	  }
-
+		}
 
 		// Read document again ... might have been updated while we were busy working
 		let { result: doc2, error: getError2 } =
@@ -560,17 +640,17 @@ export class Worker {
 			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
 		}
 
-		doc2.mediainfo = Object.assign(doc2.mediainfo, {
+		doc2.mediainfo = Object.assign(doc2.mediainfo, literal<MediaInfo>({
 			name: doc2._id,
-			path: doc2.mediaPath,
-			size: doc.mediaSize,
-			time: doc.mediaTime,
+			// path: doc2.mediaPath, Error found with typings. These fields do not exist on MediaInfo
+			// size: doc.mediaSize,
+			// time: doc.mediaTime,
 
 			field_order: fieldOrder,
 			scenes: metadata.scenes,
 			freezes: metadata.freezes,
 			blacks: metadata.blacks
-		} as MediaInfo)
+		}))
 
 		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
 		if (putError) {
@@ -580,40 +660,6 @@ export class Worker {
 		return literal<WorkResult>({
 			status: WorkStepStatus.DONE
 		})
-		// try {
-		// 	if (!this.config.mediaScanner.host) {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.SKIPPED,
-		// 			messages: ['Media-scanner host not set']
-		// 		})
-		// 	}
-		// 	let fileId = getID(step.file.name)
-		// 	if (step.target.options && step.target.options.mediaPath) {
-		// 		fileId = step.target.options.mediaPath + '/' + fileId
-		// 	}
-		// 	const res = await request({
-		// 		method: 'POST',
-		// 		uri: `http://${this.config.mediaScanner.host}:${
-		// 			this.config.mediaScanner.port
-		// 		}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
-		// 	}).promise()
-		// 	const resString = (res || '') as string
-		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
-		// 		return this.metaLoopUntilDone(
-		// 			'METADATA',
-		// 			`http://${this.config.mediaScanner.host}:${
-		// 				this.config.mediaScanner.port
-		// 			}/metadata/generateAsync/${escapeUrlComponent(fileId)}`
-		// 		)
-		// 	} else {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.ERROR,
-		// 			messages: [res + '']
-		// 		})
-		// 	}
-		// } catch (e) {
-		// 	return this.failStep(e)
-		// }
 	}
 
 
