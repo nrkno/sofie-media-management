@@ -17,7 +17,9 @@ export class MediaManagerApp {
 		this.app.use(cors({
 		  'origin': '*'
 		}))
+	}
 
+	async init() {
 		this.router.get('/', async (ctx, next) => {
 		  ctx.body = { msg: 'Hello World', params: ctx.params }
 		  await next()
@@ -54,11 +56,14 @@ export class MediaManagerApp {
 
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
 
-		if (this.config.httpPort) {
-			this.app.listen(this.config.httpPort, () => {
-				this.logger.info(`MediaMangerApp: Koa started on HTTP port ${this.config.httpPort}`)
-			})
-		}
+		return new Promise((resolve) => {
+			if (this.config.httpPort) {
+				this.app.listen(this.config.httpPort, () => {
+					this.logger.info(`MediaMangerApp: Koa started on HTTP port ${this.config.httpPort}`)
+					resolve()
+				})
+			}
+		})
 		// TODO HTTPS
 	}
 }

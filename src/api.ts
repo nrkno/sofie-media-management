@@ -38,6 +38,7 @@ export interface DeviceSettings {
 	paths?: {
 		ffmpeg: string //process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
 		ffprobe: string // process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
+		resources: string
 	}
 
 	/** Configuration of thumbnail size. */
@@ -45,6 +46,7 @@ export interface DeviceSettings {
 		width: number
 		/** Set height to `-1` for proportional scaling */
 		height: number
+		folder?: string // Not in use yet - default 'thumbnails'
 	},
 
 	/** Configuration for various kinds of advanced metadata generation. */
@@ -74,6 +76,7 @@ export interface DeviceSettings {
 		width: number // default 160
 		height: number // default -1 for scale in proportion
 		bitrate: string // default '40k'
+		folder?: string // default 'previews'
 	},
 
 }

@@ -14,6 +14,7 @@ import { ExpectedItemsGenerator } from './workflowGenerators/expectedItemsGenera
 import { Process } from './process'
 import { MonitorManager } from './monitors/manager'
 import * as PouchDB from 'pouchdb-node'
+import { MediaManagerApp } from './app'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -48,6 +49,7 @@ export class MediaManager {
 
 	private mediaDB: PouchDB.Database<MediaObject>
 	private _monitorManager: MonitorManager
+	private _app: MediaManagerApp
 
 	constructor(logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -86,6 +88,10 @@ export class MediaManager {
 			await this.initMediaManager(peripheralDevice.settings || {})
 			this._logger.info('MediaManager initialized')
 
+			this._logger.info('Initialising HTTP/S server(s)...')
+			await this.initServer(peripheralDevice.settings || {})
+			this._logger.info('HTTP/S servers initialized')
+
 			this._logger.info('Initialization done')
 			return
 		} catch (e) {
@@ -118,6 +124,10 @@ export class MediaManager {
 	async initCore() {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
 		return this.coreHandler.init(this._config.core, this._process)
+	}
+	async initServer(settings: DeviceSettings) {
+		this._app = new MediaManagerApp(settings, this._logger)
+		return this._app.init()
 	}
 
 	async initMediaManager(settings: DeviceSettings): Promise<void> {

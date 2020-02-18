@@ -303,46 +303,96 @@ export class Worker {
 	}
 
 	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {
-		this.mediaDB.get(getID(step.file.name))
-		return literal<WorkResult>({
-			status: WorkStepStatus.ERROR,
-			messages: ['preview generation not implemented!']
+		let fileId = getID(step.file.name)
+		if (step.target.options && step.target.options.mediaPath) {
+			fileId = step.target.options.mediaPath + '/' + fileId
+		}
+		let { result: doc, error: getError } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError) {
+			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
+		}
+		const destPath = path.join(
+			this.config.paths && this.config.paths.resources || '',
+			this.config.previews && this.config.previews.folder || 'previews',
+			`${doc.mediaId}.webm`
+		)
+		const tmpPath = destPath + '.new'
+
+		const args = [
+			'-hide_banner',
+			'-y',
+			'-threads 1',
+			'-i', `"${doc.mediaPath}"`,
+			'-f', 'webm',
+			'-an',
+			'-c:v', 'libvpx',
+			'-b:v', this.config.previews && this.config.previews.bitrate || '40k',
+			'-auto-alt-ref', '0',
+			`-vf scale=${this.config.previews && this.config.previews.width || 190}:`+
+				`${this.config.previews && this.config.previews.height || -1}`,
+			'-deadline realtime',
+			`"${tmpPath}"`
+		]
+
+		await fs.mkdirp(path.dirname(tmpPath))
+		this.logger.info(`Worker: preview generate: starting preview generation for "${fileId}" at path "${tmpPath}"`)
+
+		let resolver: (v?: any) => void
+		let rejector: (reason?: any) => void
+		let generating = () => new Promise((resolve, reject) => {
+			resolver = resolve
+			rejector = reject
+			let process = spawn('ffmpeg', args, { shell: true })
+			process.stdout.on('data', (data) => {
+				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data)
+			})
+			process.stdout.on('data', (data) => {
+				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data)
+			})
+			process.on('close', (code) => {
+				if (code === 0) {
+					resolver()
+				} else {
+					rejector(new Error(`Worker: preview generate: ffmpeg process with pid "${process.pid}" exited with code "${code}"`))
+				}
+			})
 		})
-		// try {
-		// 	if (!this.config.mediaScanner.host) {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.SKIPPED,
-		// 			messages: ['Media-scanner host not set']
-		// 		})
-		// 	}
-		//
-		// 	let fileId = getID(step.file.name)
-		// 	if (step.target.options && step.target.options.mediaPath) {
-		// 		fileId = step.target.options.mediaPath + '/' + fileId
-		// 	}
-		// 	const res = await request({
-		// 		method: 'POST',
-		// 		uri: `http://${this.config.mediaScanner.host}:${
-		// 			this.config.mediaScanner.port
-		// 		}/preview/generateAsync/${escapeUrlComponent(fileId)}`
-		// 	}).promise()
-		// 	const resString = (res || '') as string
-		// 	if (resString.startsWith('202') || resString.startsWith('203')) {
-		// 		return this.metaLoopUntilDone(
-		// 			'PREVIEW GENERATE',
-		// 			`http://${this.config.mediaScanner.host}:${
-		// 				this.config.mediaScanner.port
-		// 			}/preview/generateAsync/${escapeUrlComponent(fileId)}`
-		// 		)
-		// 	} else {
-		// 		return literal<WorkResult>({
-		// 			status: WorkStepStatus.ERROR,
-		// 			messages: [res + '']
-		// 		})
-		// 	}
-		// } catch (e) {
-		// 	return this.failStep(e)
-		// }
+		const { error: generateError } = await noTryAsync(generating)
+		if (generateError) {
+			return this.failStep(`error while generating preview for "${fileId}"`, step.action, generateError)
+		}
+		this.logger.info(`Worker: preview generate: generated preview for "${fileId}" at path "${tmpPath}"`)
+
+		const { result: previewStat, error: statError } = await noTryAsync(() => fs.stat(tmpPath))
+		if (statError) {
+			return this.failStep(`failed to read file stats for "${fileId}" at path "${tmpPath}"`, step.action, statError)
+		}
+
+		const { error: renameError } = await noTryAsync(() => fs.rename(tmpPath, destPath))
+		if (renameError) {
+			return this.failStep(`failed to remname tmp file from "${tmpPath}" to "${destPath}"`, step.action, renameError)
+		}
+
+		// Read document again ... might have been updated while we were busy working
+		let { result: doc2, error: getError2 } =
+			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (getError2) {
+			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+		}
+
+		doc2.previewSize = previewStat.size
+		doc2.previewTime = doc.mediaTime
+		doc2.previewPath = destPath
+
+		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
+		if (putError) {
+			return this.failStep(`failed to write preview details to database for "${fileId}"`, step.action, putError)
+		}
+
+		return literal<WorkResult>({
+			status: WorkStepStatus.DONE
+		})
 	}
 
 	private static readonly fieldRegex = /Multi frame detection: TFF:\s+(\d+)\s+BFF:\s+(\d+)\s+Progressive:\s+(\d+)/
