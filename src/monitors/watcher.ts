@@ -204,22 +204,22 @@ export class Watcher extends EventEmitter {
 		while (true) {
 			const deleted: Array<PouchDB.Core.PutDocument<MediaObject>> = []
 
-			const { rows } = await this.db.allDocs({
+			const result: PouchDB.Core.AllDocsResponse<MediaObject> = await this.db.allDocs({
 				include_docs: true,
 				startkey,
 				limit
 			})
-			await Promise.all(rows.map(async ({ doc }) => {
+			await Promise.all(result.rows.map(async ({ doc }) => {
 				const { error } = await noTryAsync(async () => {
 					const mediaFolder = path.normalize(Array.isArray(this.settings.paths) ? this.settings.paths[0] : this.settings.paths)
-					const mediaPath = path.normalize(doc.mediaPath)
-					if (mediaPath.indexOf(mediaFolder) === 0 && await fileExists(doc.mediaPath)) {
+					const mediaPath = path.normalize(doc!.mediaPath)
+					if (mediaPath.indexOf(mediaFolder) === 0 && await fileExists(doc!.mediaPath)) {
 						return
 					}
 
 					deleted.push(literal<PouchDB.Core.PutDocument<MediaObject>>({
-						_id: doc._id,
-						_rev: doc._rev,
+						_id: doc!._id,
+						_rev: doc!._rev,
 						_deleted: true
 					} as MediaObject & PouchDB.Core.ChangesMeta))
 				})
@@ -230,10 +230,10 @@ export class Watcher extends EventEmitter {
 
 			await this.db.bulkDocs(deleted)
 
-			if (rows.length < limit) {
+			if (result.rows.length < limit) {
 				break
 			}
-			startkey = rows[rows.length - 1].doc._id
+			startkey = result.rows[result.rows.length - 1].doc!._id
 		}
 
 		this.logger.info(`Media scanning: finished check for dead media`)

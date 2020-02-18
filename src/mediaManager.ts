@@ -15,6 +15,7 @@ import { Process } from './process'
 import { MonitorManager } from './monitors/manager'
 import * as PouchDB from 'pouchdb-node'
 import { MediaManagerApp } from './app'
+import { PreviewVacuum } from './monitors/previewVacuum'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -26,16 +27,19 @@ export interface Config {
 	device: DeviceConfig
 	core: CoreConfig
 }
+
 export interface ProcessConfig {
 	/** Will cause the Node applocation to blindly accept all certificates. Not recommenced unless in local, controlled networks. */
 	unsafeSSL: boolean
 	/** Paths to certificates to load, for SSL-connections */
 	certificates: string[]
 }
+
 export interface DeviceConfig {
 	deviceId: string
 	deviceToken: string
 }
+
 export class MediaManager {
 	private coreHandler: CoreHandler
 	private _config: Config
@@ -50,6 +54,7 @@ export class MediaManager {
 	private mediaDB: PouchDB.Database<MediaObject>
 	private _monitorManager: MonitorManager
 	private _app: MediaManagerApp
+	private vac: PreviewVacuum
 
 	constructor(logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -88,9 +93,12 @@ export class MediaManager {
 			await this.initMediaManager(peripheralDevice.settings || {})
 			this._logger.info('MediaManager initialized')
 
-			this._logger.info('Initialising HTTP/S server(s)...')
+			this._logger.info('Initializing HTTP/S server(s)...')
 			await this.initServer(peripheralDevice.settings || {})
 			this._logger.info('HTTP/S servers initialized')
+
+			this.vac = new PreviewVacuum(this.mediaDB, peripheralDevice.settings || {}, this._logger)
+			this._logger.info('Preview vacuum initialized')
 
 			this._logger.info('Initialization done')
 			return
@@ -117,14 +125,17 @@ export class MediaManager {
 			return
 		}
 	}
+
 	initProcess() {
 		this._process = new Process(this._logger)
 		this._process.init(this._config.process)
 	}
+
 	async initCore() {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
 		return this.coreHandler.init(this._config.core, this._process)
 	}
+
 	async initServer(settings: DeviceSettings) {
 		this._app = new MediaManagerApp(settings, this._logger)
 		return this._app.init()

@@ -15,7 +15,7 @@ export interface WorkResult {
 	messages?: string[]
 }
 
-/** Used for sorting black frames and freezes. */
+/** Used for sorting black frames and freeze frames. */
 interface SortMeta {
 	time: number
 	type: 'start' | 'end'
@@ -189,42 +189,6 @@ export class Worker {
 			error => this.logger.error(`Worker: error updating progress in database`, error))
 	}
 
-	// private async metaLoopUntilDone(name: string, uri: string) {
-	// 	// It was queued, we need to loop with a GET to see if it is done:
-	// 	let notDone = true
-	// 	let queryRes
-	// 	while (notDone) {
-	// 		queryRes = await request({
-	// 			method: 'GET',
-	// 			uri: uri
-	// 		}).promise()
-	// 		let responseString = (queryRes || '') as string
-	// 		if (responseString.startsWith(`202 ${name} OK`)) {
-	// 			notDone = false
-	// 			return literal<WorkResult>({
-	// 				status: WorkStepStatus.DONE
-	// 			})
-	// 		}
-	// 		if (responseString.startsWith('500') || responseString.startsWith('404')) {
-	// 			notDone = false
-	// 			return literal<WorkResult>({
-	// 				status: WorkStepStatus.ERROR,
-	// 				messages: [queryRes + '']
-	// 			})
-	// 		}
-	// 		// wait a bit, then retry
-	// 		if (responseString.startsWith(`203 ${name} IN PROGRESS`)) {
-	// 			await new Promise(resolve => {
-	// 				setTimeout(resolve, 1000)
-	// 			})
-	// 		}
-	// 	}
-	// 	return literal<WorkResult>({
-	// 		status: WorkStepStatus.ERROR,
-	// 		messages: [queryRes + '']
-	// 	})
-	// }
-
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
 		if (step.target.options && step.target.options.mediaPath) {
@@ -318,6 +282,13 @@ export class Worker {
 			`${doc.mediaId}.webm`
 		)
 		const tmpPath = destPath + '.new'
+
+		if (doc.previewTime === doc.mediaTime && await fs.pathExists(destPath)) {
+			this.logger.debug(`Worker: generate preview: not regenerating preview at "${destPath}" as, by timestamp, it already exists`)
+			return literal<WorkResult>({
+				status: WorkStepStatus.DONE
+			})
+		}
 
 		const args = [
 			'-hide_banner',
