@@ -77,7 +77,7 @@
     "@types/pouchdb-node": "^6.1.2",
     "@types/request-promise-native": "^1.0.15",
     "@types/underscore": "^1.8.8",
-    "codecov": "^3.0.2",
+    "codecov": "^3.6.5",
     "find": "^0.3.0",
     "jest": "^24.9.0",
     "nexe": "^3.3.2",
