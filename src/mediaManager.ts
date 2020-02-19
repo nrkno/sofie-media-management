@@ -103,9 +103,7 @@ export class MediaManager {
 			this._logger.info('Initialization done')
 			return
 		} catch (e) {
-			this._logger.error('Error during initialization:')
-			this._logger.error(e)
-			this._logger.error(e.stack)
+			this._logger.error('Error during initialization:', e)
 			try {
 				if (this.coreHandler) {
 					this.coreHandler.destroy().catch(this._logger.error)
@@ -118,6 +116,7 @@ export class MediaManager {
 			} catch (e2) {
 				this._logger.error(e2)
 			}
+			this.vac.stop()
 			this._logger.info('Shutting down in 10 seconds!')
 			setTimeout(() => {
 				process.exit(0)
