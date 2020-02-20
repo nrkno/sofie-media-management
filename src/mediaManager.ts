@@ -54,7 +54,7 @@ export class MediaManager {
 	private mediaDB: PouchDB.Database<MediaObject>
 	private _monitorManager: MonitorManager
 	private _app: MediaManagerApp
-	private vac: PreviewVacuum
+	private vac: PreviewVacuum | null = null
 
 	constructor(logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -116,7 +116,7 @@ export class MediaManager {
 			} catch (e2) {
 				this._logger.error(e2)
 			}
-			this.vac.stop()
+			if (this.vac) { this.vac.stop() }
 			this._logger.info('Shutting down in 10 seconds!')
 			setTimeout(() => {
 				process.exit(0)

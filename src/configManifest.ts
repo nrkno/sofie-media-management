@@ -200,15 +200,129 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			name: 'Cron-Job Interval Time',
 			type: ConfigManifestEntryType.INT
 		},
+		// {
+		// 	id: 'mediaScanner.host',
+		// 	name: 'Media Scanner Host',
+		// 	type: ConfigManifestEntryType.STRING
+		// },
+		// {
+		// 	id: 'mediaScanner.port',
+		// 	name: 'Media Scanner Port',
+		// 	type: ConfigManifestEntryType.INT
+		// },
 		{
-			id: 'mediaScanner.host',
-			name: 'Media Scanner Host',
+			id: 'httpPort',
+			name: 'HTTP port for thumbnails and previews',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'httpsPort',
+			name: 'HTTPS port for thumbnails and previews',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'thumbnails.width',
+			name: 'Thumbnail width',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'thumbnails.height',
+			name: 'Thumbnail height, -1 preserves aspect',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'thumbnails.folder',
+			name: 'Thumbnail sub-folder',
 			type: ConfigManifestEntryType.STRING
 		},
 		{
-			id: 'mediaScanner.port',
-			name: 'Media Scanner Port',
+			id: 'metadata.fieldOrder',
+			name: 'Enable field order check?',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'metadata.fieldOrderScanDuration',
+			name: 'Number of frames to use to test field order',
 			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'metadata.scenes',
+			name: 'Enable scene change detection',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'metadata.sceneThreshold',
+			name: 'Likelihood frame introduces a new scene - between 0.0 and 1.0',
+			type: ConfigManifestEntryType.NUMBER
+		},
+		{
+			id: 'metadata.freezeDetection',
+			name: 'Enable freeze frame detection',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'metadata.freezeNoise',
+			name: 'Noise tolerance - difference ratio between 0.0 to 1.0',
+			type: ConfigManifestEntryType.NUMBER,
+		},
+		{
+			id: 'metadata.freezeDuration',
+			name: 'Duration of freeze until notified, e.g. "2s"',
+			type: ConfigManifestEntryType.STRING
+		},
+		{
+			id: 'metadata.blackDetection',
+			name: 'Enable black frame detection',
+			type: ConfigManifestEntryType.STRING
+		},
+		{
+			id: 'metadata.blackDuration',
+			name: 'Minimum duration of black frames',
+			type: ConfigManifestEntryType.STRING
+		},
+		{
+			id: 'metadata.blackRatio',
+			name: 'Ratio of black pixels',
+			type: ConfigManifestEntryType.NUMBER
+		},
+		{
+			id: 'metadata.blackThreshold',
+			name: 'Luminance threshold - pixel if (condition) {
+
+			} else {
+
+			} black',
+			type: ConfigManifestEntryType.NUMBER
+		},
+		{
+			id: 'metadata.mergeBlacksAndFreezes',
+			name: 'Merge black and freeze frame detect',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'previews.enable',
+			name: 'Enable preview generation',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'previews.width',
+			name: 'Preview width',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'previews.height',
+			name: 'Preview height,-1 prop',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'previews.bitrate',
+			name: 'Preview bitrate, e.g. 40k',
+			type: ConfigManifestEntryType.STRING
+		},
+		{
+			id: 'previews.folder',
+			name: 'Preview sub-folder',
+			type: ConfigManifestEntryType.STRING
 		},
 		{
 			id: 'debugLogging',
