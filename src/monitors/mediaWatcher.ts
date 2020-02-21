@@ -2,7 +2,7 @@ import * as _ from 'underscore'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
-import { MonitorSettingsMediaScanner, MediaObject, DiskInfo } from '../api'
+import { MonitorSettingsWatcher, MediaObject, DiskInfo } from '../api'
 import { LoggerInstance } from 'winston'
 import { FetchError } from 'node-fetch'
 import { promisify } from 'util'
@@ -10,7 +10,7 @@ import { exec as execCB } from 'child_process'
 import { Watcher } from './watcher'
 const exec = promisify(execCB)
 
-export class MonitorMediaScanner extends Monitor {
+export class MonitorMediaWatcher extends Monitor {
 	private changes: PouchDB.Core.Changes<MediaObject>
 	private triggerupdateFsStatsTimeout?: NodeJS.Timer
 	private checkFsStatsInterval?: NodeJS.Timer
@@ -37,7 +37,7 @@ export class MonitorMediaScanner extends Monitor {
 	constructor(
 		deviceId: string,
 		private db: PouchDB.Database<MediaObject>,
-		public settings: MonitorSettingsMediaScanner,
+		public settings: MonitorSettingsWatcher,
 		logger: LoggerInstance
 	) {
 		super(deviceId, settings, logger)
@@ -48,7 +48,7 @@ export class MonitorMediaScanner extends Monitor {
 
 	get deviceInfo(): MonitorDevice {
 		return {
-			deviceName: `Media scanning in media manager`,
+			deviceName: `Media watcher in media manager`,
 			deviceId: this.deviceId,
 
 			deviceCategory: PeripheralDeviceAPI.DeviceCategory.MEDIA_MANAGER,
@@ -58,19 +58,19 @@ export class MonitorMediaScanner extends Monitor {
 	}
 
 	public async restart(): Promise<void> {
-		throw Error('Media scanning restart not implemented yet')
+		throw Error('Media watcher restart not implemented yet')
 	}
 
 	public async init(): Promise<void> {
 		try {
-			this.logger.info(`Initializing media scanning monitor`, this.settings)
+			this.logger.info(`Initializing media watcher monitor`, this.settings)
 
 			if (!this.settings.disable) {
-				this.logger.info('Media scanning init')
+				this.logger.info('Media watcher init')
 
 				this.restartChangesStream()
 
-				this.logger.info('Media scanning: start syncing media files')
+				this.logger.info('Media watcher: start syncing media files')
 
 				// Check disk usage now
 				this.updateFsStats()
@@ -87,7 +87,7 @@ export class MonitorMediaScanner extends Monitor {
 					this.db.info()
 				])
 
-				this.logger.info('Media scanning: sync object lists', coreObjRevisions.length, allDocsResponse.total_rows)
+				this.logger.info('Media watcher: sync object lists', coreObjRevisions.length, allDocsResponse.total_rows)
 
 				for ( let doc of allDocsResponse.rows ) {
 					const docId = this.hashId(doc.id)
@@ -126,13 +126,13 @@ export class MonitorMediaScanner extends Monitor {
 					await this.sendRemoved(id)
 				}
 
-				this.logger.info('Media scanning: done file sync init')
+				this.logger.info('Media watcher: done file sync init')
 			} else {
-				this.logger.info('Media scanning disabled')
+				this.logger.info('Media watcher disabled')
 			}
 			this.initialized = true
 		} catch (e) {
-			this.logger.error('Media scanning: error initializing media scanning', e)
+			this.logger.error('Media watcher: error initializing media watcher', e)
 		}
 	}
 
@@ -195,7 +195,7 @@ export class MonitorMediaScanner extends Monitor {
 					}
 					break
 				default:
-					this.logger.error(`Media scanning: unrecognized platform '${process.platform}'`)
+					this.logger.error(`Media watcher: unrecognized platform '${process.platform}'`)
 					return
 			}
 			if (cmd) { // some flavour of Unix
@@ -245,14 +245,14 @@ export class MonitorMediaScanner extends Monitor {
 			this.statusDisk.messages = messages
 			this.updateAndSendStatus()
 		} catch(e) {
-			this.logger.warn('Media scanning: it was not possible to determine disk usage stats.')
+			this.logger.warn('Media watcher: it was not possible to determine disk usage stats.')
 			// Removed - not making a network request
 			// if (!((e + '').match(/ECONNREFUSED/i) || (e + '').match(/ECONNRESET/i) || (e + '').match(/ENOTFOUND/i))) {
 			// 	this.logger.warn('Error in _updateFsStats', e.message || e.stack || e)
 			// }
 
 			this.statusDisk.statusCode = PeripheralDeviceAPI.StatusCode.WARNING_MAJOR
-			this.statusDisk.messages = [`Media scanning: error when trying to determine disk usage stats.`]
+			this.statusDisk.messages = [`Media watcher: error when trying to determine disk usage stats.`]
 			this.updateAndSendStatus()
 		}
 	}
@@ -355,7 +355,7 @@ export class MonitorMediaScanner extends Monitor {
 			this.changes.cancel()
 		}
 		const opts = this.getChangesOptions()
-		this.logger.info(`Media scanning: restarting changes stream (since ${opts.since})`)
+		this.logger.info(`Media watcher: restarting changes stream (since ${opts.since})`)
 		this.changes = this.db
 			.changes<MediaObject>(opts)
 			.on('change', changes => this.changeHandler(changes))
@@ -371,9 +371,9 @@ export class MonitorMediaScanner extends Monitor {
 			if (!(changes.id + '').match(/watchdogIgnore/i)) {
 				// Ignore watchdog file changes
 
-				this.logger.debug('Media scanning: deleteMediaObject', changes.id, newSequenceNr)
+				this.logger.debug('Media watcher: deleteMediaObject', changes.id, newSequenceNr)
 				this.sendRemoved(changes.id).catch(e => {
-					this.logger.error('Media scanning: error sending deleted doc', e)
+					this.logger.error('Media watcher: error sending deleted doc', e)
 				})
 			}
 		} else if (changes.doc) {
@@ -381,10 +381,10 @@ export class MonitorMediaScanner extends Monitor {
 			if (!(md._id + '').match(/watchdogIgnore/i)) {
 				// Ignore watchdog file changes
 
-				this.logger.debug('Media scanning: updateMediaObject', newSequenceNr, md._id, md.mediaId)
+				this.logger.debug('Media watcher: updateMediaObject', newSequenceNr, md._id, md.mediaId)
 				md.mediaId = md._id
 				this.sendChanged(md).catch(e => {
-					this.logger.error('Media scanning: error sending changed doc', e)
+					this.logger.error('Media watcher: error sending changed doc', e)
 				})
 			}
 		}
@@ -396,7 +396,7 @@ export class MonitorMediaScanner extends Monitor {
 
 	private errorHandler(err) {
 		if (err instanceof SyntaxError || err instanceof FetchError || err.type === 'invalid-json') {
-			this.logger.warn('Media scanning: terminated (' + err.message + ')') // not a connection issue
+			this.logger.warn('Media watcher: terminated (' + err.message + ')') // not a connection issue
 			this.restartChangesStream(true)
 			return // restart silently, since PouchDB connections can drop from time to time and are not a very big issue
 		} else {

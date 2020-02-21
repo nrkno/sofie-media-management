@@ -2,7 +2,7 @@ import { EventEmitter } from 'events'
 import * as path from 'path'
 import * as chokidar from 'chokidar'
 import { noTryAsync } from 'no-try'
-import { MonitorSettingsMediaScanner, MediaObject } from '../api'
+import { MonitorSettingsWatcher, MediaObject } from '../api'
 import { LoggerInstance } from 'winston'
 import { Stats, stat } from 'fs-extra'
 import { literal } from '../lib/lib'
@@ -43,7 +43,7 @@ export class Watcher extends EventEmitter {
 
 	constructor(
 		private db: PouchDB.Database<MediaObject>,
-		private settings: MonitorSettingsMediaScanner,
+		private settings: MonitorSettingsWatcher,
 		private logger: LoggerInstance
 	) {
 		super()

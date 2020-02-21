@@ -1,7 +1,7 @@
 import { Monitor } from './_monitor'
 import { DeviceSettings, MonitorSettings, MonitorSettingsType, MediaObject } from '../api'
 import * as _ from 'underscore'
-import { MonitorMediaScanner } from './mediaScanner'
+import { MonitorMediaWatcher} from './mediaWatcher'
 import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
 import { MonitorQuantel } from './quantel'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
@@ -59,8 +59,8 @@ export class MonitorManager {
 			return
 		}
 		const monitor: Monitor | null =
-			settings.type === MonitorSettingsType.MEDIA_SCANNER
-				? new MonitorMediaScanner(deviceId, this.mediaDB, settings, this._coreHandler.logger)
+			settings.type === MonitorSettingsType.WATCHER
+				? new MonitorMediaWatcher(deviceId, this.mediaDB, settings, this._coreHandler.logger)
 				: settings.type === MonitorSettingsType.QUANTEL
 				? new MonitorQuantel(deviceId, settings, this._coreHandler.logger)
 				: null

@@ -308,7 +308,7 @@ export enum WorkStepAction {
 	GENERATE_METADATA = 'generate_metadata'
 }
 
-export type MonitorSettings = MonitorSettingsNull | MonitorSettingsMediaScanner | MonitorSettingsQuantel
+export type MonitorSettings = MonitorSettingsNull | MonitorSettingsWatcher | MonitorSettingsQuantel
 export interface MonitorSettingsBase {
 	type: MonitorSettingsType
 
@@ -320,14 +320,14 @@ export interface MonitorSettingsBase {
 }
 export enum MonitorSettingsType {
 	NULL = '',
-	MEDIA_SCANNER = 'mediascanner',
+	WATCHER = 'watcher',
 	QUANTEL = 'quantel'
 }
 export interface MonitorSettingsNull extends MonitorSettingsBase {
 	type: MonitorSettingsType.NULL
 }
-export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
-	type: MonitorSettingsType.MEDIA_SCANNER
+export interface MonitorSettingsWatcher extends MonitorSettingsBase {
+	type: MonitorSettingsType.WATCHER
 
 	/** Paths that media manager should watch to check for content */
 	paths: string | Array<string>
