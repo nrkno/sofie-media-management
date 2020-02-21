@@ -30,7 +30,7 @@ export abstract class Monitor extends EventEmitter {
 	}
 
 	public get status(): PeripheralDeviceAPI.StatusObject {
-		return Object.assign(this.status)
+		return Object.assign(this._status)
 	}
 
 	abstract init(): Promise<void>

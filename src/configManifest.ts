@@ -129,7 +129,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
 
 export enum MediaMonitorType {
 	NULL = 'null',
-	MEDIA_SCANNER = 'mediascanner',
+	WATCHER = 'watcher',
 	QUANTEL = 'quantel'
 }
 const MEDIA_MANAGER_MEDIAMONITOR_COMMON: SubDeviceConfigManifestEntry[] = [
@@ -141,17 +141,23 @@ const MEDIA_MANAGER_MEDIAMONITOR_COMMON: SubDeviceConfigManifestEntry[] = [
 ]
 const MEDIA_MANAGER_MEDIAMONITOR_CONFIG: SubDeviceConfigManifest['config'] = {}
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.NULL] = []
-MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.MEDIA_SCANNER] = [
+MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
-		id: 'host',
-		name: 'Host',
+		id: 'paths',
+		name: 'Paths to watch',
+		type: ConfigManifestEntryType.STRING
+	},
+	// TODO work out which watch options to follow
+	{
+		id: 'casparMediaPath',
+		name: 'Path to CasparCG (shared) media folder',
 		type: ConfigManifestEntryType.STRING
 	},
 	{
-		id: 'port',
-		name: 'Port',
-		type: ConfigManifestEntryType.STRING
+		id: 'retryLimit',
+		name: 'Maximum number file scane retries',
+		type: ConfigManifestEntryType.INT
 	}
 ]
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
@@ -200,16 +206,6 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			name: 'Cron-Job Interval Time',
 			type: ConfigManifestEntryType.INT
 		},
-		// {
-		// 	id: 'mediaScanner.host',
-		// 	name: 'Media Scanner Host',
-		// 	type: ConfigManifestEntryType.STRING
-		// },
-		// {
-		// 	id: 'mediaScanner.port',
-		// 	name: 'Media Scanner Port',
-		// 	type: ConfigManifestEntryType.INT
-		// },
 		{
 			id: 'httpPort',
 			name: 'HTTP port serving resources',
