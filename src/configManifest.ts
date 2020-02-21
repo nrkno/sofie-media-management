@@ -212,12 +212,12 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		// },
 		{
 			id: 'httpPort',
-			name: 'HTTP port for thumbnails and previews',
+			name: 'HTTP port serving resources',
 			type: ConfigManifestEntryType.INT
 		},
 		{
 			id: 'httpsPort',
-			name: 'HTTPS port for thumbnails and previews',
+			name: 'HTTPS port serving resources',
 			type: ConfigManifestEntryType.INT
 		},
 		{
@@ -237,7 +237,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		},
 		{
 			id: 'metadata.fieldOrder',
-			name: 'Enable field order check?',
+			name: 'Enable field order check',
 			type: ConfigManifestEntryType.BOOLEAN
 		},
 		{
@@ -252,7 +252,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		},
 		{
 			id: 'metadata.sceneThreshold',
-			name: 'Likelihood frame introduces a new scene - between 0.0 and 1.0',
+			name: 'Likelihood frame introduces new scene (0.0 to 1.0)',
 			type: ConfigManifestEntryType.NUMBER
 		},
 		{
@@ -287,16 +287,12 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		},
 		{
 			id: 'metadata.blackThreshold',
-			name: 'Luminance threshold - pixel if (condition) {
-
-			} else {
-
-			} black',
+			name: 'Luminance threshold - pixel is black',
 			type: ConfigManifestEntryType.NUMBER
 		},
 		{
 			id: 'metadata.mergeBlacksAndFreezes',
-			name: 'Merge black and freeze frame detect',
+			name: 'Merge black with freeze frame',
 			type: ConfigManifestEntryType.BOOLEAN
 		},
 		{
@@ -311,7 +307,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		},
 		{
 			id: 'previews.height',
-			name: 'Preview height,-1 prop',
+			name: 'Preview height, -1 preserves aspect',
 			type: ConfigManifestEntryType.INT
 		},
 		{

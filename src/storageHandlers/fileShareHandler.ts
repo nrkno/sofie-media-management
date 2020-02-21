@@ -32,7 +32,8 @@ export class FileShareHandler extends LocalFolderHandler {
 			options: {
 				basePath: targetBasePath,
 				usePolling: true,
-				onlySelectedFiles: true // settings.options.onlySelectedFiles
+				onlySelectedFiles: // Needs to be false for standalone tests ... otherwise true
+					typeof fsSettings.options.onlySelectedFiles === 'boolean' ? fsSettings.options.onlySelectedFiles : true
 			}
 		}
 		return settingsObj

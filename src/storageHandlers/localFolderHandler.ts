@@ -129,7 +129,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 
 		return new Promise<void>(resolve => {
 			this._watcher.on('ready', () => {
-				this._initialized = true
+			  this._initialized = true
 				resolve()
 			})
 		})

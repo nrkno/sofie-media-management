@@ -4,7 +4,7 @@ import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
 import { StorageSettings, DeviceSettings, MediaObject } from './api'
-import { GeneralStorageSettings, StorageObject, buildStorageHandler } from './storageHandlers/storageHandler'
+import { GeneralStorageSettings, StorageObject } from './storageHandlers/storageHandler'
 import { TrackedMediaItems } from './mediaItemTracker'
 import { Dispatcher } from './work/dispatcher'
 import { BaseWorkFlowGenerator } from './workflowGenerators/baseWorkFlowGenerator'
@@ -16,6 +16,7 @@ import { MonitorManager } from './monitors/manager'
 import * as PouchDB from 'pouchdb-node'
 import { MediaManagerApp } from './app'
 import { PreviewVacuum } from './monitors/previewVacuum'
+import { buildStorageHandler } from './storageHandlers/storageHandlerFactory'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 

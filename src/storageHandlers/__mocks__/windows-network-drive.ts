@@ -13,7 +13,7 @@ const windowsNetworkDrive = {
 	),
 	mount: jest.fn(
 		(_drivePath: string, driveLetter?: string, _username?: string, _password?: string): Promise<string> => {
-			return new Promise(resolve => resolve(driveLetter))
+			return new Promise(resolve => { resolve(driveLetter) })
 		}
 	),
 	unmount: jest.fn(
