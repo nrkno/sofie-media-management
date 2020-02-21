@@ -1,12 +1,8 @@
-export interface MediaScannerConfig {
-	host?: string
-	port?: number
-	collectionId: string
-}
 export enum MediaStreamType {
 	Audio = 'audio',
 	Video = 'video'
 }
+
 export interface MediaStreamCodec {
 	type?: MediaStreamType
 	long_name?: string
@@ -14,6 +10,7 @@ export interface MediaStreamCodec {
 	tag_string?: string
 	is_avc?: string
 }
+
 export interface MediaStream {
 	codec: MediaStreamCodec
 
@@ -42,6 +39,7 @@ export interface MediaStream {
 	max_bit_rate?: string
 	nb_frames?: string
 }
+
 export interface MediaFormat {
 	name?: string
 	long_name?: string

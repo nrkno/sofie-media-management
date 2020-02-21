@@ -277,7 +277,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		},
 		{
 			id: 'metadata.blackDuration',
-			name: 'Minimum duration of black frames',
+			name: 'Duration of black until notified, e.g. "2s"',
 			type: ConfigManifestEntryType.STRING
 		},
 		{

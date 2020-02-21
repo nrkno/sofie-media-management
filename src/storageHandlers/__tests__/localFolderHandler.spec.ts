@@ -148,7 +148,7 @@ describe('LocalFolderHandler', () => {
 	afterAll(async () => {
 		try {
 			await lfh0.destroy()
-			fs.removeSync('./test')
+			await fs.remove('./test')
 		} catch (e) {
 			fail()
 		}

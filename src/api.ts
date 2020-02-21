@@ -26,8 +26,9 @@ export interface DeviceSettings {
 	/** When to warn that a worker is working too long */
 	warningTaskWorkingTime?: number
 
-	/** Connection details for the media access */
+	/** Connection details for media access via HTTP server */
 	httpPort?: number
+	/** Connection details for media access via HTTPS server */
 	httpsPort?: number
 
 	/** A list of Monitors, which will monitor media statuses */
@@ -35,50 +36,71 @@ export interface DeviceSettings {
 		[monitorId: string]: MonitorSettings
 	}
 
+	/** Local path configuration for media manager system */
 	paths?: {
-		ffmpeg: string //process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-		ffprobe: string // process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe'
-		resources: string
+		/** Cammand to execute to run `ffmpeg` */
+		ffmpeg?: string
+		/** Command to execute to run `ffprobe` */
+		ffprobe?: string
+		/** Folder to store generated resources. Defaults to where media manager is started */
+		resources?: string
 	}
 
-	/** Configuration of thumbnail size. */
+	/** Configuration of thumbnail size */
 	thumbnails?: {
-		width: number
-		/** Set height to `-1` for proportional scaling */
-		height: number
-		folder?: string // Not in use yet - default 'thumbnails'
-	},
+		/** Width of thumbnail in pixels. Default is `256` */
+		width?: number
+		/** Height of thumbnail in pixels. Set height to `-1` - the default - to preserve aspect */
+		height?: number
+		/** Sub-folder of `paths.resources` where thumbnails are stored. Defaults to `.../thumbnails` */
+		folder?: string // Not in use yet
+	}
 
-	/** Configuration for various kinds of advanced metadata generation. */
+	/** Configuration for various kinds of advanced metadata generation */
 	metadata?: {
-		/** Enable field order detection. */
-		fieldOrder: boolean // This is an expensive check, as it requires decoding the beginning of the video
-		fieldOrderScanDuration: number // Frames. Note: Needs sufficient motion (Not titlecard)
-		/** Enable scene detection */
-		scenes: boolean
-		sceneThreshold: number // default 0.4
+		/** Enable field order detection. An expensive chcek that decodes the start of the video */
+		fieldOrder?: boolean
+		/** Number of frames to scan to determine files order. Neede sufficient motion, i.e. beyong title card */
+		fieldOrderScanDuration?: number
+
+		/** Enable scene change detection */
+		scenes?: boolean
+		/** Likelihood frame introduces new scene (`0.0` to `1.0`). Defaults to `0.4` */
+		sceneThreshold?: number
+
 		/** Enable freeze frame detection */
-		freezeDetection: boolean
-		freezeNoise: number // default 0.001
-		freezeDuration: string // default '2s',
-		/** Enable black frame detection. */
-		blackDetection: boolean
-		blackDuration: string // default '2.0'
-		blackRatio: number // default 0.98
-		blackThreshold: number // default 0.1
-		mergeBlacksAndFreezes: boolean // default true
-	},
+		freezeDetection?: boolean
+		/** Noise tolerance - difference ratio between `0.0` to `1.0`. Default is `0.001` */
+		freezeNoise?: number
+		/** Duration of freeze before notification. Default is `2s` */
+		freezeDuration?: string
 
-	/** Configuration of _hover-scrub_ preview generation. */
+		/** Enable black frame detection */
+		blackDetection?: boolean
+		/** Duration of black until notified. Default `2.0` */
+		blackDuration?: string
+		/** Ratio of black pixels per frame before frame is black. Value between `0.0` and `1.0` defaulting to `0.98` */
+		blackRatio?: number
+		/** Luminance threshold for a single pixel to be considered black. Default is `0.1` */
+		blackThreshold?: number
+
+		/** Merge black and freeze frame detection results. Default is `true` */
+		mergeBlacksAndFreezes?: boolean
+	}
+
+	/** Configuration of _hover-scrub_ preview generation */
 	previews?: {
-		/** Enable preview generation */
-		enable: boolean // default false
-		width: number // default 160
-		height: number // default -1 for scale in proportion
-		bitrate: string // default '40k'
-		folder?: string // default 'previews'
-	},
-
+		/** Enable preview generation. Default is `false` */
+		enable?: boolean
+		/** Width of preview video in pixels. Default is `160` */
+		width?: number
+		/** Height of preview video in pixels. Set height to `-1` - the default - to preserve aspect */
+		height?: number
+		/** Bitrate for preview video. Default is `40k` */
+		bitrate?: string
+		/** Sub-folder of `paths.resources` where thumbnails are stored. Defaults to `.../previews` */
+		folder?: string
+	}
 }
 
 export type Time = number // Timestamp, unix time in ms
@@ -123,7 +145,8 @@ export interface ExpectedMediaItem {
 export enum MediaFlowType {
 	WATCH_FOLDER = 'watch_folder',
 	LOCAL_INGEST = 'local_ingest',
-	EXPECTED_ITEMS = 'expected_items'
+	EXPECTED_ITEMS = 'expected_items',
+	UNKNOWN = 'unknown'
 }
 
 export interface MediaFlow {
