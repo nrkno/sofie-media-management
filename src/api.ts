@@ -328,20 +328,13 @@ export interface MonitorSettingsNull extends MonitorSettingsBase {
 }
 export interface MonitorSettingsMediaScanner extends MonitorSettingsBase {
 	type: MonitorSettingsType.MEDIA_SCANNER
-	/** Host of the media-scanner PouchDB server */
-	// host: string
-	// port: number
 
+	/** Paths that media manager should watch to check for content */
 	paths: string | Array<string>
 	/** See https://www.npmjs.com/package/chokidar#api */
 	scanner: WatchOptions
-	/** Properties specific to CasparCG configuration and file location. */
-	caspar: {
-		config: string
-		templatePath: string
-		mediaPath: string
-		fontPath: string
-	}
+	/** CasparCG (shared) media path */
+	casparMediaPath: string
 	/** Maximum number of times to try and scan a file. */
 	retryLimit: number
 }

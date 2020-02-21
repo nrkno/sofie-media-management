@@ -58,17 +58,17 @@ export class Watcher extends EventEmitter {
 			}
 		}, this.settings.scanner))
 		this.watcher.on('add', (localPath: string, stat: Stats): void => {
-			const mediaId = getId(this.settings.caspar.mediaPath, localPath)
+			const mediaId = getId(this.settings.casparMediaPath, localPath)
 			this.scanFile(localPath, mediaId, stat)
 				.catch(error => { this.logger.error(error) })
 		})
 		this.watcher.on('change', (localPath: string, stat: Stats) => {
-			const mediaId = getId(this.settings.caspar.mediaPath, localPath)
+			const mediaId = getId(this.settings.casparMediaPath, localPath)
 			this.scanFile(localPath, mediaId, stat)
 				.catch(error => { this.logger.error(error) })
 		})
 		this.watcher.on('unlink', (localPath: string, _stat: Stats) => {
-			const mediaId = getId(this.settings.caspar.mediaPath, localPath)
+			const mediaId = getId(this.settings.casparMediaPath, localPath)
 			this.db.get(mediaId)
 				.then((doc) => this.db.remove(doc))
 				.catch(error => { this.logger.error(error) })
