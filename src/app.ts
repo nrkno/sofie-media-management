@@ -4,14 +4,20 @@ import * as send from 'koa-send'
 import * as cors from '@koa/cors'
 import * as range from 'koa-range'
 import * as fs from 'fs-extra'
-import { DeviceSettings } from './api'
+import * as path from 'path'
+import { DeviceSettings, MediaObject } from './api'
 import { LoggerInstance } from 'winston'
+import { noTryAsync } from 'no-try'
 
 export class MediaManagerApp {
 	private app = new Koa()
 	private router = new Router()
 
-	constructor(private config: DeviceSettings, private logger: LoggerInstance) {
+	constructor(
+		private config: DeviceSettings,
+		private mediaDB: PouchDB.Database<MediaObject>,
+		private logger: LoggerInstance
+	) {
 		this.app.use(range)
 
 		this.app.use(cors({
@@ -28,31 +34,43 @@ export class MediaManagerApp {
 		// TODO make it work with non-quantel images
 
 		this.router.get('/media/thumbnail/:id', async (ctx, next) => {
-		  console.log(`Received thumbnail request ${ctx.params.id}`)
+		  this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
 		  if (ctx.params.id.startsWith('QUANTEL:')) {
 				let id = ctx.params.id.slice(8)
 				ctx.type = 'image/jpeg'
 				await send(ctx, `thumbs/${id}.jpg`)
 		  } else {
-				await next()
+				const { _attachments } = await this.mediaDB.get(
+					ctx.params.id.toUpperCase(),
+					{ attachments: true, binary: true })
+
+				if (!_attachments['thumb.png']) {
+					ctx.status = 404
+					return await next()
+				}
+
+				ctx.type = 'image/png'
+				ctx.body = _attachments['thumb.png'].data
 		  }
 		})
 
 		this.router.get('/media/preview/:id', async (ctx, next) => {
-		  console.log(`Received preview request ${ctx.params.id}`)
-		  if (ctx.params.id.startsWith('QUANTEL:')) {
-				let id = ctx.params.id.slice(8)
-				ctx.type = 'video/webm'
-				let length = await fs.stat(`previews/${id}.webm`)
-				ctx.body = fs.createReadStream(`previews/${id}.webm`)
-				ctx.length = length.size
-				console.log(`Finished sending ${id}`)
-		  } else {
-				await next()
-		  }
+		  this.logger.debug(`HTTP/S server: received preview request ${ctx.params.id}`)
+			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
+			ctx.type = 'video/webm'
+			let previewPath = path.join(
+				this.config.paths && this.config.paths.resources || '',
+				this.config.previews && this.config.previews.folder || '',
+				`${id}.webm`
+			)
+			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
+			if (statError) {
+				this.logger.warning(`HTTP/S server: preview requested that did not exist ${ctx.params.id}`, statError)
+				return await next()
+			}
+			ctx.body = fs.createReadStream(previewPath)
+			ctx.length = stats.size
 		})
-
-		// TODO other medio
 
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
 

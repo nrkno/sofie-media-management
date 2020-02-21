@@ -137,7 +137,7 @@ export class MediaManager {
 	}
 
 	async initServer(settings: DeviceSettings) {
-		this._app = new MediaManagerApp(settings, this._logger)
+		this._app = new MediaManagerApp(settings, this.mediaDB, this._logger)
 		return this._app.init()
 	}
 
