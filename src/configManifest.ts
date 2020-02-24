@@ -222,6 +222,11 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			type: ConfigManifestEntryType.INT
 		},
 		{
+			id: 'paths.resources',
+			name: 'Parent folder for serving resources',
+			type: ConfigManifestEntryType.STRING
+		}
+		{
 			id: 'thumbnails.width',
 			name: 'Thumbnail width',
 			type: ConfigManifestEntryType.INT,
