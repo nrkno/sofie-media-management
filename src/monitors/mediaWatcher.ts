@@ -43,6 +43,7 @@ export class MonitorMediaWatcher extends Monitor {
 		super(deviceId, settings, logger)
 
 		this.watcher = new Watcher(db, settings, logger)
+		this.watcher.init()
 		this.updateStatus()
 	}
 
@@ -87,7 +88,7 @@ export class MonitorMediaWatcher extends Monitor {
 					this.db.info()
 				])
 
-				this.logger.info('Media watcher: sync object lists', coreObjRevisions.length, allDocsResponse.total_rows)
+				this.logger.info('Media watcher: sync object lists', Object.keys(coreObjRevisions).length, allDocsResponse.total_rows)
 
 				for ( let doc of allDocsResponse.rows ) {
 					const docId = this.hashId(doc.id)

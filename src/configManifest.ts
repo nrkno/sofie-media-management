@@ -156,7 +156,7 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 	},
 	{
 		id: 'retryLimit',
-		name: 'Maximum number file scane retries',
+		name: 'Maximum file scan retries',
 		type: ConfigManifestEntryType.INT,
 		placeholder: '3'
 	}

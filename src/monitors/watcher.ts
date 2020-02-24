@@ -121,7 +121,7 @@ export class Watcher extends EventEmitter {
 					path: mediaPath,
 					size: mediaStat.size,
 					mtime: mediaStat.mtime.toISOString()
-				})}: ${message}`)
+				}).toString()}: ${message}`)
 			}
 
 			if (doc.mediaPath && doc.mediaPath !== mediaPath) {

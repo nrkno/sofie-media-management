@@ -38,7 +38,7 @@ if (logPath) {
 	logger.add(Winston.transports.Console, {
 		handleExceptions: true,
 		json: true,
-		level: 'debug',
+		level: 'silly',
 		stringify: obj => {
 			obj.localTimestamp = getCurrentTime()
 			return JSON.stringify(obj) // make single line
