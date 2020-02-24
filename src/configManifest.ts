@@ -157,7 +157,8 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 	{
 		id: 'retryLimit',
 		name: 'Maximum number file scane retries',
-		type: ConfigManifestEntryType.INT
+		type: ConfigManifestEntryType.INT,
+		placeholder: '3'
 	}
 ]
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
@@ -189,22 +190,26 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'workers',
 			name: 'No. of Available Workers',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '3'
 		},
 		{
 			id: 'lingerTime',
-			name: 'File Linger Time',
-			type: ConfigManifestEntryType.INT
+			name: 'File Linger Time (ms)',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '259200000'
 		},
 		{
 			id: 'workFlowLingerTime',
-			name: 'Workflow Linger Time',
-			type: ConfigManifestEntryType.INT
+			name: 'Workflow Linger Time (ms)',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '86400000'
 		},
 		{
 			id: 'cronJobTime',
-			name: 'Cron-Job Interval Time',
-			type: ConfigManifestEntryType.INT
+			name: 'Cron-Job Interval Time (ms)',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '3600000'
 		},
 		{
 			id: 'httpPort',
@@ -219,17 +224,20 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'thumbnails.width',
 			name: 'Thumbnail width',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '256'
 		},
 		{
 			id: 'thumbnails.height',
 			name: 'Thumbnail height, -1 preserves aspect',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '-1'
 		},
 		{
 			id: 'thumbnails.folder',
 			name: 'Thumbnail sub-folder',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.STRING,
+			placeholder: 'thumbnails'
 		},
 		{
 			id: 'metadata.fieldOrder',
@@ -239,7 +247,8 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'metadata.fieldOrderScanDuration',
 			name: 'Number of frames to use to test field order',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '200'
 		},
 		{
 			id: 'metadata.scenes',
@@ -249,7 +258,8 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'metadata.sceneThreshold',
 			name: 'Likelihood frame introduces new scene (0.0 to 1.0)',
-			type: ConfigManifestEntryType.NUMBER
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.4'
 		},
 		{
 			id: 'metadata.freezeDetection',
@@ -258,13 +268,15 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		},
 		{
 			id: 'metadata.freezeNoise',
-			name: 'Noise tolerance - difference ratio between 0.0 to 1.0',
+			name: 'Noise tolerance - difference ratio 0.0 upto 1.0',
 			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.001'
 		},
 		{
 			id: 'metadata.freezeDuration',
 			name: 'Duration of freeze until notified, e.g. "2s"',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.STRING,
+			placeholder: '2s'
 		},
 		{
 			id: 'metadata.blackDetection',
@@ -274,17 +286,20 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'metadata.blackDuration',
 			name: 'Duration of black until notified, e.g. "2s"',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.STRING,
+			placeholder: '2s'
 		},
 		{
 			id: 'metadata.blackRatio',
 			name: 'Ratio of black pixels',
-			type: ConfigManifestEntryType.NUMBER
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.98'
 		},
 		{
 			id: 'metadata.blackThreshold',
 			name: 'Luminance threshold - pixel is black',
-			type: ConfigManifestEntryType.NUMBER
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.1'
 		},
 		{
 			id: 'metadata.mergeBlacksAndFreezes',
@@ -299,22 +314,26 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'previews.width',
 			name: 'Preview width',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '160'
 		},
 		{
 			id: 'previews.height',
 			name: 'Preview height, -1 preserves aspect',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '-1'
 		},
 		{
 			id: 'previews.bitrate',
 			name: 'Preview bitrate, e.g. 40k',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.STRING,
+			placeholder: '40k'
 		},
 		{
 			id: 'previews.folder',
 			name: 'Preview sub-folder',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.STRING,
+			placeholder: 'previews'
 		},
 		{
 			id: 'debugLogging',

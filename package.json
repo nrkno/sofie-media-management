@@ -40,7 +40,7 @@
     "build-linux": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t linux-x64 -o deploy/media-manager && node copy-natives.js linux-x64",
     "build-win32": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t windows-x64 -o deploy/media-manager.exe && node copy-natives.js win32-x64",
     "lint": "tslint --project tsconfig.jest.json --config tslint.json",
-    "unit": "jest",
+    "unit": "jest --coverage false",
     "test": "yarn lint && yarn unit",
     "test:integration": "yarn lint && jest --config=jest-integration.config.js",
     "watch": "jest --watch",
