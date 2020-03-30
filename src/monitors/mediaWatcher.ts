@@ -401,7 +401,7 @@ export class MonitorMediaWatcher extends Monitor {
 			this.restartChangesStream(true)
 			return // restart silently, since PouchDB connections can drop from time to time and are not a very big issue
 		} else {
-			this.logger.error('MediaScanner: Error', err)
+			this.logger.error('Media watcher: Error', err)
 		}
 
 		this.setConnectionStatus(false)

@@ -60,18 +60,15 @@ export abstract class Monitor extends EventEmitter {
 
 	/** To be triggered whenever a MediaObject is added or changed */
 	protected async sendChanged(doc: MediaObject): Promise<void> {
+		let sendDoc = _.omit(doc, ['_attachments'])
+		this.logger.info('Media scanning: _sendChanged', JSON.stringify(sendDoc, null, 2))
 		try {
-			let sendDoc = _.omit(doc, ['_attachments'])
-			// @ts-ignore
-			// this.logger.info('MediaScanner: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
-			await this._coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
+			await this.coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
 				this.settings.storageId,
 				this.hashId(doc._id),
 				sendDoc
 			])
 		} catch (e) {
-			// @ts-ignore
-			this.logger.info('Media scanning: _sendChanged', JSON.stringify(sendDoc, ' ', 2))
 			this.logger.error('Media scanning: error while updating changed Media object', e)
 		}
 	}

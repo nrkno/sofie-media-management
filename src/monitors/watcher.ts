@@ -74,11 +74,11 @@ export class Watcher extends EventEmitter {
 				.catch(error => { this.logger.error(error) })
 		})
 		this.watcher.on('ready', () => {
-			this.logger.info('Media scanning: watcher ready!')
+			this.logger.info('Watcher: ready!')
 		})
 		this.watcher.on('error', (err) => {
 			if (err) {
-				this.logger.error(`Media scanner: error from watcher: ${err.message}`, err)
+				this.logger.error(`Watcher: error: ${err.message}`, err)
 			}
 		})
 
@@ -88,7 +88,7 @@ export class Watcher extends EventEmitter {
 	public async dispose(): Promise<void> {
 		// await this.db.close()
 		await this.watcher.close()
-		this.logger.info('Media scanner: watcher stopped')
+		this.logger.info('Watcher: stopped')
 	}
 
 	private async scanFile (
@@ -116,12 +116,12 @@ export class Watcher extends EventEmitter {
 			  .catch(() => ({ _id: mediaId } as MediaObject))
 
 			const mediaLogger = (level: string, message: string): void => {
-				this.logger[level](`Media scanning: scanning ${({
+				this.logger[level](`Watcher: ${message}`, {
 					id: mediaId,
 					path: mediaPath,
 					size: mediaStat.size,
 					mtime: mediaStat.mtime.toISOString()
-				}).toString()}: ${message}`)
+				})
 			}
 
 			if (doc.mediaPath && doc.mediaPath !== mediaPath) {
@@ -165,7 +165,7 @@ export class Watcher extends EventEmitter {
 			this.scanning = false
 			this.filesToScanFail[mediaId] = (this.filesToScanFail[mediaId] || 0) + 1
 			if (this.filesToScanFail[mediaId] >= this.settings.retryLimit) {
-			  this.logger.error(`Media scanner: skipping file. Too many retries for '${mediaId}'`)
+			  this.logger.error(`Media watching: skipping file. Too many retries for '${mediaId}'`)
 			  delete this.filesToScanFail[mediaId]
 			  delete this.filesToScan[mediaId]
 			}
@@ -198,7 +198,7 @@ export class Watcher extends EventEmitter {
 	}
 
 	private async cleanDeleted() {
-		this.logger.info('Media scanning: checking for dead media')
+		this.logger.info('Media watching: checking for dead media')
 		const limit = 256
 		let startkey: string | undefined = undefined
 		while (true) {
