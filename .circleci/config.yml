@@ -37,7 +37,7 @@ jobs:
 
   validate-dependencies:
     docker:
-      - image: circleci/node:12
+      - image: circleci/node:12.15.0
     working_directory: ~/project
     steps:
       - checkout
@@ -52,7 +52,7 @@ jobs:
 
   build-windows:
     docker:
-      - image: circleci/node:12
+      - image: circleci/node:12.15.0
     working_directory: ~/project
     steps:
       - attach_workspace:
@@ -67,7 +67,7 @@ jobs:
 
   build-linux:
     docker:
-      - image: circleci/node:12
+      - image: circleci/node:12.15.0
     working_directory: ~/project
     steps:
       - attach_workspace:
@@ -82,7 +82,7 @@ jobs:
 
   release:
     docker:
-      - image: circleci/node:12
+      - image: circleci/node:12.15.0
     working_directory: ~/project
     steps:
       - attach_workspace:
