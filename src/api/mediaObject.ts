@@ -100,6 +100,8 @@ export interface MediaObject extends PouchDB.Core.IdMeta, PouchDB.Core.GetMeta {
 	thumbSize: number
 	/** Thumbnail last updated timestamp */
 	thumbTime: number
+	/** Thumbnail path */
+	thumbPath?: string
 
 	/** Preview file size in bytes */
 	previewSize?: number

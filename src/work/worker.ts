@@ -6,7 +6,6 @@ import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
 import { noTryAsync } from 'no-try'
 import * as path from 'path'
-import * as os from 'os'
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import * as fs from 'fs-extra'
 
@@ -200,7 +199,12 @@ export class Worker {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 
-		const tmpPath = path.join(os.tmpdir(), `${Math.random().toString(16)}.png`)
+		const destPath = path.join(
+			this.config.paths && this.config.paths.resources || '',
+			this.config.thumbnails && this.config.thumbnails.folder || 'thumbs',
+			`${doc.mediaId}.jpg`
+		)
+		const tmpPath = destPath.slice(0, -4) + '.new.jpg'
 		const args = [ // TODO (perf) Low priority process?
 			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
 			'-hide_banner',
@@ -212,8 +216,6 @@ export class Worker {
 			`"${tmpPath}"`
 		]
 
-		// Not necessary ... just checking that /tmp or Windows equivalent exists
-		// await fs.mkdirp(path.dirname(tmpPath))
 		const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
 				this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
@@ -233,9 +235,9 @@ export class Worker {
 			return this.failStep(`failed to stat generated thumbmail for "${fileId}"`, step.action, statError)
 		}
 
-		const { result: data, error: readError } = await noTryAsync(() => fs.readFile(tmpPath))
-		if (readError) {
-			return this.failStep(`failed to read data from thumbnail file "${tmpPath}"`, step.action, readError)
+		const { error: renameError } = await noTryAsync(() => fs.rename(tmpPath, destPath))
+		if (renameError) {
+			return this.failStep(`failed to remname tmp file from "${tmpPath}" to "${destPath}"`, step.action, renameError)
 		}
 
 		// Read document again ... might have been updated while we were busy working
@@ -247,19 +249,12 @@ export class Worker {
 
 		doc2.thumbSize = thumbStat.size
 		doc2.thumbTime = thumbStat.mtime.getTime()
-		doc2._attachments = {
-			'thumb.png': {
-				content_type: 'image/png',
-				data
-			}
-		}
+		doc2.thumbPath = destPath
+
 		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
 		if (putError) {
-			return this.failStep(`failed to write thumbnail to database for "${fileId}"`, step.action, putError)
+			return this.failStep(`failed to write thumbnail details to database for "${fileId}"`, step.action, putError)
 		}
-		await noTryAsync(
-			() => fs.unlink(tmpPath),
-			error => this.logger.warn(`Worked: thumbnail generate: failed to delete temporary file "${tmpPath}"`, error))
 
 		return literal<WorkResult>({
 			status: WorkStepStatus.DONE

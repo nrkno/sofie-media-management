@@ -242,7 +242,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			id: 'thumbnails.folder',
 			name: 'Thumbnail sub-folder',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: 'thumbnails'
+			placeholder: 'thumbs'
 		},
 		{
 			id: 'metadata.fieldOrder',

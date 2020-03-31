@@ -15,7 +15,7 @@ import { Process } from './process'
 import { MonitorManager } from './monitors/manager'
 import * as PouchDB from 'pouchdb-node'
 import { MediaManagerApp } from './app'
-import { PreviewVacuum } from './monitors/previewVacuum'
+import { PreviewAndThumbnailVacuum } from './monitors/previewVacuum'
 import { buildStorageHandler } from './storageHandlers/storageHandlerFactory'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
@@ -55,7 +55,7 @@ export class MediaManager {
 	private mediaDB: PouchDB.Database<MediaObject>
 	private _monitorManager: MonitorManager
 	private _app: MediaManagerApp
-	private vac: PreviewVacuum | null = null
+	private vac: PreviewAndThumbnailVacuum | null = null
 
 	constructor(logger: Winston.LoggerInstance) {
 		this._logger = logger
@@ -98,7 +98,7 @@ export class MediaManager {
 			await this.initServer(peripheralDevice.settings || {})
 			this._logger.info('HTTP/S servers initialized')
 
-			this.vac = new PreviewVacuum(this.mediaDB, peripheralDevice.settings || {}, this._logger)
+			this.vac = new PreviewAndThumbnailVacuum(this.mediaDB, peripheralDevice.settings || {}, this._logger)
 			this._logger.info('Preview vacuum initialized')
 
 			this._logger.info('Initialization done')
@@ -137,7 +137,7 @@ export class MediaManager {
 	}
 
 	async initServer(settings: DeviceSettings) {
-		this._app = new MediaManagerApp(settings, this.mediaDB, this._logger)
+		this._app = new MediaManagerApp(settings, this._logger)
 		return this._app.init()
 	}
 

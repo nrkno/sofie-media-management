@@ -5,7 +5,7 @@ import * as cors from '@koa/cors'
 import * as range from 'koa-range'
 import * as fs from 'fs-extra'
 import * as path from 'path'
-import { DeviceSettings, MediaObject } from './api'
+import { DeviceSettings } from './api'
 import { LoggerInstance } from 'winston'
 import { noTryAsync } from 'no-try'
 
@@ -15,7 +15,6 @@ export class MediaManagerApp {
 
 	constructor(
 		private config: DeviceSettings,
-		private mediaDB: PouchDB.Database<MediaObject>,
 		private logger: LoggerInstance
 	) {
 		this.app.use(range)
@@ -31,27 +30,22 @@ export class MediaManagerApp {
 		  await next()
 		})
 
-		// TODO make it work with non-quantel images
-
 		this.router.get('/media/thumbnail/:id', async (ctx, next) => {
 		  this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
-		  if (ctx.params.id.startsWith('QUANTEL:')) {
-				let id = ctx.params.id.slice(8)
-				ctx.type = 'image/jpeg'
-				await send(ctx, `thumbs/${id}.jpg`)
-		  } else {
-				const { _attachments } = await this.mediaDB.get(
-					ctx.params.id.toUpperCase(),
-					{ attachments: true, binary: true })
-
-				if (!_attachments['thumb.png']) {
-					ctx.status = 404
-					return await next()
-				}
-
-				ctx.type = 'image/png'
-				ctx.body = _attachments['thumb.png'].data
-		  }
+			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
+			let thumbPath = path.join(
+				this.config.paths && this.config.paths.resources || '',
+				this.config.previews && this.config.previews.folder || 'thumbs',
+				`${id}.jpg`
+			)
+			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
+			if (statError) {
+				this.logger.warning(`HTTP/S server: thumbnail requested that did not exist ${ctx.params.id}`, statError)
+				return await next()
+			}
+			ctx.type = 'image/jpeg'
+			ctx.body = await send(ctx, thumbPath)
+			ctx.length = stats.size
 		})
 
 		this.router.get('/media/preview/:id', async (ctx, next) => {
@@ -82,6 +76,6 @@ export class MediaManagerApp {
 				})
 			}
 		})
-		// TODO HTTPS
+		// Not doing HTTPS ... use nginx or equivalent to front this
 	}
 }
