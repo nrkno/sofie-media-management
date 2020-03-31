@@ -60,7 +60,7 @@ export class MediaManagerApp {
 			ctx.type = 'video/webm'
 			let previewPath = path.join(
 				this.config.paths && this.config.paths.resources || '',
-				this.config.previews && this.config.previews.folder || '',
+				this.config.previews && this.config.previews.folder || 'previews',
 				`${id}.webm`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
