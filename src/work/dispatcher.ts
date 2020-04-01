@@ -364,9 +364,11 @@ export class Dispatcher {
 	}
 
 	private async actionRestartWorkflow(workflowId: string) {
-		const wf: WorkFlowDB = await this.workFlows.get(workflowId)
+		const { result: wf, error: getError } = await noTryAsync(
+			() => this.workFlows.get<WorkFlowDB>(workflowId))
 
-		if (!wf) throw Error(`Dispatcher: workflow "${workflowId}" not found`)
+		if (getError || !wf)
+			throw Error(`Dispatcher: workflow "${workflowId}" not found`)
 
 		// Step 1: Abort the workflow
 		await this.actionAbortWorkflow(wf._id)
@@ -402,12 +404,12 @@ export class Dispatcher {
 	}
 
 	private async prioritizeWorkflow(workflowId: string) {
-		const wf: WorkFlowDB = await this.workFlows.get(workflowId)
+		const { result: wf, error: getError } = await noTryAsync(
+			() => this.workFlows.get<WorkFlowDB>(workflowId))
+
+		if (getError || !wf) throw Error(`Workflow "${workflowId}" not found`)
 
 		const prioritized = wf.priority > 1 ? true : false
-
-		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
-
 		const result = await this.workSteps.find({
 			selector: {
 				workFlowId: workflowId
@@ -434,9 +436,10 @@ export class Dispatcher {
 	}
 
 	private async actionAbortWorkflow(workflowId: string) {
-		const wf: WorkFlowDB = await this.workFlows.get(workflowId)
+		const { result: wf, error: getError } = await noTryAsync(
+			() => this.workFlows.get<WorkFlowDB>(workflowId))
 
-		if (!wf) throw Error(`Dispatcher: workflow "${workflowId}" not found`)
+		if (getError || !wf) throw Error(`Dispatcher: workflow "${workflowId}" not found`)
 
 		// Step 1: Block all Idle steps
 		await this.blockStepsInWorkFlow(wf._id, 'Aborted')
@@ -895,7 +898,7 @@ export class Dispatcher {
 
 						return async (): Promise<void> => {
 							const { result: doc, error: docError } = await noTryAsync(
-								() => this.workFlows.get(doc.id))
+								() => this.workFlows.get<WorkFlowDB>(docId))
 							if (docError) {
 								this.logger.error(`Dispatcher: workFlows: failed to retrieve document "${docId}" on sync operation`, docError)
 								throw docError
@@ -965,7 +968,7 @@ export class Dispatcher {
 
 						return async () => {
 							const { result: doc, error: docError } = await noTryAsync(
-								() => this.workSteps.get(doc.id))
+								() => this.workSteps.get<WorkStepDB>(docId))
 							if (docError) {
 								this.logger.error(`Dispatcher: workSteps: failed to retrieve document "${docId}" on sync operation`, docError)
 								throw docError
