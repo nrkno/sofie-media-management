@@ -157,6 +157,26 @@ export class MediaManager {
 
 		this._trackedMedia = this._trackedMedia || new TrackedMediaItems(this._logger)
 
+		await Promise.all(
+			this._availableStorage.map(st => {
+				this._logger.info(`About to initialize storage handler for ${st.id}.`)
+				return st.handler
+					.init()
+					.then(() => {
+						this._logger.info(`Storage handler for "${st.id}" initialized.`)
+					})
+					.catch(reason => {
+						this.coreHandler.setProcessState(
+							st.id,
+							[`Could not set up storage handler "${st.id}": ${reason}`],
+							P.StatusCode.BAD
+						)
+						this._logger.error(`Storage handler for "${st.id}" not initialized`, reason)
+						throw reason
+					})
+			})
+		)
+
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
 			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this._logger),
@@ -184,23 +204,7 @@ export class MediaManager {
 			this._logger
 		)
 
-		await Promise.all(
-			this._availableStorage.map(st => {
-				st.handler
-					.init()
-					.then(() => {
-						this._logger.info(`Storage handler for "${st.id}" initialized.`)
-					})
-					.catch(reason => {
-						this.coreHandler.setProcessState(
-							st.id,
-							[`Could not set up storage handler "${st.id}": ${reason}`],
-							P.StatusCode.BAD
-						)
-						throw reason
-					})
-			})
-		)
+
 		await this._dispatcher.init()
 
 		this._monitorManager.init(this.coreHandler)

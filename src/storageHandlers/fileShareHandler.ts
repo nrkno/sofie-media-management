@@ -49,6 +49,7 @@ export class FileShareHandler extends LocalFolderHandler {
 
 	async init(): Promise<void> {
 		let usedLetters: networkDrive.Dictionary<string> = {}
+		// this.logger.debug(`File share details: ${JSON.stringify(this)}`)
 		try {
 			usedLetters = await networkDrive.list()
 		} catch (e) {
@@ -73,6 +74,7 @@ export class FileShareHandler extends LocalFolderHandler {
 		if (mounts.indexOf(this._driveLetter.toUpperCase()) < 0) {
 			await networkDrive.mount(this._uncPath, this._driveLetter, this._username, this._password)
 		}
+		this.logger.debug(`Finished mounting '${this._driveLetter}:' as '${this._uncPath}'`)
 		return super.init()
 	}
 

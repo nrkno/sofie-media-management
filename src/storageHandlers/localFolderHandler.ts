@@ -128,10 +128,15 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			.on('unlink', this.onUnlink)
 
 		return new Promise<void>(resolve => {
-			this._watcher.on('ready', () => {
-			  this._initialized = true
-				resolve()
-			})
+			if (this._selectiveListen) { // Ready event never fired
+				this._initialized = true
+				setImmediate(resolve)
+			} else {
+				this._watcher.on('ready', () => {
+				  this._initialized = true
+					resolve()
+				})
+			}
 		})
 	}
 

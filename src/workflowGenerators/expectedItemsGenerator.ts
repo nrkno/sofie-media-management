@@ -550,13 +550,14 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						return allTrackedFiles.find(j => j.expectedMediaItemId === i.expectedMediaItemId) ? null : i
 					})
 				)
+				this.logger.debug(`New items are`, newItems)
 				this._trackedItems
 					.bulkChange(newItems)
 					.then(() => {
 						return newItems.map(item => this.checkAndEmitCopyWorkflow(item, 'initialExpectedCheck'))
 					})
 					.catch(e => {
-						this.emit('error', `There has been an error writing to tracked items database`, e)
+						this.emit('error', `There has been an error writing to tracked items database: ${e.message} ${e.stack}`)
 					})
 			})
 			.catch(_e => {

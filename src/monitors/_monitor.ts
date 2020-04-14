@@ -60,7 +60,7 @@ export abstract class Monitor extends EventEmitter {
 
 	/** To be triggered whenever a MediaObject is added or changed */
 	protected async sendChanged(doc: MediaObject): Promise<void> {
-		let sendDoc = _.omit(doc, ['_attachments'])
+		let sendDoc = _.omit(doc, ['_attachments']) // TODO not required with thumbs external
 		this.logger.info('Media scanning: _sendChanged', JSON.stringify(sendDoc, null, 2))
 		try {
 			await this.coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
