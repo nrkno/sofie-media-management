@@ -17,6 +17,7 @@ import * as PouchDB from 'pouchdb-node'
 import { MediaManagerApp } from './app'
 import { PreviewVacuum } from './monitors/previewVacuum'
 import { buildStorageHandler } from './storageHandlers/storageHandlerFactory'
+import * as fs from 'fs-extra'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -66,7 +67,11 @@ export class MediaManager {
 
 		try {
 			this._logger.info(`Initialising media database`)
-			this.mediaDB = new PouchDB('_media')
+			await fs.ensureDir('./db') // TODO this should be configurable?
+			const PrefixedPouchDB = PouchDB.defaults({
+				prefix: './db/'
+			} as PouchDB.Configuration.DatabaseConfiguration)
+			this.mediaDB = new PrefixedPouchDB('media')
 			this._monitorManager = new MonitorManager(this.mediaDB)
 			this._logger.info(`Database initialized`)
 

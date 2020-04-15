@@ -92,7 +92,7 @@ export class Dispatcher {
 		await fs.ensureDir('./db') // TODO this should be configurable?
 		const PrefixedPouchDB = PouchDB.defaults({
 			prefix: './db/'
-		} as any)
+		} as PouchDB.Configuration.DatabaseConfiguration)
 
 		this.workFlows = new PrefixedPouchDB('workFlows')
 		this.workSteps = new PrefixedPouchDB('workSteps')

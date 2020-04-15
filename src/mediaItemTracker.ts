@@ -42,7 +42,7 @@ export class TrackedMediaItems {
 			await fs.ensureDir(dbPrefix || './db')
 			const PrefixedPouchDB = PouchDB.defaults({
 				prefix: dbPrefix || './db/'
-			} as any)
+			} as PouchDB.Configuration.DatabaseConfiguration)
 
 			this.db = new PrefixedPouchDB('trackedMediaItems', {
 				adapter: dbAdapter
