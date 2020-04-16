@@ -66,7 +66,7 @@ export class Dispatcher {
 		private availableStorage: StorageObject[],
 		private tmi: TrackedMediaItems,
 		private config: DeviceSettings,
-		workersCount: number,
+		private workersCount: number,
 		private workFlowLingerTime: number,
 		private coreHandler: CoreHandler,
 		private logger: LoggerInstance
@@ -80,11 +80,6 @@ export class Dispatcher {
 		this.cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
 		this.warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
 		this.warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
-
-		for (let i = 0; i < workersCount; i++) {
-			this.workers.push(
-				new Worker(this.workSteps, this.mediaDB, this.tmi, this.config, this.logger, i))
-		}
 	}
 
 	private async initDB(): Promise<void> {
@@ -145,6 +140,10 @@ export class Dispatcher {
 
 	async init(): Promise<void> {
 		await this.initDB()
+		for (let i = 0; i < this.workersCount; i++) {
+			this.workers.push(
+				new Worker(this.workSteps, this.mediaDB, this.tmi, this.config, this.logger, i))
+		}
 		await this.cleanupOldWorkflows()
 		await noTryAsync(
 			() => this.initialWorkFlowSync(),

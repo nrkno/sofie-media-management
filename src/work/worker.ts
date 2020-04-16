@@ -1,6 +1,6 @@
 import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
-import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject, FieldOrder, Anomaly, Metadata, MediaInfo } from '../api'
+import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject, FieldOrder, Anomaly, Metadata, MediaInfo, StorageSettings } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
@@ -20,6 +20,13 @@ interface SortMeta {
 	time: number
 	type: 'start' | 'end'
 	isBlack: boolean
+}
+
+/** Grouping of details created during a file stat. */
+interface MediaFileDetails {
+	mediaPath: string
+	mediaStat: fs.Stats
+	mediaId: string
 }
 
 /**
@@ -187,6 +194,18 @@ export class Worker {
 				return obj
 			}),
 			error => this.logger.error(`Worker: error updating progress in database`, error))
+	}
+
+	private async lookForFile(mediaGeneralId: string, config: StorageSettings): Promise<MediaFileDetails | false> {
+		const mediaPath = path.join(config.options && config.options.mediaPath || '', mediaGeneralId)
+		const { error, result: mediaStat } = await noTryAsync(() => fs.stat(mediaPath))
+		if (error) return false
+		const mediaId = getID(mediaPath)
+		return literal<MediaFileDetails>({
+			mediaPath,
+			mediaStat,
+			mediaId
+		})
 	}
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
@@ -683,16 +702,32 @@ export class Worker {
 		})
 	}
 
-
 	private async doGenerateMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		let fileId = getID(step.file.name.replace('\\', '/'))
+		let fileId = getID(step.file.name)
 		if (step.target.options && step.target.options.mediaPath) {
 			fileId = step.target.options.mediaPath + '/' + fileId
 		}
+		let docExists = true
+		// FIXME scanFile case when object is new
 		let { result: doc, error: getError } =
 			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
-			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
+			const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
+			if (mediaFileDetails === false)
+				return this.failStep(`failed to locate media object file with ID "${fileId}" at path "${step.target.options && step.target.options.mediaPath}"`, step.action)
+			docExists = false
+			doc = literal<MediaObject>({
+				_id: mediaFileDetails.mediaId,
+				_rev: '',
+				mediaId: mediaFileDetails.mediaId,
+				mediaPath: mediaFileDetails.mediaPath,
+				mediaSize: mediaFileDetails.mediaStat.size,
+				mediaTime: mediaFileDetails.mediaStat.mtime.getTime(),
+				thumbSize: 0,
+				thumbTime: 0,
+				cinf: '',
+				tinf: ''
+			})
 		}
 
 		const args = [ 			// TODO (perf) Low priority process?
@@ -780,18 +815,18 @@ export class Worker {
 			}
 		})
 
-		// TODO not generating CINF - assuming not required
-
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
-		if (getError2) {
-			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+		if (docExists) {
+			let { result: doc2, error: getError2 } =
+				await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+			if (getError2) {
+				return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+			}
+			doc = doc2
 		}
+		doc.mediainfo = Object.assign(doc.mediainfo || {}, newInfo)
 
-		doc2.mediainfo = Object.assign(doc2.mediainfo, newInfo)
-
-		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
+		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc))
 		if (putError) {
 			return this.failStep(`failed to write metadata to database for "${fileId}"`, step.action, putError)
 		}
