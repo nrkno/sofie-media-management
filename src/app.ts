@@ -72,6 +72,13 @@ export class MediaManagerApp {
 			ctx.length = stats.size
 		})
 
+		this.router.get('/stat/seq', async (ctx, next) => {
+			const { update_seq } = await this.mediaDB.info()
+
+			ctx.body = { update_seq }
+			await next()
+		})
+
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
 
 		return new Promise((resolve) => {
