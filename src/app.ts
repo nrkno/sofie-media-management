@@ -33,7 +33,7 @@ export class MediaManagerApp {
 
 		// TODO make it work with non-quantel images
 
-		this.router.get('/media/thumbnail/:id', async (ctx, next) => {
+		this.router.get('/media/thumbnail/:id+', async (ctx, next) => {
 		  this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
 		  if (ctx.params.id.startsWith('QUANTEL:')) {
 				let id = ctx.params.id.slice(8)
@@ -54,7 +54,7 @@ export class MediaManagerApp {
 		  }
 		})
 
-		this.router.get('/media/preview/:id', async (ctx, next) => {
+		this.router.get('/media/preview/:id+', async (ctx, next) => {
 		  this.logger.debug(`HTTP/S server: received preview request ${ctx.params.id}`)
 			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
 			ctx.type = 'video/webm'
@@ -65,7 +65,7 @@ export class MediaManagerApp {
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
 			if (statError) {
-				this.logger.warning(`HTTP/S server: preview requested that did not exist ${ctx.params.id}`, statError)
+				this.logger.warn(`HTTP/S server: preview requested that did not exist ${ctx.params.id}`, statError)
 				return await next()
 			}
 			ctx.body = fs.createReadStream(previewPath)

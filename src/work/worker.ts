@@ -197,10 +197,12 @@ export class Worker {
 	}
 
 	private async lookForFile(mediaGeneralId: string, config: StorageSettings): Promise<MediaFileDetails | false> {
-		const mediaPath = path.join(config.options && config.options.mediaPath || '', mediaGeneralId)
+		const storagePath = config.options && config.options.mediaPath || ''
+		const mediaPath = path.join(storagePath, mediaGeneralId)
+		this.logger.debug(`Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(storagePath, mediaPath)}"`)
 		const { error, result: mediaStat } = await noTryAsync(() => fs.stat(mediaPath))
-		if (error) return false
-		const mediaId = getID(mediaPath)
+		if (error) { return false }
+		const mediaId = getID(path.relative(storagePath, mediaPath))
 		return literal<MediaFileDetails>({
 			mediaPath,
 			mediaStat,
@@ -210,9 +212,9 @@ export class Worker {
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
-		if (step.target.options && step.target.options.mediaPath) {
-			fileId = step.target.options.mediaPath + '/' + fileId
-		}
+		// if (step.target.options && step.target.options.mediaPath) {
+		// 	fileId = step.target.options.mediaPath + '/' + fileId
+		// }
 		let { result: doc, error: getError } =
 			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
@@ -287,9 +289,9 @@ export class Worker {
 
 	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
-		if (step.target.options && step.target.options.mediaPath) {
-			fileId = step.target.options.mediaPath + '/' + fileId
-		}
+		// if (step.target.options && step.target.options.mediaPath) {
+		// 	fileId = step.target.options.mediaPath + '/' + fileId
+		// }
 		let { result: doc, error: getError } =
 			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
@@ -635,9 +637,9 @@ export class Worker {
 
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
-		if (step.target.options && step.target.options.mediaPath) {
-			fileId = step.target.options.mediaPath + '/' + fileId
-		}
+		// if (step.target.options && step.target.options.mediaPath) {
+		// 	fileId = step.target.options.mediaPath + '/' + fileId
+		// }
 		let { result: doc, error: getError } =
 			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
@@ -704,11 +706,10 @@ export class Worker {
 
 	private async doGenerateMetadata(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
-		if (step.target.options && step.target.options.mediaPath) {
-			fileId = step.target.options.mediaPath + '/' + fileId
-		}
+		// if (step.target.options && step.target.options.mediaPath) {
+		// 	fileId = step.target.options.mediaPath + '/' + fileId
+		// }
 		let docExists = true
-		// FIXME scanFile case when object is new
 		let { result: doc, error: getError } =
 			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
