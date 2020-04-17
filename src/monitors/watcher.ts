@@ -2,7 +2,7 @@ import { EventEmitter } from 'events'
 import * as path from 'path'
 import * as chokidar from 'chokidar'
 import { noTryAsync } from 'no-try'
-import { MonitorSettingsWatcher, MediaObject } from '../api'
+import { MonitorSettingsWatcher, MediaObject, LocalFolderStorage, FileShareStorage } from '../api'
 import { LoggerInstance } from 'winston'
 import { Stats, stat } from 'fs-extra'
 import { literal } from '../lib/lib'
@@ -43,32 +43,34 @@ export class Watcher extends EventEmitter {
 
 	constructor(
 		private db: PouchDB.Database<MediaObject>,
-		private settings: MonitorSettingsWatcher,
-		private logger: LoggerInstance
+		private monitorSettings: MonitorSettingsWatcher,
+		private logger: LoggerInstance,
+		private storageSettings: LocalFolderStorage | FileShareStorage
 	) {
 		super()
 	}
 
   public init() {
-		this.watcher = chokidar.watch(this.settings.paths, Object.assign({
+		if (!this.storageSettings) return
+		this.watcher = chokidar.watch(this.storageSettings.options.basePath, Object.assign({
 			alwaysStat: true,
 			awaitWriteFinish: {
 				stabilityThreshold: 4000,
 				pollInterval: 1000
 			}
-		}, this.settings.scanner))
+		}, this.monitorSettings.scanner))
 		this.watcher.on('add', (localPath: string, stat: Stats): void => {
-			const mediaId = getId(this.settings.casparMediaPath, localPath)
+			const mediaId = getId(this.storageSettings.options.basePath, localPath)
 			this.scanFile(localPath, mediaId, stat)
 				.catch(error => { this.logger.error(error) })
 		})
 		this.watcher.on('change', (localPath: string, stat: Stats) => {
-			const mediaId = getId(this.settings.casparMediaPath, localPath)
+			const mediaId = getId(this.storageSettings.options.basePath, localPath)
 			this.scanFile(localPath, mediaId, stat)
 				.catch(error => { this.logger.error(error) })
 		})
 		this.watcher.on('unlink', (localPath: string, _stat: Stats) => {
-			const mediaId = getId(this.settings.casparMediaPath, localPath)
+			const mediaId = getId(this.storageSettings.options.basePath, localPath)
 			this.db.get(mediaId)
 				.then((doc) => this.db.remove(doc))
 				.catch(error => { this.logger.error(error) })
@@ -164,7 +166,7 @@ export class Watcher extends EventEmitter {
 		if (error) {
 			this.scanning = false
 			this.filesToScanFail[mediaId] = (this.filesToScanFail[mediaId] || 0) + 1
-			if (this.filesToScanFail[mediaId] >= this.settings.retryLimit) {
+			if (this.filesToScanFail[mediaId] >= this.monitorSettings.retryLimit) {
 			  this.logger.error(`Media watching: skipping file. Too many retries for '${mediaId}'`)
 			  delete this.filesToScanFail[mediaId]
 			  delete this.filesToScan[mediaId]
@@ -211,8 +213,9 @@ export class Watcher extends EventEmitter {
 			})
 			await Promise.all(result.rows.map(async ({ doc }) => {
 				const { error } = await noTryAsync(async () => {
-					const mediaFolder = path.normalize(Array.isArray(this.settings.paths) ? this.settings.paths[0] : this.settings.paths)
+					const mediaFolder = path.normalize(this.storageSettings.options.basePath)
 					const mediaPath = path.normalize(doc!.mediaPath)
+					this.logger.debug(`Delete test: mediaPath = ${mediaPath} mediaFolder = ${mediaFolder} indexOf=${mediaPath.indexOf(mediaFolder)}`)
 					if (mediaPath.indexOf(mediaFolder) === 0 && await fileExists(doc!.mediaPath)) {
 						return
 					}
@@ -228,6 +231,7 @@ export class Watcher extends EventEmitter {
 				}
 			}))
 
+			this.logger.debug(`About to delete media objects ${deleted.map(x => x._id)}`)
 			await this.db.bulkDocs(deleted)
 
 			if (result.rows.length < limit) {

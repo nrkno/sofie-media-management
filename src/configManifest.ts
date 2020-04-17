@@ -144,17 +144,6 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.NULL] = []
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
-		id: 'paths',
-		name: 'Paths to watch',
-		type: ConfigManifestEntryType.STRING
-	},
-	// TODO work out which watch options to follow
-	{
-		id: 'casparMediaPath',
-		name: 'Path to CasparCG (shared) media folder',
-		type: ConfigManifestEntryType.STRING
-	},
-	{
 		id: 'retryLimit',
 		name: 'Maximum file scan retries',
 		type: ConfigManifestEntryType.INT,

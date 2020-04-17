@@ -329,12 +329,8 @@ export interface MonitorSettingsNull extends MonitorSettingsBase {
 export interface MonitorSettingsWatcher extends MonitorSettingsBase {
 	type: MonitorSettingsType.WATCHER
 
-	/** Paths that media manager should watch to check for content */
-	paths: string | Array<string>
 	/** See https://www.npmjs.com/package/chokidar#api */
 	scanner: WatchOptions
-	/** CasparCG (shared) media path */
-	casparMediaPath: string
 	/** Maximum number of times to try and scan a file. */
 	retryLimit: number
 }

@@ -2,13 +2,21 @@ import * as _ from 'underscore'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
-import { MonitorSettingsWatcher, MediaObject, DiskInfo } from '../api'
+import { MonitorSettingsWatcher, MediaObject, DiskInfo, StorageSettings, StorageType, LocalFolderStorage, FileShareStorage } from '../api'
 import { LoggerInstance } from 'winston'
 import { FetchError } from 'node-fetch'
 import { promisify } from 'util'
 import { exec as execCB } from 'child_process'
 import { Watcher } from './watcher'
 const exec = promisify(execCB)
+
+function isLocalFolderStorage(sets: StorageSettings): sets is LocalFolderStorage {
+	return sets.type === StorageType.LOCAL_FOLDER
+}
+
+function isFileShareStorage(sets: StorageSettings): sets is FileShareStorage {
+	return sets.type === StorageType.FILE_SHARE
+}
 
 export class MonitorMediaWatcher extends Monitor {
 	private changes: PouchDB.Core.Changes<MediaObject>
@@ -37,13 +45,19 @@ export class MonitorMediaWatcher extends Monitor {
 	constructor(
 		deviceId: string,
 		private db: PouchDB.Database<MediaObject>,
-		public settings: MonitorSettingsWatcher,
-		logger: LoggerInstance
+		public monitorSettings: MonitorSettingsWatcher,
+		logger: LoggerInstance,
+		private storageSettings?: StorageSettings
 	) {
-		super(deviceId, settings, logger)
+		super(deviceId, monitorSettings, logger)
 
-		this.watcher = new Watcher(db, settings, logger)
-		this.watcher.init()
+		if (
+			storageSettings &&
+			(isFileShareStorage(storageSettings) || isLocalFolderStorage(storageSettings))
+		) {
+			this.watcher = new Watcher(db, monitorSettings, logger, storageSettings)
+			this.watcher.init()
+		}
 		this.updateStatus()
 	}
 
@@ -64,9 +78,9 @@ export class MonitorMediaWatcher extends Monitor {
 
 	public async init(): Promise<void> {
 		try {
-			this.logger.info(`Initializing media watcher monitor`, this.settings)
+			this.logger.info(`Initializing media watcher monitor`, this.monitorSettings)
 
-			if (!this.settings.disable) {
+			if (!this.monitorSettings.disable) {
 				this.logger.info('Media watcher init')
 
 				this.restartChangesStream()
@@ -149,7 +163,9 @@ export class MonitorMediaWatcher extends Monitor {
 			this.changes.cancel()
 		}
 		// await this.db.close()
-		await this.watcher.dispose()
+		if (this.watcher) {
+			await this.watcher.dispose()
+		}
 	}
 
 	private triggerupdateFsStats(): void {
@@ -283,10 +299,10 @@ export class MonitorMediaWatcher extends Monitor {
 
 		let statusSettings: PeripheralDeviceAPI.StatusObject = { statusCode: PeripheralDeviceAPI.StatusCode.GOOD }
 
-		if (!this.settings.storageId) {
+		if (!this.monitorSettings.storageId || !this.storageSettings) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Settings parameter "storageId" not set']
+				messages: ['Settings parameter "storageId" not set or no corresponding storage']
 			}
 		} else if (!this.initialized) {
 			statusSettings = {

@@ -71,7 +71,7 @@ export class MediaManager {
 			const PrefixedPouchDB = PouchDB.defaults({
 				prefix: './db/'
 			} as PouchDB.Configuration.DatabaseConfiguration)
-			this.mediaDB = new PrefixedPouchDB('media')
+			this.mediaDB = new PrefixedPouchDB<MediaObject>('media')
 			this._monitorManager = new MonitorManager(this.mediaDB)
 			this._logger.info(`Database initialized`)
 

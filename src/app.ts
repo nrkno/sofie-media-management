@@ -34,23 +34,31 @@ export class MediaManagerApp {
 		// TODO make it work with non-quantel images
 
 		this.router.get('/media/thumbnail/:id+', async (ctx, next) => {
-		  this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
+		  this.logger.debug(`HTTP/S server: received thumbnail request "${ctx.params.id}"`)
 		  if (ctx.params.id.startsWith('QUANTEL:')) {
 				let id = ctx.params.id.slice(8)
 				ctx.type = 'image/jpeg'
 				await send(ctx, `thumbs/${id}.jpg`)
 		  } else {
-				const { _attachments } = await this.mediaDB.get(
+				this.logger.debug(`Making database thumbnail request for "${ctx.params.id}"`)
+				const { result, error } = await noTryAsync(() => this.mediaDB.get<MediaObject>(
 					ctx.params.id.toUpperCase(),
-					{ attachments: true, binary: true })
+					{ attachments: true, binary: true }))
 
-				if (!_attachments['thumb.png']) {
+				if (error) {
+					this.logger.warn(`Database requests for "${ctx.params.id}" failed: ${error.message}`)
+					ctx.status = 404
+					return await next()
+				}
+				const _attachments = result._attachments
+				// this.logger.debug(`Attachments is ${JSON.stringify(_attachments)}`)
+				if (!_attachments || (_attachments && !_attachments['thumb.png'])) {
 					ctx.status = 404
 					return await next()
 				}
 
 				ctx.type = 'image/png'
-				ctx.body = _attachments['thumb.png'].data
+				ctx.body = (_attachments['thumb.png'] as PouchDB.Core.FullAttachment).data
 		  }
 		})
 
