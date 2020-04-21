@@ -55,14 +55,17 @@ export class MonitorQuantel extends Monitor {
 	private watchError: string | null
 	private cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
 
-	constructor(		deviceId: string,
-			public settings: MonitorSettingsQuantel,
-			logger: LoggerInstance
+	private ident = 'Quantel monitor:'
+
+	constructor(
+		deviceId: string,
+		public settings: MonitorSettingsQuantel,
+		logger: LoggerInstance
 	) {
 		super(deviceId, settings, logger)
 
 		this.quantel = new QuantelGateway()
-		this.quantel.on('error', e => this.logger.error('Quantel.QuantelGateway', e))
+		this.quantel.on('error', e => this.logger.error(`${this.ident} Quantel.QuantelGateway`, e))
 	}
 
 	get deviceInfo(): MonitorDevice {
@@ -80,17 +83,17 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	public async restart(): Promise<void> {
-		throw Error('Quantel restart not implemented yet')
+		throw Error(`${this.ident} restart: Quantel restart not implemented yet`)
 	}
 
 	public async init(): Promise<void> {
-		this.logger.info(`Initializing Quantel-monitor`, this.settings)
+		this.logger.info(`${this.ident} init: Initializing Quantel-monitor`, this.settings)
 
 		const device = await this.coreHandler.getParentDevice()
 
 		this.studioId = device.studioId
 
-		if (!this.studioId) throw new Error('Quantel: Device .studioId not set!')
+		if (!this.studioId) throw new Error(`${this.ident} init: Device .studioId not set!`)
 
 		this.expectedMediaItems = () => this.coreHandler.core.getCollection('expectedMediaItems')
 
@@ -115,13 +118,13 @@ export class MonitorQuantel extends Monitor {
 				this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
 			}
 		)
-		this.logger.debug(`Quantel: Subscribed to expectedMediaItems for studio "${this.studioId}"`)
+		this.logger.debug(`${this.ident} init: Subscribed to expectedMediaItems for studio "${this.studioId}"`)
 
 		this.observer = observer
 
-		if (!this.settings.gatewayUrl) throw new Error('Quantel: parameter not set: gatewayUrl')
-		if (!this.settings.ISAUrl) throw new Error('Quantel: parameter not set: ISAUrl')
-		if (!this.settings.serverId) throw new Error('Quantel: parameter not set: serverId')
+		if (!this.settings.gatewayUrl) throw new Error(`${this.ident} init: parameter not set: gatewayUrl`)
+		if (!this.settings.ISAUrl) throw new Error(`${this.ident} init: parameter not set: ISAUrl`)
+		if (!this.settings.serverId) throw new Error(`${this.ident} init: parameter not set: serverId`)
 
 		// Setup quantel connection:
 		await this.quantel.init(
@@ -159,7 +162,7 @@ export class MonitorQuantel extends Monitor {
 			try {
 				return fcn(...args)
 			} catch (e) {
-				this.logger.error(e)
+				this.logger.error(`${this.ident} ${fcn.name}: ${e.message}`, e)
 			}
 		}
 	}
@@ -173,7 +176,7 @@ export class MonitorQuantel extends Monitor {
 
 	private parseUrlToQuery(queryUrl: string): QuantelClipSearchQuery {
 		const parsed = url.parse(queryUrl)
-		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`Unsupported URL format: ${queryUrl}`)
+		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`${this.ident} parseUrlToQuery: Unsupported URL format: ${queryUrl}`)
 		let guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
 		// path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
 		let title = decodeURI(parsed.query || '') // query for quantel:?Clip title or quantel:?"Clip title"
@@ -193,7 +196,7 @@ export class MonitorQuantel extends Monitor {
 				Title: `"${title}"`
 			}
 		}
-		throw new Error(`Unsupported URL format: ${queryUrl}`)
+		throw new Error(`${this.ident} parseUrlToQuery: Unexpected search results: ${queryUrl}`)
 	}
 
 	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
@@ -203,7 +206,7 @@ export class MonitorQuantel extends Monitor {
 		} else {
 			item = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		}
-		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
+		if (!item) throw new Error(`${this.ident} onExpectedAdded: Could not find the new item "${id}" in expectedMediaItems`)
 
 		// Note: The item.url will contain the clip GUID
 		if (item.url && !this.monitoredFiles[item.url]) {
@@ -222,7 +225,7 @@ export class MonitorQuantel extends Monitor {
 
 	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
 		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
-		if (!item) throw new Error(`Could not find the changed item "${id}" in expectedMediaItems`)
+		if (!item) throw new Error(`${this.ident} onExpectedChanged: Could not find the changed item "${id}" in expectedMediaItems`)
 
 		if (item.url && !this.monitoredFiles[item.url]) {
 			const shouldHandle = this.shouldHandleItem(item)
@@ -252,7 +255,7 @@ export class MonitorQuantel extends Monitor {
 		setTimeout(() => {
 			if (!this.isDestroyed) {
 				this.doWatch().catch(e => {
-					this.logger.error('Error in Quantel doWatch:' + e)
+					this.logger.error(`${this.ident} triggerWatch: Error in Quantel doWatch`, e)
 				})
 			}
 		}, BREATHING_ROOM)
@@ -294,7 +297,7 @@ export class MonitorQuantel extends Monitor {
 								})
 								if (clipSummary) {
 									// The clip is present, and on the right server
-									this.logger.debug(`Clip "${url}" found`)
+									this.logger.debug(`${this.ident} doWatch: Clip "${url}" found`)
 									// TODO: perhaps use clipData.Completed ?
 
 									const clipData = await this.quantel.getClip(clipSummary.ClipID)
@@ -325,12 +328,12 @@ export class MonitorQuantel extends Monitor {
 										}
 									} else {
 										this.logger.warn(
-											`Clip "${url}" summary found, but clip not found when asking for clipId`
+											`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
 										)
 									}
-								} else this.logger.debug(`Clip "${url}" found, but doesn't exist on the right server`)
-							} else this.logger.debug(`Clip "${url}" not found`)
-						} else this.logger.error(`Quantel: Falsy url encountered`)
+								} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server`)
+							} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" not found`)
+						} else this.logger.error(`${this.ident} doWatch: Falsy url encountered`)
 
 						let newStatus = mediaObject ? QuantelMonitorFileStatus.READY : QuantelMonitorFileStatus.MISSING
 
@@ -348,14 +351,14 @@ export class MonitorQuantel extends Monitor {
 						if (!oldMediaObject || newMediaObject._rev !== oldMediaObject._rev) {
 							// Added or changed
 							p.then(() => this.sendChanged(newMediaObject)).catch(e => {
-								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
+								this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
 							})
 						}
 					} else {
 						if (oldMediaObject) {
 							// Removed
 							p.then(() => this.sendRemoved(oldMediaObject._id)).catch(e => {
-								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
+								this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
 							})
 						}
 					}
@@ -368,14 +371,14 @@ export class MonitorQuantel extends Monitor {
 				await p
 				// this._cachedMediaObjects = mediaObjects
 			} else {
-				throw new Error('Quantel: Has no server')
+				throw new Error(`${this.ident} doWatch: Has no server`)
 			}
 			// last:
 			this.watchError = null
 			await this.wait(BREATHING_ROOM)
 		} catch (e) {
 			this.watchError = e.toString()
-			this.logger.error('Error in Quantel doWatch:' + e)
+			this.logger.error(`${this.ident} doWatch: Error in Quantel doWatch`, e)
 		}
 		this.triggerWatch()
 	}
