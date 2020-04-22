@@ -244,8 +244,7 @@ export class Worker {
 				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
 			}
 			args.push('-seekable 0')
-			args.push('-i')
-			args.push(hlsUrl)
+			args.push(`-i "${hlsUrl}"`)
 		} else {
 			args.push(`-i' "${doc.mediaPath}"`)
 		}
@@ -336,18 +335,29 @@ export class Worker {
 		const args = [
 			'-hide_banner',
 			'-y',
-			'-threads 1',
-			'-i', `"${doc.mediaPath}"`,
-			'-f', 'webm',
-			'-an',
-			'-c:v', 'libvpx',
-			'-b:v', this.config.previews && this.config.previews.bitrate || '40k',
-			'-auto-alt-ref', '0',
-			`-vf scale=${this.config.previews && this.config.previews.width || 190}:`+
-				`${this.config.previews && this.config.previews.height || -1}`,
-			'-deadline realtime',
-			`"${tmpPath}"`
-		]
+			'-threads 1' ]
+		if (this.isQuantel(doc.mediaId)) {
+			if (!this.quantelMonitor) {
+				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toHLSUrl(doc.mediaId))
+			if (urlError) {
+				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
+			}
+			args.push('-seekable 0')
+			args.push(`-i "${hlsUrl}"`)
+		} else {
+			args.push(`-i' "${doc.mediaPath}"`)
+		}
+		args.push('-f', 'webm')
+		args.push('-an')
+		args.push('-c:v', 'libvpx')
+		args.push('-b:v', this.config.previews && this.config.previews.bitrate || '40k')
+		args.push('-auto-alt-ref 0')
+		args.push(`-vf scale=${this.config.previews && this.config.previews.width || 190}:`+
+				`${this.config.previews && this.config.previews.height || -1}`)
+		args.push('-deadline realtime')
+		args.push(`"${tmpPath}"`)
 
 		await fs.mkdirp(path.dirname(tmpPath))
 		this.logger.info(`Worker: preview generate: starting preview generation for "${fileId}" at path "${tmpPath}"`)
@@ -423,10 +433,20 @@ export class Worker {
 			'-frames:v', this.config.metadata && this.config.metadata.fieldOrderScanDuration || 200,
 			'-an',
 			'-f', 'rawvideo',
-			'-y', (process.platform === 'win32' ? 'NUL' : '/dev/null'),
-			// '-threads 1', // Not needed. This is very quick even for big files.
-			'-i', `"${doc.mediaPath}"`
-		]
+			'-y', (process.platform === 'win32' ? 'NUL' : '/dev/null') ]
+		if (this.isQuantel(doc.mediaId)) {
+			if (!this.quantelMonitor) {
+				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toHLSUrl(doc.mediaId))
+			if (urlError) {
+				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
+			}
+			args.push('-seekable 0')
+			args.push(`-i "${hlsUrl}"`)
+		} else {
+			args.push(`-i' "${doc.mediaPath}"`)
+		}
 
 		const { error: execError, result } = await noTryAsync(() => new Promise((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
@@ -496,15 +516,25 @@ export class Worker {
 			filterString += `"select='gt(scene,${metaconf.sceneThreshold || 0.4})',showinfo"`
 		}
 
-		const args = [
-			'-hide_banner',
-			'-i', `"${doc.mediaPath}"`,
-			'-filter:v', filterString,
-			'-an',
-			'-f', 'null',
-			'-threads', '1',
-			'-'
-		]
+		const args = [ '-hide_banner' ]
+		if (this.isQuantel(doc.mediaId)) {
+			if (!this.quantelMonitor) {
+				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toHLSUrl(doc.mediaId))
+			if (urlError) {
+				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
+			}
+			args.push('-seekable 0')
+			args.push(`-i "${hlsUrl}"`)
+		} else {
+			args.push(`-i' "${doc.mediaPath}"`)
+		}
+		args.push('-filter:v', filterString)
+		args.push('-an')
+		args.push('-f null')
+		args.push('-threads 1')
+		args.push('-')
 
 		let infoProcess: ChildProcessWithoutNullStreams = spawn(
 			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
@@ -668,8 +698,14 @@ export class Worker {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 
-		const fieldOrder: FieldOrder = await this.getFieldOrder(doc)
-		const metadata: Metadata = await this.getMetadata(doc)
+		const { result: fieldOrder, error: foError } = await noTryAsync(() => this.getFieldOrder(doc))
+		if (foError) {
+			return this.failStep(`Unable to determine field order for media object with ID "${fileId}"`, step.action, foError)
+		}
+		const { result: metadata, error: mdError } = await noTryAsync(() => this.getMetadata(doc))
+		if (mdError) {
+			return this.failStep(`Unable to get metadata for media object with ID "${fileId}"`, step.action, mdError)
+		}
 
 		if (this.config.metadata && this.config.metadata.mergeBlacksAndFreezes) {
 			if (
@@ -755,12 +791,23 @@ export class Worker {
 
 		const args = [ 			// TODO (perf) Low priority process?
 			this.config.paths && this.config.paths.ffprobe || process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe',
-			'-hide_banner',
-			'-i', `"${doc.mediaPath}"`,
-			'-show_streams',
-			'-show_format',
-			'-print_format', 'json'
-		]
+			'-hide_banner' ]
+		if (this.isQuantel(doc.mediaId)) {
+			if (!this.quantelMonitor) {
+				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
+			}
+			const { result: essenceUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toEssenceUrl(doc.mediaId))
+			if (urlError) {
+				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
+			}
+			args.push('-seekable 0')
+			args.push(`-i' "${essenceUrl}"`)
+		} else {
+			args.push(`-i' "${doc.mediaPath}"`)
+		}
+		args.push('-show_streams')
+		args.push('-show_format')
+		args.push('-print_format', 'json')
 
 		const { result: probeData, error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {

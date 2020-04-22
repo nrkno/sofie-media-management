@@ -448,10 +448,10 @@ export class MonitorQuantel extends Monitor {
 		})
 	}
 
-	async toHLSUrl (mediaId: string): Promise<string> {
-		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(mediaId))
+	private async urlToClipID (url: string, method: string): Promise<number> {
+		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(url))
 		if (clipSummaries.length < 1) {
-			throw new Error(`${this.ident} toHLSUrl: Could not find clip with ID "${mediaId}"`)
+			throw new Error(`${this.ident} ${method}: Could not find clip with ID "${url}"`)
 		}
 
 		const clipSummary = _.find(clipSummaries, clipData => {
@@ -461,28 +461,24 @@ export class MonitorQuantel extends Monitor {
 			)
 		})
 		if (clipSummary) {
-			return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipSummary.ClipID}/stream.m3u8`
+			return clipSummary.ClipID
 		} else {
-			throw new Error(`${this.ident} toHLSUrl: Could not find completed clip "${mediaId}" on ISA with frame count greater than 0`)
+			throw new Error(`${this.ident} ${method}: Could not find completed clip "${url}" on ISA with frame count greater than 0`)
 		}
 	}
 
-	async toStillUrl (mediaId: string, width?: number, frame?: number): Promise<string> {
-		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(mediaId))
-		if (clipSummaries.length < 1) {
-			throw new Error(`${this.ident} toStillUrl: Could not find clip with ID "${mediaId}"`)
-		}
+	async toHLSUrl (mediaId: string): Promise<string> {
+		const clipID = await this.urlToClipID(mediaId, 'toHLSUrl')
+		return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipID}/stream.m3u8`
+	}
 
-		const clipSummary = _.find(clipSummaries, clipData => {
-			return (
-				parseInt(clipData.Frames, 10) > 0 &&
-				clipData.Completed
-			)
-		})
-		if (clipSummary) {
-			return `${this.settings.transformerUrl}/quantel/homezone/clips/stills/${clipSummary.ClipID}/${frame || 0}.${width ? width + '.' : ''}jpg`
-		} else {
-			throw new Error(`${this.ident} toStillUrl: Could not find completed clip "${mediaId}" on ISA with frame count greater than 0`)
-		}
+	async toStillUrl (mediaId: string, width?: number, frame?: number): Promise<string> {
+		const clipID = await this.urlToClipID(mediaId, 'toStillUrl')
+		return `${this.settings.transformerUrl}/quantel/homezone/clips/stills/${clipID}/${frame || 0}.${width ? width + '.' : ''}jpg`
+	}
+
+	async toEssenceUrl (mediaId: string): Promise<string> {
+		const clipID = await this.urlToClipID(mediaId, 'toEssenceUrl')
+		return `${this.settings.transformerUrl}/quantel/homezone/clips/ports/${clipID}/essence.mxf`
 	}
 }
