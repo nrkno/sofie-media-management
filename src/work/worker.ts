@@ -9,6 +9,7 @@ import * as path from 'path'
 import * as os from 'os'
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import * as fs from 'fs-extra'
+import { MonitorQuantel } from '../monitors/quantel'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -41,6 +42,7 @@ export class Worker {
 	private finishPromises: Array<Function> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
+	private quantelMonitor: MonitorQuantel | undefined = undefined
 
 	constructor(
 		private workStepDB: PouchDB.Database<WorkStepDB>,
@@ -63,6 +65,10 @@ export class Worker {
 
 	get lastBeginStep(): Time | undefined {
 		return this._busy ? this._lastBeginStep : undefined
+	}
+
+	setQuantelMonitor(monitor?: MonitorQuantel) {
+		this.quantelMonitor = monitor
 	}
 
 	/**
@@ -199,7 +205,7 @@ export class Worker {
 	private async lookForFile(mediaGeneralId: string, config: StorageSettings): Promise<MediaFileDetails | false> {
 		const storagePath = config.options && config.options.mediaPath || ''
 		const mediaPath = path.join(storagePath, mediaGeneralId)
-		this.logger.debug(`Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(storagePath, mediaPath)}"`)
+		this.logger.debug(`${this.ident}: Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(storagePath, mediaPath)}"`)
 		const { error, result: mediaStat } = await noTryAsync(() => fs.stat(mediaPath))
 		if (error) { return false }
 		const mediaId = getID(path.relative(storagePath, mediaPath))
@@ -208,6 +214,10 @@ export class Worker {
 			mediaStat,
 			mediaId
 		})
+	}
+
+	private isQuantel(id: string): boolean {
+		return id.toUpperCase().startsWith('QUANTEL:')
 	}
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
@@ -224,14 +234,26 @@ export class Worker {
 		const tmpPath = path.join(os.tmpdir(), `${Math.random().toString(16)}.png`)
 		const args = [ // TODO (perf) Low priority process?
 			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-			'-hide_banner',
-			'-i', `"${doc.mediaPath}"`,
-			'-frames:v 1',
-			`-vf thumbnail,scale=${this.config.thumbnails && this.config.thumbnails.width || 256}:` +
-				`${this.config.thumbnails && this.config.thumbnails.width || -1}`,
-			'-threads 1',
-			`"${tmpPath}"`
-		]
+			'-hide_banner' ]
+		if (this.isQuantel(doc.mediaId)) {
+			if (!this.quantelMonitor) {
+				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toHLSUrl(doc.mediaId))
+			if (urlError) {
+				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
+			}
+			args.push('-seekable 0')
+			args.push('-i')
+			args.push(hlsUrl)
+		} else {
+			args.push(`-i' "${doc.mediaPath}"`)
+		}
+		args.push('-frames:v 1')
+		args.push(`-vf thumbnail,scale=${this.config.thumbnails && this.config.thumbnails.width || 256}:` +
+			`${this.config.thumbnails && this.config.thumbnails.width || -1}`)
+		args.push('-threads 1')
+		args.push(`"${tmpPath}"`)
 
 		// Not necessary ... just checking that /tmp or Windows equivalent exists
 		// await fs.mkdirp(path.dirname(tmpPath))

@@ -155,22 +155,27 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 	{
 		id: 'gatewayUrl',
 		name: 'Gateway URL',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
 	},
 	{
 		id: 'ISAUrl',
 		name: 'ISA URL',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
 	},
 	{
 		id: 'zoneId',
 		name: 'Zone ID (leave blank for default)',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
 	},
 	{
 		id: 'serverId',
 		name: 'Quantel Server ID',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
+	},
+	{
+		id: 'transformerUrl',
+		name: 'TransformerURL',
+		type: ConfigManifestEntryType.STRING
 	}
 ]
 

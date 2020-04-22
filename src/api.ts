@@ -346,4 +346,6 @@ export interface MonitorSettingsQuantel extends MonitorSettingsBase {
 	zoneId?: string
 	/** The id of the server to control. An Ingeter */
 	serverId: number
+	/** Base Url for Quantel transformer used for metadata generation */
+	transformerUrl?: string
 }

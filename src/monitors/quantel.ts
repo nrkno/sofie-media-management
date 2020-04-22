@@ -42,6 +42,10 @@ enum QuantelMonitorFileStatus {
 	READY = 30
 }
 
+export function isQuantelMonitor(monitor: Monitor): monitor is MonitorQuantel {
+	return monitor.deviceInfo.deviceSubType === 'quantel'
+}
+
 export class MonitorQuantel extends Monitor {
 
 	private expectedMediaItems: () => Collection
@@ -331,7 +335,10 @@ export class MonitorQuantel extends Monitor {
 											`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
 										)
 									}
-								} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server`)
+								} else {
+									this.logger.debug(`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server`)
+									// TODO: initiate copy to correct server
+								}
 							} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" not found`)
 						} else this.logger.error(`${this.ident} doWatch: Falsy url encountered`)
 
@@ -439,5 +446,43 @@ export class MonitorQuantel extends Monitor {
 		return new Promise(resolve => {
 			setTimeout(resolve, time)
 		})
+	}
+
+	async toHLSUrl (mediaId: string): Promise<string> {
+		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(mediaId))
+		if (clipSummaries.length < 1) {
+			throw new Error(`${this.ident} toHLSUrl: Could not find clip with ID "${mediaId}"`)
+		}
+
+		const clipSummary = _.find(clipSummaries, clipData => {
+			return (
+				parseInt(clipData.Frames, 10) > 0 &&
+				clipData.Completed
+			)
+		})
+		if (clipSummary) {
+			return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipSummary.ClipID}/stream.m3u8`
+		} else {
+			throw new Error(`${this.ident} toHLSUrl: Could not find completed clip "${mediaId}" on ISA with frame count greater than 0`)
+		}
+	}
+
+	async toStillUrl (mediaId: string, width?: number, frame?: number): Promise<string> {
+		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(mediaId))
+		if (clipSummaries.length < 1) {
+			throw new Error(`${this.ident} toStillUrl: Could not find clip with ID "${mediaId}"`)
+		}
+
+		const clipSummary = _.find(clipSummaries, clipData => {
+			return (
+				parseInt(clipData.Frames, 10) > 0 &&
+				clipData.Completed
+			)
+		})
+		if (clipSummary) {
+			return `${this.settings.transformerUrl}/quantel/homezone/clips/stills/${clipSummary.ClipID}/${frame || 0}.${width ? width + '.' : ''}jpg`
+		} else {
+			throw new Error(`${this.ident} toStillUrl: Could not find completed clip "${mediaId}" on ISA with frame count greater than 0`)
+		}
 	}
 }

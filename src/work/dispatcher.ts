@@ -25,6 +25,7 @@ import { StorageObject } from '../storageHandlers/storageHandler'
 import { Worker, WorkResult } from './worker'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import { CoreHandler } from '../coreHandler'
+import { MonitorQuantel } from '../monitors/quantel'
 
 const CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000 // 10 hours (ms)
 const WARNING_WF_QUEUE_LENGTH = 10 // 10 items
@@ -59,6 +60,8 @@ export class Dispatcher {
 
 	private warningWFQueueLength: number
 	private warningTaskWorkingTime: number
+
+	private quantelMonitor: MonitorQuantel | undefined
 
 	constructor(
 		private mediaDB: PouchDB.Database<MediaObject>,
@@ -1026,4 +1029,9 @@ export class Dispatcher {
 		100,
 		'pushWorkStepToCore'
 	)
+
+	setQuantelMonitor(monitor: MonitorQuantel) {
+		this.quantelMonitor = monitor
+		this.workers.forEach(w => { w.setQuantelMonitor(this.quantelMonitor) })
+	}
 }
