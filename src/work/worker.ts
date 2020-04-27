@@ -9,6 +9,7 @@ import * as path from 'path'
 import * as os from 'os'
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import * as fs from 'fs-extra'
+import * as http from 'http'
 import { MonitorQuantel } from '../monitors/quantel'
 
 export interface WorkResult {
@@ -232,43 +233,57 @@ export class Worker {
 		}
 
 		const tmpPath = path.join(os.tmpdir(), `${Math.random().toString(16)}.png`)
-		const args = [ // TODO (perf) Low priority process?
-			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-			'-hide_banner' ]
 		if (this.isQuantel(doc.mediaId)) {
 			if (!this.quantelMonitor) {
 				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
 			}
-			const { result: hlsUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toHLSUrl(doc.mediaId))
+			const { result: stillUrl, error: urlError } = await noTryAsync(() => this.quantelMonitor!.toStillUrl(
+				doc.mediaId, this.config.thumbnails && this.config.thumbnails.width || 256))
 			if (urlError) {
 				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
 			}
-			args.push('-seekable 0')
-			args.push(`-i "${hlsUrl}"`)
+			// TODO make an request for the thumbnail
+			const { error: httpError } = await noTryAsync(() => new Promise((resolve, reject) => {
+				const thumbStream = fs.createWriteStream(tmpPath)
+				http.get(stillUrl, (res) => {
+					if (res.statusCode !== 200) {
+						return reject(new Error(`Expected status code of 200, got ${res.statusCode}`))
+					}
+					res.pipe(thumbStream)
+					res.on('error', reject)
+					res.on('close', resolve)
+				}).on('error', reject)
+			}))
+			if (httpError) {
+				return this.failStep(`external request to HTTP transformer to generate thumbnail for "${fileId}" failed`, step.action, httpError)
+			}
 		} else {
-			args.push(`-i' "${doc.mediaPath}"`)
-		}
-		args.push('-frames:v 1')
-		args.push(`-vf thumbnail,scale=${this.config.thumbnails && this.config.thumbnails.width || 256}:` +
-			`${this.config.thumbnails && this.config.thumbnails.width || -1}`)
-		args.push('-threads 1')
-		args.push(`"${tmpPath}"`)
+			const args = [ // TODO (perf) Low priority process?
+				this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+				'-hide_banner',
+				`-i' "${doc.mediaPath}"`,
+				'-frames:v 1',
+				`-vf thumbnail,scale=${this.config.thumbnails && this.config.thumbnails.width || 256}:` +
+					`${this.config.thumbnails && this.config.thumbnails.width || -1}`,
+				'-threads 1',
+				`"${tmpPath}"` ]
 
-		// Not necessary ... just checking that /tmp or Windows equivalent exists
-		// await fs.mkdirp(path.dirname(tmpPath))
-		const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
-			exec(args.join(' '), (err, stdout, stderr) => {
-				this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
-				if (err) {
-					return reject(err)
-				}
-				resolve()
-			})
-		}))
-		if (execError) {
-			return this.failStep(`external process to generate thumbnail for "${fileId}" failed`, step.action, execError)
-		}
-		this.logger.info(`Worker: thumbnail generate: generated thumbnail for "${fileId}" at path "${tmpPath}"`)
+			// Not necessary ... just checking that /tmp or Windows equivalent exists
+			// await fs.mkdirp(path.dirname(tmpPath))
+			const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
+				exec(args.join(' '), (err, stdout, stderr) => {
+					this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
+					if (err) {
+						return reject(err)
+					}
+					resolve()
+				})
+			}))
+			if (execError) {
+				return this.failStep(`external process to generate thumbnail for "${fileId}" failed`, step.action, execError)
+			}
+			this.logger.info(`Worker: thumbnail generate: generated thumbnail for "${fileId}" at path "${tmpPath}"`)
+		} // Not a Quantel clip
 
 		const { result: thumbStat, error: statError } = await noTryAsync(() => fs.stat(tmpPath))
 		if (statError) {
