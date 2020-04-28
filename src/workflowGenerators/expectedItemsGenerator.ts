@@ -30,14 +30,14 @@ class QuantelStorageHandlerSingleton extends StorageHandler {
 	constructor() {
 		super()
 	}
-	parseUrl = (url: string): string => { throw new Error(`parseUrl: Not implemented for Quantel`) }
+	parseUrl = (_url: string): string => { throw new Error(`parseUrl: Not implemented for Quantel`) }
 	getAllFiles = (): Promise<Array<File>> => { throw new Error(`getAllFiles: Not implemetned for Quantel`) }
-	addMonitoredFile = (url: string): void => { throw new Error(`addMonitoredFile: Not implemented for Quantel`) }
-	removeMonitoredFile = (url: string): void => { throw new Error(`removeMonitoredFile: Not implemented for Quantel`) }
-	getFile = (name: string): Promise<File> => { throw new Error(`getFile: Not implemented for Quantel`) }
-	putFile = (file: File, progressCallback?: (progress: number) => void): CancelablePromise<File> => { throw new Error(`putFile: Not implemented for Quantel`) }
-	deleteFile = (file: File): Promise<void> => { throw new Error(`deleteFile: Not implemetned for Quantel`) }
-	getFileProperties = (file: File): Promise<FileProperties> => { throw new Error(`getFileProperties: Not implemented for Quantel`) }
+	addMonitoredFile = (_url: string): void => { throw new Error(`addMonitoredFile: Not implemented for Quantel`) }
+	removeMonitoredFile = (_url: string): void => { throw new Error(`removeMonitoredFile: Not implemented for Quantel`) }
+	getFile = (_name: string): Promise<File> => { throw new Error(`getFile: Not implemented for Quantel`) }
+	putFile = (_file: File, _progressCallback?: (progress: number) => void): CancelablePromise<File> => { throw new Error(`putFile: Not implemented for Quantel`) }
+	deleteFile = (_file: File): Promise<void> => { throw new Error(`deleteFile: Not implemetned for Quantel`) }
+	getFileProperties = (_file: File): Promise<FileProperties> => { throw new Error(`getFileProperties: Not implemented for Quantel`) }
 	init = (): Promise<void> => { throw new Error(`init: Not implemented for Quantel`) }
 	destroy = (): Promise<void> => { throw new Error(`destroy: Not implemented for Quantel`) }
 }
@@ -213,8 +213,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		)
 	}
 
-	private isQuantel(url: string) {
-		return url && url.slice(0, 8).toLowerCase().startsWith('quantel:')
+	private isQuantel(url: string): boolean {
+		return url.slice(0, 8).toLowerCase().startsWith('quantel:')
 	}
 
 	/** Called when an item is added (from Core) */
@@ -446,6 +446,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							e.file as File,
 							target,
 							tracked.comment,
+							!!(e.file) && this.isQuantel(e.file.name),
 							'Monitored file was added to source storage'
 						)
 					)

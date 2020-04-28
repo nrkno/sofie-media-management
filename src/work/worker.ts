@@ -31,6 +31,34 @@ interface MediaFileDetails {
 	mediaId: string
 }
 
+const FixedQuantelStats = literal<fs.Stats>({
+	isFile: () => false,
+	isDirectory: () => false,
+	isBlockDevice: () => false,
+	isCharacterDevice: () => false,
+	isSymbolicLink: () => false,
+	isFIFO: ()=> false,
+	isSocket: () => false,
+	dev: 0,
+	ino: 0,
+	mode: 0,
+	nlink: 0,
+	uid: 0,
+	gid: 0,
+	rdev: 0,
+	size: 0,
+	blksize: 0,
+	blocks: 0,
+	atimeMs: 0,
+	mtimeMs: 0,
+	ctimeMs: 0,
+	birthtimeMs: 0,
+	atime: new Date(),
+	mtime: new Date(),
+	ctime: new Date(),
+	birthtime: new Date()
+})
+
 /**
  * A worker is given a work-step, and will perform actions, using that step
  * The workers are kept by the dispatcher and given work from it
@@ -204,6 +232,13 @@ export class Worker {
 	}
 
 	private async lookForFile(mediaGeneralId: string, config: StorageSettings): Promise<MediaFileDetails | false> {
+		if (this.isQuantel(mediaGeneralId)) {
+			return literal<MediaFileDetails>({
+				mediaPath: mediaGeneralId,
+				mediaId: mediaGeneralId,
+				mediaStat: FixedQuantelStats
+			})
+		}
 		const storagePath = config.options && config.options.mediaPath || ''
 		const mediaPath = path.join(storagePath, mediaGeneralId)
 		this.logger.debug(`${this.ident}: Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(storagePath, mediaPath)}"`)
