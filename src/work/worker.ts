@@ -335,18 +335,22 @@ export class Worker {
 		let generating = () => new Promise((resolve, reject) => {
 			resolver = resolve
 			rejector = reject
-			let process = spawn('ffmpeg', args, { shell: true })
-			process.stdout.on('data', (data) => {
-				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data)
+			let previewProcess = spawn(
+				this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+				args,
+				{ shell: true }
+			)
+			previewProcess.stdout.on('data', (data) => {
+				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data.toString())
 			})
-			process.stdout.on('data', (data) => {
-				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data)
+			previewProcess.stderr.on('data', (data) => {
+				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data.toString())
 			})
-			process.on('close', (code) => {
+			previewProcess.on('close', (code) => {
 				if (code === 0) {
 					resolver()
 				} else {
-					rejector(new Error(`Worker: preview generate: ffmpeg process with pid "${process.pid}" exited with code "${code}"`))
+					rejector(new Error(`Worker: preview generate: ffmpeg process with pid "${previewProcess.pid}" exited with code "${code}"`))
 				}
 			})
 		})
@@ -445,6 +449,7 @@ export class Worker {
 	private async getMetadata (doc: MediaObject): Promise<Metadata> {
 		const metaconf = this.config.metadata
 		if (!metaconf || (!metaconf.scenes && !metaconf.freezeDetection && !metaconf.blackDetection)) {
+			this.logger.debug(`Worker: get metadata: not generating stream metadata: ${metaconf} ${(!metaconf!.scenes && !metaconf!.freezeDetection && !metaconf!.blackDetection)}`)
 			return {}
 		}
 
@@ -540,6 +545,11 @@ export class Worker {
 		let resolver: (m: Metadata) => void
 		let rejecter: (err: Error) => void
 
+		const metaPromise = new Promise<Metadata>((resolve, reject) => {
+			resolver = resolve
+			rejecter = reject
+		})
+
 		infoProcess.on('close', (code) => {
 			if (code === 0) { // success
 				// if freeze frame is the end of video, it is not detected fully
@@ -548,6 +558,7 @@ export class Worker {
 					freezes[freezes.length - 1].end = doc.mediainfo.format.duration
 					freezes[freezes.length - 1].duration = doc.mediainfo.format.duration - freezes[freezes.length - 1].start
 				}
+				this.logger.debug(`Worker: get metadata: completed metadata analysis: scenes ${scenes ? scenes.length : 0}, freezes ${freezes ? freezes.length : 0}, blacks ${blacks ? blacks.length : 0}`)
 				resolver({ scenes, freezes, blacks })
 			} else {
 				this.logger.error(`Worker: get metadata: FFmpeg failed with code ${code}`)
@@ -555,10 +566,7 @@ export class Worker {
 			}
 		})
 
-		return new Promise((resolve, reject) => {
-			resolver = resolve
-			rejecter = reject
-		})
+		return metaPromise
 	}
 
 	private static sortBlackFreeze (tl: Array<SortMeta>): Array<SortMeta> {
