@@ -417,18 +417,19 @@ export class Worker {
 		let generating = () => new Promise((resolve, reject) => {
 			resolver = resolve
 			rejector = reject
-			let process = spawn('ffmpeg', args, { shell: true })
-			process.stdout.on('data', (data) => {
+			let previewProcess = spawn(
+				this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg', args, { shell: true })
+			previewProcess.stdout.on('data', (data) => {
 				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data)
 			})
-			process.stdout.on('data', (data) => {
+			previewProcess.stderr.on('data', (data) => {
 				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data)
 			})
-			process.on('close', (code) => {
+			previewProcess.on('close', (code) => {
 				if (code === 0) {
 					resolver()
 				} else {
-					rejector(new Error(`Worker: preview generate: ffmpeg process with pid "${process.pid}" exited with code "${code}"`))
+					rejector(new Error(`Worker: preview generate: ffmpeg process with pid "${previewProcess.pid}" exited with code "${code}"`))
 				}
 			})
 		})

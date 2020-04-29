@@ -23,7 +23,7 @@ export class MonitorManager {
 		this._initialized = true
 	}
 
-	async onNewSettings(settings: DeviceSettings, ): Promise<boolean> {
+	async onNewSettings(settings: DeviceSettings): Promise<boolean> {
 		if (!this._initialized) throw new Error('MonitorManager not initialized')
 
 		this.settings = settings
