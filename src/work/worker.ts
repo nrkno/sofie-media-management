@@ -496,10 +496,9 @@ export class Worker {
 		)
 		let [ scenes, freezes, blacks ] =
 			[ [] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly> ]
-		// current frame is not read
+		// TODO current frame is not read?
 		// let currentFrame = 0
 
-		// TODO consider is progress reporting required?
 		// infoProcess.stdout.on('data', () => { lastProgressReportTimestamp = new Date() })
 		infoProcess.stderr.on('data', (data: any) => {
 			let stringData = data.toString()

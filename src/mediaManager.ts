@@ -110,13 +110,10 @@ export class MediaManager {
 			return
 		} catch (e) {
 			this._logger.error('Error during initialization:', e)
-			try {
-				if (this.coreHandler) {
-					this.coreHandler.destroy().catch(this._logger.error)
-				}
-			} catch (e1) { // TODO this catch does nothing
-				this._logger.error(e1)
+			if (this.coreHandler) {
+				this.coreHandler.destroy().catch(this._logger.error)
 			}
+
 			try {
 				await this.mediaDB.close()
 			} catch (e2) {
