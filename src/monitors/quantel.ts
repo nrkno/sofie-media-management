@@ -8,6 +8,7 @@ import { MonitorSettingsQuantel, ExpectedMediaItem } from '../api'
 import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
 import { getHash } from '../lib/lib'
+import { noTryAsync } from 'no-try'
 
 /** The minimum time to wait between polling status */
 const BREATHING_ROOM = 300
@@ -267,127 +268,145 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	private async doWatch(): Promise<void> {
-		try {
-			const server = await this.quantel.getServer()
-			if (server) {
-				const mediaObjects: { [objectId: string]: MediaObject | null } = {}
-
-				// Fetch all url/GUID:s that we are to monitor
-				const urls = _.keys(this.monitoredFiles)
-				for (let url of urls) {
-					if (this.isDestroyed) return // abort checking
-
-					const monitoredFile = this.monitoredFiles[url]
-
-					const timeSinceLastCheck = Date.now() - (monitoredFile.lastChecked || 0)
-					const checkTime =
-						monitoredFile.status === QuantelMonitorFileStatus.READY ? CHECK_TIME_READY : CHECK_TIME_OTHER
-					if (timeSinceLastCheck >= checkTime) {
-						// It's time to check the file again
-
-						monitoredFile.lastChecked = Date.now()
-
-						let mediaObject: MediaObject | null = null
-
-						if (url) {
-							const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(url))
-							if (clipSummaries.length >= 1) {
-								const clipSummary = _.find(clipSummaries, clipData => {
-									return (
-										clipData.PoolID &&
-										(server.pools || []).indexOf(clipData.PoolID) !== -1 && // If present in any of the pools of the server
-										parseInt(clipData.Frames, 10) > 0 &&
-										clipData.Completed // Nore from Richard: Completed might not necessarily mean that it's completed on the right server
-									)
-								})
-								if (clipSummary) {
-									// The clip is present, and on the right server
-									this.logger.debug(`${this.ident} doWatch: Clip "${url}" found`)
-									// TODO: perhaps use clipData.Completed ?
-
-									const clipData = await this.quantel.getClip(clipSummary.ClipID)
-
-									if (clipData) {
-										// Make our best effort to try to construct a mediaObject:
-										mediaObject = {
-											mediaId: url.toUpperCase(),
-											mediaPath: clipData.ClipGUID,
-											mediaSize: 1,
-											mediaTime: 0,
-											mediainfo: {
-												name: clipData.Title || clipData.ClipGUID
-											},
-
-											thumbSize: 0,
-											thumbTime: 0,
-
-											// previewSize?: number,
-											// previewTime?: number,
-
-											cinf: '',
-											tinf: '',
-
-											_attachments: {},
-											_id: getHash(url + clipData.ClipGUID),
-											_rev: 'modified' + clipData.Modified
-										}
-									} else {
-										this.logger.warn(
-											`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
-										)
-									}
-								} else {
-									this.logger.debug(`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server`)
-									// TODO: initiate copy to correct server
-								}
-							} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" not found`)
-						} else this.logger.error(`${this.ident} doWatch: Falsy url encountered`)
-
-						let newStatus = mediaObject ? QuantelMonitorFileStatus.READY : QuantelMonitorFileStatus.MISSING
-
-						monitoredFile.status = newStatus
-
-						mediaObjects[url] = mediaObject
-					}
-				}
-
-				// Go through the mediaobjects and send changes to core:
-				const p = Promise.resolve()
-				_.each(mediaObjects, (newMediaObject: MediaObject | null, objectId: string) => {
-					const oldMediaObject = this.cachedMediaObjects[objectId]
-					if (newMediaObject) {
-						if (!oldMediaObject || newMediaObject._rev !== oldMediaObject._rev) {
-							// Added or changed
-							p.then(() => this.sendChanged(newMediaObject)).catch(e => {
-								this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
-							})
-						}
-					} else {
-						if (oldMediaObject) {
-							// Removed
-							p.then(() => this.sendRemoved(oldMediaObject._id)).catch(e => {
-								this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
-							})
-						}
-					}
-					if (newMediaObject) {
-						this.cachedMediaObjects[objectId] = newMediaObject
-					} else {
-						delete this.cachedMediaObjects[objectId]
-					}
-				})
-				await p
-				// this._cachedMediaObjects = mediaObjects
-			} else {
-				throw new Error(`${this.ident} doWatch: Has no server`)
-			}
-			// last:
-			this.watchError = null
-			await this.wait(BREATHING_ROOM)
-		} catch (e) {
-			this.watchError = e.toString()
-			this.logger.error(`${this.ident} doWatch: Error in Quantel doWatch`, e)
+		const { result: server, error: serverError } = await noTryAsync(() => this.quantel.getServer())
+		if (serverError || !server) {
+			this.logger.error(`${this.ident} doWatch: Failed to retrieve server details`, serverError)
+			return
 		}
+		const mediaObjects: { [objectId: string]: MediaObject | null } = {}
+
+		// Fetch all url/GUID:s that we are to monitor
+		const urls = _.keys(this.monitoredFiles)
+		for (let url of urls) {
+			if (this.isDestroyed) return // abort checking
+
+			const monitoredFile = this.monitoredFiles[url]
+
+			const timeSinceLastCheck = Date.now() - (monitoredFile.lastChecked || 0)
+			const checkTime =
+				monitoredFile.status === QuantelMonitorFileStatus.READY ? CHECK_TIME_READY : CHECK_TIME_OTHER
+			if (timeSinceLastCheck >= checkTime) {
+				// It's time to check the file again
+
+				monitoredFile.lastChecked = Date.now()
+
+				let mediaObject: MediaObject | null = null
+
+				if (url) {
+					const { result: clipSummaries, error: searchError } = await noTryAsync(() =>
+						this.quantel.searchClip(this.parseUrlToQuery(url)))
+					if (searchError) {
+						this.logger.error(`${this.ident} doWatch: Error requesting search for clip "${url}".`, searchError)
+						continue
+					}
+					if (clipSummaries.length >= 1) {
+						const clipSummaryOnPool = _.find(clipSummaries, clipData => {
+							return (
+								clipData.PoolID &&
+								(server.pools || []).indexOf(clipData.PoolID) !== -1 && // If present in any of the pools of the server
+								parseInt(clipData.Frames, 10) > 0 &&
+								clipData.Completed // Nore from Richard: Completed might not necessarily mean that it's completed on the right server
+							)
+						})
+						if (clipSummaryOnPool) {
+							// The clip is present, and on the right server
+							this.logger.debug(`${this.ident} doWatch: Clip "${url}" found`)
+							// TODO: perhaps use clipData.Completed ?
+
+							const clipData = await this.quantel.getClip(clipSummaryOnPool.ClipID)
+
+							if (clipData) {
+								// Make our best effort to try to construct a mediaObject:
+								mediaObject = {
+									mediaId: url.toUpperCase(),
+									mediaPath: clipData.ClipGUID,
+									mediaSize: 1,
+									mediaTime: 0,
+									mediainfo: {
+										name: clipData.Title || clipData.ClipGUID
+									},
+
+									thumbSize: 0,
+									thumbTime: 0,
+
+									// previewSize?: number,
+									// previewTime?: number,
+
+									cinf: '',
+									tinf: '',
+
+									_attachments: {},
+									_id: getHash(url + clipData.ClipGUID),
+									_rev: 'modified' + clipData.Modified
+								}
+							} else {
+								this.logger.warn(
+									`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
+								)
+							}
+						} else { // Clip found ... but on a different pool
+							this.logger.info(`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server. Starting clone.`)
+							if (!server.pools || server.pools.length < 1) {
+								this.logger.error(`${this.ident} doWatch: Clip "${url}" could not be copied to correct server - server pool identifiers are not known.`)
+							} else {
+								let copyCreated = false
+								for ( let pool of server.pools) {
+									const { result, error } = await noTryAsync(() => 
+										this.quantel.copyClip(undefined, clipSummaries[0].ClipID, pool, 8, true)) // Note: Intra-zone copy only
+									if (error) {
+										this.logger.warn(`${this.ident} doWatch: Failed to copy clip "${url}" to server pool "${pool}".`)
+										continue
+									}
+									this.logger.info(`${this.ident} doWatch: Copy of clip "${url}" started to pool "${pool}" with new clipID "${result.clipID}".`, result)
+									copyCreated = true
+									break
+								}
+								if (!copyCreated) {
+									this.logger.error(`${this.ident} doWatch: Failed to initiate copy of "${url}" to any of the target server pools.`)
+								}	
+							}
+						}
+					} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" not found`)
+				} else this.logger.error(`${this.ident} doWatch: Falsy url encountered`)
+
+				let newStatus = mediaObject ? QuantelMonitorFileStatus.READY : QuantelMonitorFileStatus.MISSING
+
+				monitoredFile.status = newStatus
+
+				mediaObjects[url] = mediaObject
+			} // end if timeSinceLastCheck >= checkTime 
+		} // End loop through URLs
+
+		// Go through the mediaobjects and send changes to core:
+		const p = Promise.resolve()
+		_.each(mediaObjects, (newMediaObject: MediaObject | null, objectId: string) => {
+			const oldMediaObject = this.cachedMediaObjects[objectId]
+			if (newMediaObject) {
+				if (!oldMediaObject || newMediaObject._rev !== oldMediaObject._rev) {
+					// Added or changed
+					p.then(() => this.sendChanged(newMediaObject)).catch(e => {
+						this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
+					})
+				}
+			} else {
+				if (oldMediaObject) {
+					// Removed
+					p.then(() => this.sendRemoved(oldMediaObject._id)).catch(e => {
+						this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
+					})
+				}
+			}
+			if (newMediaObject) {
+				this.cachedMediaObjects[objectId] = newMediaObject
+			} else {
+				delete this.cachedMediaObjects[objectId]
+			}
+		})
+		await p
+		// this._cachedMediaObjects = mediaObjects
+		this.watchError = null
+		await this.wait(BREATHING_ROOM)
+
 		this.triggerWatch()
 	}
 
