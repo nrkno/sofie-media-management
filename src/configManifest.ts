@@ -17,6 +17,7 @@ export function literal<T>(o: T) {
 export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
 	FILE_SHARE = 'file_share',
+	QUANTEL_HTTP = 'quantel_http',
 	UNKNOWN = 'unknown'
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
