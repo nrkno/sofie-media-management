@@ -99,7 +99,7 @@
     "tslint": "^5.11.0",
     "tslint-config-prettier": "^1.18.0",
     "tslint-plugin-prettier": "^2.0.1",
-    "typescript": "~3.3.3333"
+    "typescript": "^3.9.3"
   },
   "keywords": [
     "broadcast",
@@ -121,6 +121,7 @@
     "chokidar": "^3.2.3",
     "class-transformer": "^0.2.0",
     "fs-extra": "^8.1.0",
+    "handlebars": "^4.5.3",
     "koa": "^2.11.0",
     "koa-range": "^0.3.0",
     "koa-router": "^8.0.8",
@@ -131,19 +132,17 @@
     "pouchdb-node": "^7.0.0",
     "reflect-metadata": "^0.1.12",
     "request": "^2.88.0",
+    "set-value": "^3.0.1",
     "tslib": "^1.9.2",
-    "tv-automation-server-core-integration": "^1.4.0",
+    "tv-automation-quantel-gateway-client": "^1.0.5",
+    "tv-automation-server-core-integration": "^1.5.0",
     "underscore": "^1.9.1",
     "windows-network-drive": "^3.0.0",
     "winston": "^2.4.2",
     "xml2js": "^0.4.19"
   },
-  "resolutions": {
-    "**/**/handlebars": "^4.5.3",
-    "**/**/mem": "^4.0.0",
-    "**/**/lodash": "^4.17.12",
-    "**/**/https-proxy-agent": "^2.2.3",
-    "**/**/set-value": "^3.0.1",
-    "**/**/marked": "^0.7.0"
+  "resolutions": {    
+    "**/**/yargs-parser": "^13.1.2",
+    "**/yargs/minimist": "^1.2.3"
   }
 }

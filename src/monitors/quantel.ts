@@ -5,7 +5,7 @@ import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
 import { LoggerInstance } from 'winston'
 import { MonitorSettingsQuantel, ExpectedMediaItem } from '../api'
-import { QuantelGateway } from '../lib/quantelGateway'
+import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
 import { getHash } from '../lib/lib'
 
@@ -134,6 +134,7 @@ export class MonitorQuantel extends Monitor {
 		await this.quantel.init(
 			this.settings.gatewayUrl,
 			this.settings.ISAUrl,
+			undefined,
 			this.settings.zoneId,
 			this.settings.serverId
 		)
