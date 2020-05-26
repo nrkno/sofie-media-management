@@ -6,7 +6,7 @@ import * as stream from 'stream'
 import * as http from 'http'
 import * as _ from 'underscore'
 import { literal, atomicPromise } from '../lib/lib'
-import { QuantelGateway } from '../lib/quantelGateway'
+import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { CancelablePromise } from '../lib/cancelablePromise'
 
 function getHTTPProperties(gateway: QuantelGateway, url: string): Promise<FileProperties> {
@@ -291,7 +291,7 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 	}
 	async init(): Promise<void> {
 		QuantelGatewaySingleton = this.gateway = new QuantelGateway()
-		await this.gateway.init(this.gatewayUrl, this.ISAUrl, this.zoneId, this.serverId)
+		await this.gateway.init(this.gatewayUrl, this.ISAUrl, undefined, this.zoneId, this.serverId)
 		this._monitor = setInterval(() => this.monitor(), 5000)
 		this._initialized = true
 	}
