@@ -134,7 +134,7 @@ export class MonitorQuantel extends Monitor {
 		await this.quantel.init(
 			this.settings.gatewayUrl,
 			this.settings.ISAUrl,
-			undefined,
+			this.settings.ISABackupUrl,
 			this.settings.zoneId,
 			this.settings.serverId
 		)

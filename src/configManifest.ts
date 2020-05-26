@@ -164,6 +164,11 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 		type: ConfigManifestEntryType.STRING
 	},
 	{
+		id: 'ISABackupUrl',
+		name: 'ISA Backup URL',
+		type: ConfigManifestEntryType.STRING
+	},
+	{
 		id: 'zoneId',
 		name: 'Zone ID (leave blank for default)',
 		type: ConfigManifestEntryType.STRING

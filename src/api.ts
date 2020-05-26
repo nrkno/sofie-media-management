@@ -188,6 +188,7 @@ export interface QuantelHTTPStorage extends StorageSettings {
 		transformerUrl: string
 		gatewayUrl: string
 		ISAUrl: string
+		ISABackupUrl?: string
 		zoneId: string | undefined
 		serverId: number
 		onlySelectedFiles: true
@@ -341,8 +342,10 @@ export interface MonitorSettingsQuantel extends MonitorSettingsBase {
 
 	/** Url to the quantel gateway  */
 	gatewayUrl: string
-	/** Address to the ISA, for the gateway to connect to */
+	/** Address to the master ISA, for the gateway to connect to */
 	ISAUrl: string
+	/** Address to the backup ISA, for the gateway to failover to */
+	ISABackupUrl?: string
 	/** The ID of the zone to use. If omitted, will be using "default" */
 	zoneId?: string
 	/** The id of the server to control. An Ingeter */
