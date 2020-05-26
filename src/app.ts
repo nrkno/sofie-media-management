@@ -97,6 +97,6 @@ export class MediaManagerApp {
 				})
 			}
 		})
-		// TODO HTTPS
+		// HTTPS setup through nginx
 	}
 }

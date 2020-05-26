@@ -418,12 +418,15 @@ export class Worker {
 			resolver = resolve
 			rejector = reject
 			let previewProcess = spawn(
-				this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg', args, { shell: true })
+				this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+				args,
+				{ shell: true }
+			)
 			previewProcess.stdout.on('data', (data) => {
-				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data)
+				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data.toString())
 			})
 			previewProcess.stderr.on('data', (data) => {
-				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data)
+				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data.toString())
 			})
 			previewProcess.on('close', (code) => {
 				if (code === 0) {
@@ -499,7 +502,7 @@ export class Worker {
 			args.push(`-i' "${doc.mediaPath}"`)
 		}
 
-		const { error: execError, result } = await noTryAsync(() => new Promise((resolve, reject) => {
+		const { error: execError, result } = await noTryAsync(() => new Promise<string>((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
 				this.logger.debug(`Worker: field order detect: output (stdout, stderr)`, stdout, stderr)
 				if (err) {
@@ -538,6 +541,7 @@ export class Worker {
 	private async getMetadata (doc: MediaObject): Promise<Metadata> {
 		const metaconf = this.config.metadata
 		if (!metaconf || (!metaconf.scenes && !metaconf.freezeDetection && !metaconf.blackDetection)) {
+			this.logger.debug(`Worker: get metadata: not generating stream metadata: ${metaconf} ${(!metaconf!.scenes && !metaconf!.freezeDetection && !metaconf!.blackDetection)}`)
 			return {}
 		}
 
@@ -594,10 +598,9 @@ export class Worker {
 		)
 		let [ scenes, freezes, blacks ] =
 			[ [] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly> ]
-		// current frame is not read
+		// TODO current frame is not read?
 		// let currentFrame = 0
 
-		// TODO consider is progress reporting required?
 		// infoProcess.stdout.on('data', () => { lastProgressReportTimestamp = new Date() })
 		infoProcess.stderr.on('data', (data: any) => {
 			let stringData = data.toString()
@@ -643,6 +646,11 @@ export class Worker {
 		let resolver: (m: Metadata) => void
 		let rejecter: (err: Error) => void
 
+		const metaPromise = new Promise<Metadata>((resolve, reject) => {
+			resolver = resolve
+			rejecter = reject
+		})
+
 		infoProcess.on('close', (code) => {
 			if (code === 0) { // success
 				// if freeze frame is the end of video, it is not detected fully
@@ -651,6 +659,7 @@ export class Worker {
 					freezes[freezes.length - 1].end = doc.mediainfo.format.duration
 					freezes[freezes.length - 1].duration = doc.mediainfo.format.duration - freezes[freezes.length - 1].start
 				}
+				this.logger.debug(`Worker: get metadata: completed metadata analysis: scenes ${scenes ? scenes.length : 0}, freezes ${freezes ? freezes.length : 0}, blacks ${blacks ? blacks.length : 0}`)
 				resolver({ scenes, freezes, blacks })
 			} else {
 				this.logger.error(`Worker: get metadata: FFmpeg failed with code ${code}`)
@@ -658,10 +667,7 @@ export class Worker {
 			}
 		})
 
-		return new Promise((resolve, reject) => {
-			resolver = resolve
-			rejecter = reject
-		})
+		return metaPromise
 	}
 
 	private static sortBlackFreeze (tl: Array<SortMeta>): Array<SortMeta> {
@@ -860,7 +866,7 @@ export class Worker {
 		args.push('-show_format')
 		args.push('-print_format', 'json')
 
-		const { result: probeData, error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
+		const { result: probeData, error: execError } = await noTryAsync(() => new Promise<any>((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
 				this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
 				if (err) {
