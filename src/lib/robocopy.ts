@@ -25,7 +25,7 @@ export namespace robocopy {
 			const errors: string[] = []
 			let output: string[] = []
 
-			if (rbcpy.stdout){
+			if (rbcpy.stdout) {
 				rbcpy.stdout.on('data', data => {
 					const m = data
 						.toString()
@@ -41,7 +41,7 @@ export namespace robocopy {
 				})
 			}
 
-			if (rbcpy.stderr){
+			if (rbcpy.stderr) {
 				rbcpy.stderr.on('data', data => {
 					errors.push(data.toString().trim())
 				})

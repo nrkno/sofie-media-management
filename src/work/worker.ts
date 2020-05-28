@@ -1,6 +1,17 @@
 import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
-import { WorkStepStatus, WorkStepAction, DeviceSettings, Time, MediaObject, FieldOrder, Anomaly, Metadata, MediaInfo, StorageSettings } from '../api'
+import {
+	WorkStepStatus,
+	WorkStepAction,
+	DeviceSettings,
+	Time,
+	MediaObject,
+	FieldOrder,
+	Anomaly,
+	Metadata,
+	MediaInfo,
+	StorageSettings
+} from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
@@ -80,7 +91,7 @@ export class Worker {
 		}
 	}
 
-	private async unBusyAndFailStep (p: Promise<WorkResult>) {
+	private async unBusyAndFailStep(p: Promise<WorkResult>) {
 		const { result, error } = await noTryAsync(() => p)
 		this.notBusyAnymore()
 		return error ? this.failStep(error) : result
@@ -166,7 +177,10 @@ export class Worker {
 	 * @param reason
 	 */
 	private async failStep(reason: string | Error, action?: WorkStepAction, cause?: Error): Promise<WorkResult> {
-		this.logger.error(`${this.ident}${action ? ' ' + action + ':' : ''} ${reason.toString()}`, cause ? cause : reason)
+		this.logger.error(
+			`${this.ident}${action ? ' ' + action + ':' : ''} ${reason.toString()}`,
+			cause ? cause : reason
+		)
 		return literal<WorkResult>({
 			status: WorkStepStatus.ERROR,
 			messages: [reason.toString()]
@@ -185,23 +199,32 @@ export class Worker {
 		progress = Math.max(0, Math.min(1, progress)) // sanitize progress value
 
 		await noTryAsync(
-			() => updateDB(this.workStepDB, step._id, obj => {
-				const currentProgress = obj.progress || 0
-				if (currentProgress < progress) {
-					// this.logger.debug(`Worker: ${step._id}: Higher progress won: ${currentProgress}`),
-					obj.progress = progress
-				}
-				return obj
-			}),
-			error => this.logger.error(`Worker: error updating progress in database`, error))
+			() =>
+				updateDB(this.workStepDB, step._id, obj => {
+					const currentProgress = obj.progress || 0
+					if (currentProgress < progress) {
+						// this.logger.debug(`Worker: ${step._id}: Higher progress won: ${currentProgress}`),
+						obj.progress = progress
+					}
+					return obj
+				}),
+			error => this.logger.error(`Worker: error updating progress in database`, error)
+		)
 	}
 
 	private async lookForFile(mediaGeneralId: string, config: StorageSettings): Promise<MediaFileDetails | false> {
-		const storagePath = config.options && config.options.mediaPath || ''
+		const storagePath = (config.options && config.options.mediaPath) || ''
 		const mediaPath = path.join(storagePath, mediaGeneralId)
-		this.logger.debug(`Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(storagePath, mediaPath)}"`)
+		this.logger.debug(
+			`Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(
+				storagePath,
+				mediaPath
+			)}"`
+		)
 		const { error, result: mediaStat } = await noTryAsync(() => fs.stat(mediaPath))
-		if (error) { return false }
+		if (error) {
+			return false
+		}
 		const mediaId = getID(path.relative(storagePath, mediaPath))
 		return literal<MediaFileDetails>({
 			mediaPath,
@@ -215,37 +238,45 @@ export class Worker {
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
-		let { result: doc, error: getError } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 
 		const tmpPath = path.join(os.tmpdir(), `${Math.random().toString(16)}.png`)
-		const args = [ // TODO (perf) Low priority process?
-			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+		const args = [
+			// TODO (perf) Low priority process?
+			(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
 			'-hide_banner',
-			'-i', `"${doc.mediaPath}"`,
+			'-i',
+			`"${doc.mediaPath}"`,
 			'-frames:v 1',
-			`-vf thumbnail,scale=${this.config.thumbnails && this.config.thumbnails.width || 256}:` +
-				`${this.config.thumbnails && this.config.thumbnails.width || -1}`,
+			`-vf thumbnail,scale=${(this.config.thumbnails && this.config.thumbnails.width) || 256}:` +
+				`${(this.config.thumbnails && this.config.thumbnails.width) || -1}`,
 			'-threads 1',
 			`"${tmpPath}"`
 		]
 
 		// Not necessary ... just checking that /tmp or Windows equivalent exists
 		// await fs.mkdirp(path.dirname(tmpPath))
-		const { error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
-			exec(args.join(' '), (err, stdout, stderr) => {
-				this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
-				if (err) {
-					return reject(err)
-				}
-				resolve()
-			})
-		}))
+		const { error: execError } = await noTryAsync(
+			() =>
+				new Promise((resolve, reject) => {
+					exec(args.join(' '), (err, stdout, stderr) => {
+						this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
+						if (err) {
+							return reject(err)
+						}
+						resolve()
+					})
+				})
+		)
 		if (execError) {
-			return this.failStep(`external process to generate thumbnail for "${fileId}" failed`, step.action, execError)
+			return this.failStep(
+				`external process to generate thumbnail for "${fileId}" failed`,
+				step.action,
+				execError
+			)
 		}
 		this.logger.info(`Worker: thumbnail generate: generated thumbnail for "${fileId}" at path "${tmpPath}"`)
 
@@ -260,10 +291,13 @@ export class Worker {
 		}
 
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError2) {
-			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+			return this.failStep(
+				`after work, failed to retrieve media object with ID "${fileId}"`,
+				step.action,
+				getError2
+			)
 		}
 
 		doc2.thumbSize = thumbStat.size
@@ -280,7 +314,8 @@ export class Worker {
 		}
 		await noTryAsync(
 			() => fs.unlink(tmpPath),
-			error => this.logger.warn(`Worked: thumbnail generate: failed to delete temporary file "${tmpPath}"`, error))
+			error => this.logger.warn(`Worked: thumbnail generate: failed to delete temporary file "${tmpPath}"`, error)
+		)
 
 		return literal<WorkResult>({
 			status: WorkStepStatus.DONE
@@ -292,20 +327,21 @@ export class Worker {
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
-		let { result: doc, error: getError } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 		const destPath = path.join(
-			this.config.paths && this.config.paths.resources || '',
-			this.config.previews && this.config.previews.folder || 'previews',
+			(this.config.paths && this.config.paths.resources) || '',
+			(this.config.previews && this.config.previews.folder) || 'previews',
 			`${doc.mediaId}.webm`
 		)
 		const tmpPath = destPath + '.new'
 
-		if (doc.previewTime === doc.mediaTime && await fs.pathExists(destPath)) {
-			this.logger.debug(`Worker: generate preview: not regenerating preview at "${destPath}" as, by timestamp, it already exists`)
+		if (doc.previewTime === doc.mediaTime && (await fs.pathExists(destPath))) {
+			this.logger.debug(
+				`Worker: generate preview: not regenerating preview at "${destPath}" as, by timestamp, it already exists`
+			)
 			return literal<WorkResult>({
 				status: WorkStepStatus.DONE
 			})
@@ -315,14 +351,19 @@ export class Worker {
 			'-hide_banner',
 			'-y',
 			'-threads 1',
-			'-i', `"${doc.mediaPath}"`,
-			'-f', 'webm',
+			'-i',
+			`"${doc.mediaPath}"`,
+			'-f',
+			'webm',
 			'-an',
-			'-c:v', 'libvpx',
-			'-b:v', this.config.previews && this.config.previews.bitrate || '40k',
-			'-auto-alt-ref', '0',
-			`-vf scale=${this.config.previews && this.config.previews.width || 190}:`+
-				`${this.config.previews && this.config.previews.height || -1}`,
+			'-c:v',
+			'libvpx',
+			'-b:v',
+			(this.config.previews && this.config.previews.bitrate) || '40k',
+			'-auto-alt-ref',
+			'0',
+			`-vf scale=${(this.config.previews && this.config.previews.width) || 190}:` +
+				`${(this.config.previews && this.config.previews.height) || -1}`,
 			'-deadline realtime',
 			`"${tmpPath}"`
 		]
@@ -332,28 +373,35 @@ export class Worker {
 
 		let resolver: (v?: any) => void
 		let rejector: (reason?: any) => void
-		let generating = () => new Promise((resolve, reject) => {
-			resolver = resolve
-			rejector = reject
-			let previewProcess = spawn(
-				this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-				args,
-				{ shell: true }
-			)
-			previewProcess.stdout.on('data', (data) => {
-				this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data.toString())
+		let generating = () =>
+			new Promise((resolve, reject) => {
+				resolver = resolve
+				rejector = reject
+				let previewProcess = spawn(
+					(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32'
+						? 'ffmpeg.exe'
+						: 'ffmpeg',
+					args,
+					{ shell: true }
+				)
+				previewProcess.stdout.on('data', data => {
+					this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data.toString())
+				})
+				previewProcess.stderr.on('data', data => {
+					this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data.toString())
+				})
+				previewProcess.on('close', code => {
+					if (code === 0) {
+						resolver()
+					} else {
+						rejector(
+							new Error(
+								`Worker: preview generate: ffmpeg process with pid "${previewProcess.pid}" exited with code "${code}"`
+							)
+						)
+					}
+				})
 			})
-			previewProcess.stderr.on('data', (data) => {
-				this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data.toString())
-			})
-			previewProcess.on('close', (code) => {
-				if (code === 0) {
-					resolver()
-				} else {
-					rejector(new Error(`Worker: preview generate: ffmpeg process with pid "${previewProcess.pid}" exited with code "${code}"`))
-				}
-			})
-		})
 		const { error: generateError } = await noTryAsync(generating)
 		if (generateError) {
 			return this.failStep(`error while generating preview for "${fileId}"`, step.action, generateError)
@@ -362,19 +410,30 @@ export class Worker {
 
 		const { result: previewStat, error: statError } = await noTryAsync(() => fs.stat(tmpPath))
 		if (statError) {
-			return this.failStep(`failed to read file stats for "${fileId}" at path "${tmpPath}"`, step.action, statError)
+			return this.failStep(
+				`failed to read file stats for "${fileId}" at path "${tmpPath}"`,
+				step.action,
+				statError
+			)
 		}
 
 		const { error: renameError } = await noTryAsync(() => fs.rename(tmpPath, destPath))
 		if (renameError) {
-			return this.failStep(`failed to remname tmp file from "${tmpPath}" to "${destPath}"`, step.action, renameError)
+			return this.failStep(
+				`failed to remname tmp file from "${tmpPath}" to "${destPath}"`,
+				step.action,
+				renameError
+			)
 		}
 
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError2) {
-			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+			return this.failStep(
+				`after work, failed to retrieve media object with ID "${fileId}"`,
+				step.action,
+				getError2
+			)
 		}
 
 		doc2.previewSize = previewStat.size
@@ -393,34 +452,46 @@ export class Worker {
 
 	private static readonly fieldRegex = /Multi frame detection: TFF:\s+(\d+)\s+BFF:\s+(\d+)\s+Progressive:\s+(\d+)/
 
-	private async getFieldOrder (doc: MediaObject): Promise<FieldOrder> {
+	private async getFieldOrder(doc: MediaObject): Promise<FieldOrder> {
 		if (this.config.metadata && !this.config.metadata.fieldOrder) {
 			return FieldOrder.Unknown
 		}
 
-		const args = [ // TODO (perf) Low priority process?
-			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+		const args = [
+			// TODO (perf) Low priority process?
+			(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
 			'-hide_banner',
-			'-filter:v', 'idet',
-			'-frames:v', this.config.metadata && this.config.metadata.fieldOrderScanDuration || 200,
+			'-filter:v',
+			'idet',
+			'-frames:v',
+			(this.config.metadata && this.config.metadata.fieldOrderScanDuration) || 200,
 			'-an',
-			'-f', 'rawvideo',
-			'-y', (process.platform === 'win32' ? 'NUL' : '/dev/null'),
+			'-f',
+			'rawvideo',
+			'-y',
+			process.platform === 'win32' ? 'NUL' : '/dev/null',
 			// '-threads 1', // Not needed. This is very quick even for big files.
-			'-i', `"${doc.mediaPath}"`
+			'-i',
+			`"${doc.mediaPath}"`
 		]
 
-		const { error: execError, result } = await noTryAsync(() => new Promise<string>((resolve, reject) => {
-			exec(args.join(' '), (err, stdout, stderr) => {
-				this.logger.debug(`Worker: field order detect: output (stdout, stderr)`, stdout, stderr)
-				if (err) {
-					return reject(err)
-				}
-				resolve(stderr)
-			})
-		}))
+		const { error: execError, result } = await noTryAsync(
+			() =>
+				new Promise<string>((resolve, reject) => {
+					exec(args.join(' '), (err, stdout, stderr) => {
+						this.logger.debug(`Worker: field order detect: output (stdout, stderr)`, stdout, stderr)
+						if (err) {
+							return reject(err)
+						}
+						resolve(stderr)
+					})
+				})
+		)
 		if (execError) {
-			this.logger.error(`${this.ident}: external process to detect field order for "${doc.mediaPath}" failed`, execError)
+			this.logger.error(
+				`${this.ident}: external process to detect field order for "${doc.mediaPath}" failed`,
+				execError
+			)
 			return FieldOrder.Unknown
 		}
 		this.logger.info(`Worker: field order detect: generated field order for "${doc.mediaPath}"`)
@@ -432,10 +503,7 @@ export class Worker {
 
 		const tff = parseInt(res[1])
 		const bff = parseInt(res[2])
-		const fieldOrder =
-			tff <= 10 && bff <= 10 ?
-				FieldOrder.Progressive :
-				(tff > bff ? FieldOrder.TFF : FieldOrder.BFF)
+		const fieldOrder = tff <= 10 && bff <= 10 ? FieldOrder.Progressive : tff > bff ? FieldOrder.TFF : FieldOrder.BFF
 
 		return fieldOrder
 	}
@@ -446,10 +514,14 @@ export class Worker {
 	private static readonly freezeDetectDuration = /(lavfi\.freezedetect\.freeze_duration: )(\d+(.\d+)?)/g
 	private static readonly freezeDetectEnd = /(lavfi\.freezedetect\.freeze_end: )(\d+(.\d+)?)/g
 
-	private async getMetadata (doc: MediaObject): Promise<Metadata> {
+	private async getMetadata(doc: MediaObject): Promise<Metadata> {
 		const metaconf = this.config.metadata
 		if (!metaconf || (!metaconf.scenes && !metaconf.freezeDetection && !metaconf.blackDetection)) {
-			this.logger.debug(`Worker: get metadata: not generating stream metadata: ${metaconf} ${(!metaconf!.scenes && !metaconf!.freezeDetection && !metaconf!.blackDetection)}`)
+			this.logger.debug(
+				`Worker: get metadata: not generating stream metadata: ${metaconf} ${!metaconf!.scenes &&
+					!metaconf!.freezeDetection &&
+					!metaconf!.blackDetection}`
+			)
 			return {}
 		}
 
@@ -459,7 +531,8 @@ export class Worker {
 
 		let filterString = ''
 		if (metaconf.blackDetection) {
-			filterString+= `blackdetect=d=${metaconf.blackDuration || '2.0'}:` +
+			filterString +=
+				`blackdetect=d=${metaconf.blackDuration || '2.0'}:` +
 				`pic_th=${metaconf.blackRatio || 0.98}:` +
 				`pix_th=${metaconf.blackThreshold || 0.1}`
 		}
@@ -468,8 +541,7 @@ export class Worker {
 			if (filterString) {
 				filterString += ','
 			}
-			filterString += `freezedetect=n=${metaconf.freezeNoise || 0.001}:` +
-				`d=${metaconf.freezeDuration || '2s'}`
+			filterString += `freezedetect=n=${metaconf.freezeNoise || 0.001}:` + `d=${metaconf.freezeDuration || '2s'}`
 		}
 
 		if (metaconf.scenes) {
@@ -481,21 +553,24 @@ export class Worker {
 
 		const args = [
 			'-hide_banner',
-			'-i', `"${doc.mediaPath}"`,
-			'-filter:v', filterString,
+			'-i',
+			`"${doc.mediaPath}"`,
+			'-filter:v',
+			filterString,
 			'-an',
-			'-f', 'null',
-			'-threads', '1',
+			'-f',
+			'null',
+			'-threads',
+			'1',
 			'-'
 		]
 
 		let infoProcess: ChildProcessWithoutNullStreams = spawn(
-			this.config.paths && this.config.paths.ffmpeg || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+			(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
 			args,
 			{ shell: true }
 		)
-		let [ scenes, freezes, blacks ] =
-			[ [] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly> ]
+		let [scenes, freezes, blacks] = [[] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly>]
 		// TODO current frame is not read?
 		// let currentFrame = 0
 
@@ -515,19 +590,23 @@ export class Worker {
 			}
 
 			while ((res = Worker.blackDetectRegex.exec(stringData)) !== null) {
-				blacks.push(literal<Anomaly>({
-					start: parseFloat(res[2]),
-					duration: parseFloat(res[8]),
-					end: parseFloat(res[5])
-				}))
+				blacks.push(
+					literal<Anomaly>({
+						start: parseFloat(res[2]),
+						duration: parseFloat(res[8]),
+						end: parseFloat(res[5])
+					})
+				)
 			}
 
 			while ((res = Worker.freezeDetectStart.exec(stringData)) !== null) {
-				freezes.push(literal<Anomaly>({
-					start: parseFloat(res[2]),
-					duration: 0.0,
-					end: 0.0
-				}))
+				freezes.push(
+					literal<Anomaly>({
+						start: parseFloat(res[2]),
+						duration: 0.0,
+						end: 0.0
+					})
+				)
 			}
 
 			let i = 0
@@ -549,15 +628,26 @@ export class Worker {
 			rejecter = reject
 		})
 
-		infoProcess.on('close', (code) => {
-			if (code === 0) { // success
+		infoProcess.on('close', code => {
+			if (code === 0) {
+				// success
 				// if freeze frame is the end of video, it is not detected fully
-				if (freezes[freezes.length - 1] && !freezes[freezes.length - 1].end &&
-						doc.mediainfo && doc.mediainfo.format && typeof doc.mediainfo.format.duration === 'number') {
+				if (
+					freezes[freezes.length - 1] &&
+					!freezes[freezes.length - 1].end &&
+					doc.mediainfo &&
+					doc.mediainfo.format &&
+					typeof doc.mediainfo.format.duration === 'number'
+				) {
 					freezes[freezes.length - 1].end = doc.mediainfo.format.duration
-					freezes[freezes.length - 1].duration = doc.mediainfo.format.duration - freezes[freezes.length - 1].start
+					freezes[freezes.length - 1].duration =
+						doc.mediainfo.format.duration - freezes[freezes.length - 1].start
 				}
-				this.logger.debug(`Worker: get metadata: completed metadata analysis: scenes ${scenes ? scenes.length : 0}, freezes ${freezes ? freezes.length : 0}, blacks ${blacks ? blacks.length : 0}`)
+				this.logger.debug(
+					`Worker: get metadata: completed metadata analysis: scenes ${scenes ? scenes.length : 0}, freezes ${
+						freezes ? freezes.length : 0
+					}, blacks ${blacks ? blacks.length : 0}`
+				)
 				resolver({ scenes, freezes, blacks })
 			} else {
 				this.logger.error(`Worker: get metadata: FFmpeg failed with code ${code}`)
@@ -568,7 +658,7 @@ export class Worker {
 		return metaPromise
 	}
 
-	private static sortBlackFreeze (tl: Array<SortMeta>): Array<SortMeta> {
+	private static sortBlackFreeze(tl: Array<SortMeta>): Array<SortMeta> {
 		return tl.sort((a, b) => {
 			if (a.time > b.time) {
 				return 1
@@ -590,7 +680,7 @@ export class Worker {
 		})
 	}
 
-	private static updateFreezeStartEnd (tl: Array<SortMeta>): Array<Anomaly> {
+	private static updateFreezeStartEnd(tl: Array<SortMeta>): Array<Anomaly> {
 		let freeze: Anomaly | undefined
 		let interruptedFreeze = false
 		let freezes: Array<Anomaly> = []
@@ -647,8 +737,7 @@ export class Worker {
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
-		let { result: doc, error: getError } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
@@ -657,12 +746,7 @@ export class Worker {
 		const metadata: Metadata = await this.getMetadata(doc)
 
 		if (this.config.metadata && this.config.metadata.mergeBlacksAndFreezes) {
-			if (
-				metadata.blacks &&
-				metadata.blacks.length &&
-				metadata.freezes &&
-				metadata.freezes.length
-			) {
+			if (metadata.blacks && metadata.blacks.length && metadata.freezes && metadata.freezes.length) {
 				// blacks are subsets of freezes, so we can remove the freeze frame warnings during a black
 				// in order to do this we create a linear timeline:
 				let tl: Array<SortMeta> = []
@@ -683,23 +767,29 @@ export class Worker {
 		}
 
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError2) {
-			return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+			return this.failStep(
+				`after work, failed to retrieve media object with ID "${fileId}"`,
+				step.action,
+				getError2
+			)
 		}
 
-		doc2.mediainfo = Object.assign(doc2.mediainfo, literal<MediaInfo>({
-			name: doc2._id,
-			// path: doc2.mediaPath, Error found with typings. These fields do not exist on MediaInfo
-			// size: doc.mediaSize,
-			// time: doc.mediaTime,
+		doc2.mediainfo = Object.assign(
+			doc2.mediainfo,
+			literal<MediaInfo>({
+				name: doc2._id,
+				// path: doc2.mediaPath, Error found with typings. These fields do not exist on MediaInfo
+				// size: doc.mediaSize,
+				// time: doc.mediaTime,
 
-			field_order: fieldOrder,
-			scenes: metadata.scenes,
-			freezes: metadata.freezes,
-			blacks: metadata.blacks
-		}))
+				field_order: fieldOrder,
+				scenes: metadata.scenes,
+				freezes: metadata.freezes,
+				blacks: metadata.blacks
+			})
+		)
 
 		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
 		if (putError) {
@@ -717,12 +807,15 @@ export class Worker {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
 		let docExists = true
-		let { result: doc, error: getError } =
-			await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
 			if (mediaFileDetails === false)
-				return this.failStep(`failed to locate media object file with ID "${fileId}" at path "${step.target.options && step.target.options.mediaPath}"`, step.action)
+				return this.failStep(
+					`failed to locate media object file with ID "${fileId}" at path "${step.target.options &&
+						step.target.options.mediaPath}"`,
+					step.action
+				)
 			docExists = false
 			doc = literal<MediaObject>({
 				_id: mediaFileDetails.mediaId,
@@ -738,28 +831,36 @@ export class Worker {
 			})
 		}
 
-		const args = [ 			// TODO (perf) Low priority process?
-			this.config.paths && this.config.paths.ffprobe || process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe',
+		const args = [
+			// TODO (perf) Low priority process?
+			(this.config.paths && this.config.paths.ffprobe) || process.platform === 'win32'
+				? 'ffprobe.exe'
+				: 'ffprobe',
 			'-hide_banner',
-			'-i', `"${doc.mediaPath}"`,
+			'-i',
+			`"${doc.mediaPath}"`,
 			'-show_streams',
 			'-show_format',
-			'-print_format', 'json'
+			'-print_format',
+			'json'
 		]
 
-		const { result: probeData, error: execError } = await noTryAsync(() => new Promise<any>((resolve, reject) => {
-			exec(args.join(' '), (err, stdout, stderr) => {
-				this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
-				if (err) {
-					return reject(err)
-				}
-				const json: any = JSON.parse(stdout)
-				if (!json.streams || !json.streams[0]) {
-					return reject(new Error('not media'))
-				}
-				resolve(json)
-			})
-		}))
+		const { result: probeData, error: execError } = await noTryAsync(
+			() =>
+				new Promise<any>((resolve, reject) => {
+					exec(args.join(' '), (err, stdout, stderr) => {
+						this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
+						if (err) {
+							return reject(err)
+						}
+						const json: any = JSON.parse(stdout)
+						if (!json.streams || !json.streams[0]) {
+							return reject(new Error('not media'))
+						}
+						resolve(json)
+					})
+				})
+		)
 		if (execError) {
 			return this.failStep(`external process to generate metadata for "${fileId}" failed`, step.action, execError)
 		}
@@ -825,10 +926,13 @@ export class Worker {
 
 		// Read document again ... might have been updated while we were busy working
 		if (docExists) {
-			let { result: doc2, error: getError2 } =
-				await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+			let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 			if (getError2) {
-				return this.failStep(`after work, failed to retrieve media object with ID "${fileId}"`, step.action, getError2)
+				return this.failStep(
+					`after work, failed to retrieve media object with ID "${fileId}"`,
+					step.action,
+					getError2
+				)
 			}
 			doc = doc2
 		}
@@ -892,8 +996,8 @@ export class Worker {
 		}
 
 		this.logger.debug(`${this.ident} starting updating TMI on "${step.file.name}"`)
-		const { error: upsertError } = await noTryAsync(
-			() => this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
+		const { error: upsertError } = await noTryAsync(() =>
+			this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
 				// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 				if (tmi) {
 					if (tmi.targetStorageIds.indexOf(step.target.id) < 0) {
@@ -920,8 +1024,8 @@ export class Worker {
 			return this.failStep(`failed to delete "${step.file.name}"`, step.action, deleteError)
 		}
 
-		const { error: upsertError } = await noTryAsync(
-			() => this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
+		const { error: upsertError } = await noTryAsync(() =>
+			this.trackedMediaItems.upsert(step.file.name, (tmi?: TrackedMediaItemDB) => {
 				// if (!tmi) throw new Error(`Item not tracked: ${step.file.name}`)
 				if (tmi) {
 					const idx = tmi.targetStorageIds.indexOf(step.target.id)
@@ -938,7 +1042,9 @@ export class Worker {
 		)
 		if (upsertError) {
 			if ((upsertError as any).status && (upsertError as any).status === 404) {
-				this.logger.info(`${this.ident}: file "${step.file.name}" to be deleted was already removed from tracking database`)
+				this.logger.info(
+					`${this.ident}: file "${step.file.name}" to be deleted was already removed from tracking database`
+				)
 			} else {
 				return this.failStep(`failure updating TMI for copy of "${step.file.name}"`, step.action, upsertError)
 			}

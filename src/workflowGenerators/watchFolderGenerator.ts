@@ -30,7 +30,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 
 					if (srcStorage && dstStorage) {
 						if (srcStorage.options.onlySelectedFiles) {
-							this.logger.error(`${this.ident} ${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`)
+							this.logger.error(
+								`${this.ident} ${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`
+							)
 							return
 						}
 						this.registerStoragePair(srcStorage, dstStorage)
@@ -76,20 +78,24 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		const localFile = e.file
 		const dstStorageId = this._storageMapping[st.id]
 		const targetStorage = this._availableStorage.find(i => i.id === dstStorageId)
-		if (!targetStorage) throw new Error(`${this.ident} onFileUpdated: Could not find target storage "${dstStorageId}"`)
+		if (!targetStorage)
+			throw new Error(`${this.ident} onFileUpdated: Could not find target storage "${dstStorageId}"`)
 		this._tracked
 			.getById(e.path)
 			.then(
 				() => {
-					this.logger.debug(`${this.ident} onFileUpdated: File "${e.path}" is already tracked, "${st.id}" ignoring.`)
+					this.logger.debug(
+						`${this.ident} onFileUpdated: File "${e.path}" is already tracked, "${st.id}" ignoring.`
+					)
 
 					return Promise.resolve()
 				},
 				() => {
 					return this.registerFile(localFile, st, [targetStorage])
 						.then(() => {
-							this.logger.debug(`${this.ident} onFileUpdated: ` +
-								`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`
+							this.logger.debug(
+								`${this.ident} onFileUpdated: ` +
+									`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`
 							)
 						})
 						.catch(e => {
@@ -114,7 +120,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 						}),
 						this
 					)
-					this.logger.debug(`${this.ident} onFileUpdated: New forkflow started for "${e.path}": "${workflowId}".`)
+					this.logger.debug(
+						`${this.ident} onFileUpdated: New forkflow started for "${e.path}": "${workflowId}".`
+					)
 				}
 
 				return targetStorage.handler.getFile(localFile.name).then(
@@ -133,7 +141,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				)
 			})
 			.then(() => {})
-			.catch(e => this.logger.error(`${this.ident} onFileUpdated: An error was thrown when handling an updated file`, e))
+			.catch(e =>
+				this.logger.error(`${this.ident} onFileUpdated: An error was thrown when handling an updated file`, e)
+			)
 	}
 
 	protected onAdd(st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
@@ -172,24 +182,30 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 									// return storageObject.handler.deleteFile(file)
 								})
 								.then(() => {
-									this.logger.debug(`${this.ident} onDelete: ` +
-										`New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`
+									this.logger.debug(
+										`${this.ident} onDelete: ` +
+											`New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`
 									)
 								})
 								.catch(e => {
-									this.logger.warn(`${this.ident} onDelete: Could not find file in target storage: "${storageObject.id}"`, e)
+									this.logger.warn(
+										`${this.ident} onDelete: Could not find file in target storage: "${storageObject.id}"`,
+										e
+									)
 								})
 						}
 					})
 					this._tracked.remove(tmi).then(
 						() => {
-							this.logger.debug(`${this.ident} onDelete: ` +
-								`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`
+							this.logger.debug(
+								`${this.ident} onDelete: ` +
+									`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`
 							)
 						},
 						e => {
-							this.logger.error(`${this.ident} onDelete: ` +
-								`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`,
+							this.logger.error(
+								`${this.ident} onDelete: ` +
+									`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`,
 								e
 							)
 						}
@@ -222,7 +238,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 									try {
 										await this._tracked.put(trackedFile)
 									} catch (e1) {
-										this.logger.error(`${this.ident} initialCheck: Could not update "${trackedFile.name}" last seen: ${e1}`)
+										this.logger.error(
+											`${this.ident} initialCheck: Could not update "${trackedFile.name}" last seen: ${e1}`
+										)
 									}
 
 									await targetStorage.handler.getFile(trackedFile.name)

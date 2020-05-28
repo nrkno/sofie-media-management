@@ -16,11 +16,7 @@ export abstract class Monitor extends EventEmitter {
 		messages: ['Initializing...']
 	}
 
-	constructor(
-		readonly deviceId: string,
-		readonly settings: MonitorSettings,
-		protected logger: LoggerInstance
-	) {
+	constructor(readonly deviceId: string, readonly settings: MonitorSettings, protected logger: LoggerInstance) {
 		super()
 		this.deviceType = this.settings.type
 	}
@@ -46,8 +42,7 @@ export abstract class Monitor extends EventEmitter {
 
 	// Overide EventEmitter.on() for stronger typings:
 	/** The connection status has changed */
-	on(event: 'connectionChanged',
-		listener: (status: PeripheralDeviceAPI.StatusObject) => void): this
+	on(event: 'connectionChanged', listener: (status: PeripheralDeviceAPI.StatusObject) => void): this
 	on(event: string | symbol, listener: (...args: any[]) => void): this {
 		return super.on(event, listener)
 	}

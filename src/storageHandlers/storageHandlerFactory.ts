@@ -11,10 +11,7 @@ import { FileShareHandler } from './fileShareHandler'
  * @param  {StorageSettings} storage
  * @return StorageHandler
  */
-export function buildStorageHandler(
-	storage: GeneralStorageSettings,
-	logger: LoggerInstance
-): StorageHandler {
+export function buildStorageHandler(storage: GeneralStorageSettings, logger: LoggerInstance): StorageHandler {
 	switch (storage.type) {
 		case StorageType.LOCAL_FOLDER:
 			return new LocalFolderHandler(storage, logger)

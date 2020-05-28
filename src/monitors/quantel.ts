@@ -43,7 +43,6 @@ enum QuantelMonitorFileStatus {
 }
 
 export class MonitorQuantel extends Monitor {
-
 	private expectedMediaItems: () => Collection
 	private observer: Observer
 	private expectedMediaItemsSubscription: string
@@ -55,10 +54,7 @@ export class MonitorQuantel extends Monitor {
 	private watchError: string | null
 	private cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
 
-	constructor(		deviceId: string,
-			public settings: MonitorSettingsQuantel,
-			logger: LoggerInstance
-	) {
+	constructor(deviceId: string, public settings: MonitorSettingsQuantel, logger: LoggerInstance) {
 		super(deviceId, settings, logger)
 
 		this.quantel = new QuantelGateway()

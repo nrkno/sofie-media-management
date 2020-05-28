@@ -23,29 +23,32 @@ export class PreviewVacuum {
 		}
 	}
 
-	private async deletePreview (mediaId: string) {
+	private async deletePreview(mediaId: string) {
 		const destPath = path.join(
-			this.config.paths && this.config.paths.resources || '',
-			this.config.previews && this.config.previews.folder || 'previews',
+			(this.config.paths && this.config.paths.resources) || '',
+			(this.config.previews && this.config.previews.folder) || 'previews',
 			`${mediaId}.webm`
 		)
 		this.logger.info(`PreviewVacuum: deleting preview file "${destPath}" that is no longer required`)
-	  await fs.unlink(destPath).catch((err: NodeJS.ErrnoException) => {
+		await fs.unlink(destPath).catch((err: NodeJS.ErrnoException) => {
 			if (err.code && err.code !== 'ENOENT' && err.message.indexOf('no such file or directory') === -1) {
 				this.logger.error(`PreviewVacuum: error deleting preview file "${err.stack}"`, err)
 			}
-	  })
+		})
 	}
 
 	start() {
-		this.changes = this.mediaDB.changes({
-			since: 'now',
-			live: true
-		}).on('change', change => {
-			this.rowChanged(change.id, change.deleted)
-		}).on('error', err => {
-			this.logger.error(`PreviewVacuum: error from change listener`, err)
-		})
+		this.changes = this.mediaDB
+			.changes({
+				since: 'now',
+				live: true
+			})
+			.on('change', change => {
+				this.rowChanged(change.id, change.deleted)
+			})
+			.on('error', err => {
+				this.logger.error(`PreviewVacuum: error from change listener`, err)
+			})
 	}
 
 	stop() {

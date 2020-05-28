@@ -2,7 +2,15 @@ import * as _ from 'underscore'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
-import { MonitorSettingsWatcher, MediaObject, DiskInfo, StorageSettings, StorageType, LocalFolderStorage, FileShareStorage } from '../api'
+import {
+	MonitorSettingsWatcher,
+	MediaObject,
+	DiskInfo,
+	StorageSettings,
+	StorageType,
+	LocalFolderStorage,
+	FileShareStorage
+} from '../api'
 import { LoggerInstance } from 'winston'
 import { FetchError } from 'node-fetch'
 import { promisify } from 'util'
@@ -51,10 +59,7 @@ export class MonitorMediaWatcher extends Monitor {
 	) {
 		super(deviceId, monitorSettings, logger)
 
-		if (
-			storageSettings &&
-			(isFileShareStorage(storageSettings) || isLocalFolderStorage(storageSettings))
-		) {
+		if (storageSettings && (isFileShareStorage(storageSettings) || isLocalFolderStorage(storageSettings))) {
 			this.watcher = new Watcher(db, monitorSettings, logger, storageSettings)
 			this.watcher.init()
 		}
@@ -93,7 +98,7 @@ export class MonitorMediaWatcher extends Monitor {
 					this.triggerupdateFsStats()
 				}, 30 * 1000) // Run a check every 30 seconds
 
-				const [ coreObjRevisions, allDocsResponse, dbInfo ] = await Promise.all([
+				const [coreObjRevisions, allDocsResponse, dbInfo] = await Promise.all([
 					this.getAllCoreObjRevisions(),
 					this.db.allDocs({
 						include_docs: true,
@@ -102,9 +107,13 @@ export class MonitorMediaWatcher extends Monitor {
 					this.db.info()
 				])
 
-				this.logger.info('Media watcher: sync object lists', Object.keys(coreObjRevisions).length, allDocsResponse.total_rows)
+				this.logger.info(
+					'Media watcher: sync object lists',
+					Object.keys(coreObjRevisions).length,
+					allDocsResponse.total_rows
+				)
 
-				for ( let doc of allDocsResponse.rows ) {
+				for (let doc of allDocsResponse.rows) {
 					const docId = this.hashId(doc.id)
 
 					if (doc.value.deleted) {
@@ -127,7 +136,8 @@ export class MonitorMediaWatcher extends Monitor {
 						await new Promise(resolve => {
 							setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
 						})
-					} else { // identical
+					} else {
+						// identical
 						delete coreObjRevisions[docId]
 						continue
 					}
@@ -137,7 +147,7 @@ export class MonitorMediaWatcher extends Monitor {
 					this.lastSequenceNr = parseInt(dbInfo.update_seq + '', 10)
 				}
 				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
-				for ( let id in coreObjRevisions) {
+				for (let id in coreObjRevisions) {
 					await this.sendRemoved(id)
 				}
 
@@ -184,29 +194,37 @@ export class MonitorMediaWatcher extends Monitor {
 			switch (process.platform) {
 				// Note: the Description (Win) and '-l' flag (Linux) limits this to local disks only.
 				case 'darwin':
-				  cmd = 'df -lkP | grep ^/'
+					cmd = 'df -lkP | grep ^/'
 					break
 				case 'linux':
-				  cmd = 'df -lkPT | grep ^/'
+					cmd = 'df -lkPT | grep ^/'
 					break
 				case 'openbsd':
 				case 'freebsd':
-				  cmd = 'df -lkPT'
-				  break
+					cmd = 'df -lkPT'
+					break
 				case 'win32':
-					const { stdout } = await exec('wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size', { windowsHide: true })
-					let lines = stdout.split('\r\n').filter(line => line.trim() !== '').filter((_line, idx) => idx > 0)
-				 	for ( let line of lines ) {
-						let lineMatch = line.match(/(?<fs>\w:)\s+(?<desc>(Local Fixed Disk|Network Connection|Removable Disk))\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/)
+					const { stdout } = await exec(
+						'wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size',
+						{ windowsHide: true }
+					)
+					let lines = stdout
+						.split('\r\n')
+						.filter(line => line.trim() !== '')
+						.filter((_line, idx) => idx > 0)
+					for (let line of lines) {
+						let lineMatch = line.match(
+							/(?<fs>\w:)\s+(?<desc>(Local Fixed Disk|Network Connection|Removable Disk))\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/
+						)
 						if (lineMatch && lineMatch.groups) {
 							if (lineMatch.groups.desc !== 'Local Fixed Disk') continue // Only report on local disks
-							let [ free, size ] = [ parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size) ]
+							let [free, size] = [parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size)]
 							disks.push({
 								fs: lineMatch.groups.fs,
 								type: lineMatch.groups.type,
 								size,
 								used: size - free,
-								use: parseFloat((100.0 * (size - free) / size).toFixed(2)),
+								use: parseFloat(((100.0 * (size - free)) / size).toFixed(2)),
 								mount: lineMatch.groups!.fs
 							} as DiskInfo)
 						}
@@ -216,21 +234,26 @@ export class MonitorMediaWatcher extends Monitor {
 					this.logger.error(`Media watcher: unrecognized platform '${process.platform}'`)
 					return
 			}
-			if (cmd) { // some flavour of Unix
+			if (cmd) {
+				// some flavour of Unix
 				const { stdout } = await exec(cmd)
 				let lines = stdout.split('\n')
-				for ( let line of lines ) {
+				for (let line of lines) {
 					let lineMatch = line.match(
-						/(?<fs>\/\S+)\s+(?<type>\w+)\s+(?<sizeb>\d+)\s+(?<usedb>\d+)\s+(?<avail>\d+)\s+(?<capacity>\d+\%)\s+(?<mount>\S+)/)
+						/(?<fs>\/\S+)\s+(?<type>\w+)\s+(?<sizeb>\d+)\s+(?<usedb>\d+)\s+(?<avail>\d+)\s+(?<capacity>\d+\%)\s+(?<mount>\S+)/
+					)
 
 					if (lineMatch && lineMatch.groups) {
-						let [ size, used ] = [ parseInt(lineMatch.groups.sizeb) * 1024, parseInt(lineMatch.groups.usedb) * 1024 ]
+						let [size, used] = [
+							parseInt(lineMatch.groups.sizeb) * 1024,
+							parseInt(lineMatch.groups.usedb) * 1024
+						]
 						disks.push({
 							fs: lineMatch.groups.fs,
 							type: lineMatch.groups.type,
 							size,
 							used,
-							use: parseFloat((100.0 * used / size).toFixed(2)),
+							use: parseFloat(((100.0 * used) / size).toFixed(2)),
 							mount: lineMatch.groups.mount
 						} as DiskInfo)
 					}
@@ -239,7 +262,7 @@ export class MonitorMediaWatcher extends Monitor {
 
 			let messages: Array<string> = []
 			let status = PeripheralDeviceAPI.StatusCode.GOOD
-			for ( let disk of disks ) {
+			for (let disk of disks) {
 				let diskStatus = PeripheralDeviceAPI.StatusCode.GOOD
 				if (disk.use) {
 					if (disk.use > 75) {
@@ -262,7 +285,7 @@ export class MonitorMediaWatcher extends Monitor {
 			this.statusDisk.statusCode = status
 			this.statusDisk.messages = messages
 			this.updateAndSendStatus()
-		} catch(e) {
+		} catch (e) {
 			this.logger.warn('Media watcher: it was not possible to determine disk usage stats.')
 			// Removed - not making a network request
 			// if (!((e + '').match(/ECONNREFUSED/i) || (e + '').match(/ECONNRESET/i) || (e + '').match(/ENOTFOUND/i))) {
@@ -331,10 +354,7 @@ export class MonitorMediaWatcher extends Monitor {
 	private updateAndSendStatus() {
 		const status = this.updateStatus()
 
-		if (
-			this.status.statusCode !== status.statusCode
-			|| !_.isEqual(this.status.messages, status.messages)
-		) {
+		if (this.status.statusCode !== status.statusCode || !_.isEqual(this.status.messages, status.messages)) {
 			this._status = {
 				statusCode: status.statusCode,
 				messages: status.messages

@@ -20,30 +20,32 @@ export class MediaManagerApp {
 	) {
 		this.app.use(range)
 
-		this.app.use(cors({
-		  'origin': '*'
-		}))
+		this.app.use(
+			cors({
+				origin: '*'
+			})
+		)
 	}
 
 	async init() {
 		this.router.get('/', async (ctx, next) => {
-		  ctx.body = { msg: 'Hello World', params: ctx.params }
-		  await next()
+			ctx.body = { msg: 'Hello World', params: ctx.params }
+			await next()
 		})
 
 		// TODO make it work with non-quantel images
 
 		this.router.get('/media/thumbnail/:id+', async (ctx, next) => {
-		  this.logger.debug(`HTTP/S server: received thumbnail request "${ctx.params.id}"`)
-		  if (ctx.params.id.startsWith('QUANTEL:')) {
+			this.logger.debug(`HTTP/S server: received thumbnail request "${ctx.params.id}"`)
+			if (ctx.params.id.startsWith('QUANTEL:')) {
 				let id = ctx.params.id.slice(8)
 				ctx.type = 'image/jpeg'
 				await send(ctx, `thumbs/${id}.jpg`)
-		  } else {
+			} else {
 				this.logger.debug(`Making database thumbnail request for "${ctx.params.id}"`)
-				const { result, error } = await noTryAsync(() => this.mediaDB.get<MediaObject>(
-					ctx.params.id.toUpperCase(),
-					{ attachments: true, binary: true }))
+				const { result, error } = await noTryAsync(() =>
+					this.mediaDB.get<MediaObject>(ctx.params.id.toUpperCase(), { attachments: true, binary: true })
+				)
 
 				if (error) {
 					this.logger.warn(`Database requests for "${ctx.params.id}" failed: ${error.message}`)
@@ -59,16 +61,16 @@ export class MediaManagerApp {
 
 				ctx.type = 'image/png'
 				ctx.body = (_attachments['thumb.png'] as PouchDB.Core.FullAttachment).data
-		  }
+			}
 		})
 
 		this.router.get('/media/preview/:id+', async (ctx, next) => {
-		  this.logger.debug(`HTTP/S server: received preview request ${ctx.params.id}`)
+			this.logger.debug(`HTTP/S server: received preview request ${ctx.params.id}`)
 			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
 			ctx.type = 'video/webm'
 			let previewPath = path.join(
-				this.config.paths && this.config.paths.resources || '',
-				this.config.previews && this.config.previews.folder || '',
+				(this.config.paths && this.config.paths.resources) || '',
+				(this.config.previews && this.config.previews.folder) || '',
 				`${id}.webm`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
@@ -89,7 +91,7 @@ export class MediaManagerApp {
 
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
 
-		return new Promise((resolve) => {
+		return new Promise(resolve => {
 			if (this.config.httpPort) {
 				this.app.listen(this.config.httpPort, () => {
 					this.logger.info(`MediaMangerApp: Koa started on HTTP port ${this.config.httpPort}`)

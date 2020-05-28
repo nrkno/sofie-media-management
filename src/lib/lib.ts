@@ -349,8 +349,8 @@ export function putToDBUpsert<T>(
 }
 
 /** Async Javascripts missing wait function. */
-export function wait (time: number): Promise<void> {
-	return new Promise((resolve) => {
+export function wait(time: number): Promise<void> {
+	return new Promise(resolve => {
 		setTimeout(resolve, time)
 	})
 }
