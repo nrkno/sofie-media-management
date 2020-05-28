@@ -182,7 +182,7 @@ export class MonitorMediaWatcher extends Monitor {
 			let disks: Array<DiskInfo> = []
 			let cmd = ''
 			switch (process.platform) {
-				// Note: the '-l' flag limits this to local disks only.
+				// Note: the Description (Win) and '-l' flag (Linux) limits this to local disks only.
 				case 'darwin':
 				  cmd = 'df -lkP | grep ^/'
 					break
@@ -194,11 +194,12 @@ export class MonitorMediaWatcher extends Monitor {
 				  cmd = 'df -lkPT'
 				  break
 				case 'win32':
-					const { stdout } = await exec('wmic logicaldisk get Caption,FileSystem,FreeSpace,Size', { windowsHide: true })
+					const { stdout } = await exec('wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size', { windowsHide: true })
 					let lines = stdout.split('\r\n').filter(line => line.trim() !== '').filter((_line, idx) => idx > 0)
 				 	for ( let line of lines ) {
-						let lineMatch = line.match(/(?<fs>\w:)\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/)
+						let lineMatch = line.match(/(?<fs>\w:)\s+(?<desc>(Local Fixed Disk|Network Connection|Removable Disk))\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/)
 						if (lineMatch && lineMatch.groups) {
+							if (lineMatch.groups.desc !== 'Local Fixed Disk') continue // Only report on local disks
 							let [ free, size ] = [ parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size) ]
 							disks.push({
 								fs: lineMatch.groups.fs,
@@ -235,7 +236,7 @@ export class MonitorMediaWatcher extends Monitor {
 					}
 				}
 			}
-			// @todo: we temporarily report under playout-gateway, until we can handle multiple media-scanners
+
 			let messages: Array<string> = []
 			let status = PeripheralDeviceAPI.StatusCode.GOOD
 			for ( let disk of disks ) {
