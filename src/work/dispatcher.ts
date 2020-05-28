@@ -2,24 +2,23 @@ import * as _ from 'underscore'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as fs from 'fs-extra'
-import * as PromiseSequence from 'promise-sequence'
-import * as request from 'request-promise-native'
-import { EventEmitter } from 'events'
+import { noTryAsync, noTry } from 'no-try'
+import { LoggerInstance } from 'winston'
 
 import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
 
 import {
 	extendMandadory,
 	randomId,
-	LogEvents,
 	getCurrentTime,
 	getFlowHash,
 	throttleOnKey,
 	atomic,
 	Omit,
-	updateDB
+	updateDB,
+  wait
 } from '../lib/lib'
-import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings } from '../api'
+import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings, MediaObject } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from '../workflowGenerators/baseWorkFlowGenerator'
 import { StorageObject } from '../storageHandlers/storageHandler'
@@ -42,357 +41,311 @@ enum MMPDMethods {
 const PROCESS_NAME = 'Dispatcher'
 
 /**
- * The dispatcher connects the storages to the workflow generators
- * And then dispathes the work to the workers
+ * The dispatcher connects the storages to the workflow generators.
+ * Then it dispathes the work to the workers.
  */
-export class Dispatcher extends EventEmitter {
-	generators: BaseWorkFlowGenerator[]
+export class Dispatcher {
+	private workers: Worker[] = []
 
-	private _workers: Worker[] = []
+	private workFlows: PouchDB.Database<WorkFlowDB>
+	private workSteps: PouchDB.Database<WorkStepDB>
 
-	private _workFlows: PouchDB.Database<WorkFlowDB>
-	private _workSteps: PouchDB.Database<WorkStepDB>
-	private _availableStorage: StorageObject[]
-	private _tmi: TrackedMediaItems
-	private _config: DeviceSettings
-	private _coreHandler: CoreHandler
+	private cronJobInterval: NodeJS.Timer | undefined = undefined
+	private watchdogInterval: NodeJS.Timer | undefined = undefined
 
-	private _bestEffort: NodeJS.Timer | undefined = undefined
-	private _cronJobInterval: NodeJS.Timer | undefined = undefined
-	private _watchdogInterval: NodeJS.Timer | undefined = undefined
+	private cronJobTime: number
+	private watchdogTime: number = 5 * 60 * 1000
+	private watchdogRunning: boolean = false
 
-	private _cronJobTime: number
-	private _watchdogTime: number = 5 * 60 * 1000
-	private _workFlowLingerTime: number
-	private _watchdogRunning: boolean = false
-
-	private _warningWFQueueLength: number
-	private _warningTaskWorkingTime: number
-
-	on(type: LogEvents, listener: (e: string) => void): this {
-		return super.on(type, listener)
-	}
+	private warningWFQueueLength: number
+	private warningTaskWorkingTime: number
 
 	constructor(
-		generators: BaseWorkFlowGenerator[],
-		availableStorage: StorageObject[],
-		tmi: TrackedMediaItems,
-		config: DeviceSettings,
-		workersCount: number,
-		workFlowLingerTime: number,
-		coreHandler: CoreHandler
+		private mediaDB: PouchDB.Database<MediaObject>,
+		private generators: BaseWorkFlowGenerator[],
+		private availableStorage: StorageObject[],
+		private tmi: TrackedMediaItems,
+		private config: DeviceSettings,
+		private workersCount: number,
+		private workFlowLingerTime: number,
+		private coreHandler: CoreHandler,
+		private logger: LoggerInstance
 	) {
-		super()
+		this.coreHandler.restartWorkflow = workflowId => this.actionRestartWorkflow(workflowId)
+		this.coreHandler.abortWorkflow = workflowId => this.actionAbortWorkflow(workflowId)
+		this.coreHandler.prioritizeWorkflow = workflowId => this.prioritizeWorkflow(workflowId)
+		this.coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
+		this.coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
 
-		this.generators = generators
-		this._tmi = tmi
-		this._config = config
-		this._coreHandler = coreHandler
+		this.cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
+		this.warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
+		this.warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
+	}
 
-		if (!this._config.mediaScanner) this._config.mediaScanner = { port: 80 } // tmp fix
-
-		this._coreHandler.restartWorkflow = workflowId => this.actionRestartWorkflow(workflowId)
-		this._coreHandler.abortWorkflow = workflowId => this.actionAbortWorkflow(workflowId)
-		this._coreHandler.prioritizeWorkflow = workflowId => this.prioritizeWorkflow(workflowId)
-		this._coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
-		this._coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
-		this.attachLogEvents('TrackedMediaItems', this._tmi)
-
-		this._cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
-		this._workFlowLingerTime = workFlowLingerTime
-		this._warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
-		this._warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
-
-		fs.ensureDirSync('./db')
+	private async initDB(): Promise<void> {
 		PouchDB.plugin(PouchDBFind)
+		await fs.ensureDir('./db') // TODO this should be configurable?
 		const PrefixedPouchDB = PouchDB.defaults({
 			prefix: './db/'
-		} as any)
+		} as PouchDB.Configuration.DatabaseConfiguration)
 
-		this._workFlows = new PrefixedPouchDB('workFlows')
-		this._workSteps = new PrefixedPouchDB('workSteps')
+		this.workFlows = new PrefixedPouchDB('workFlows')
+		this.workSteps = new PrefixedPouchDB('workSteps')
 
-		this._availableStorage = availableStorage
+		await Promise.all([ this.initWorkflowsDB(), this.initWorkStepsDB() ])
+	}
 
-		for (let i = 0; i < workersCount; i++) {
-			const newWorker = new Worker(this._workSteps, this._tmi, this._config)
-			this.attachLogEvents(`Worker ${i}`, newWorker)
-			this._workers.push(newWorker)
+	private async initWorkflowsDB(): Promise<void> {
+		const { error } = await noTryAsync(async () => {
+			await this.workFlows.createIndex({
+				index: {
+					fields: ['priority']
+				}
+			})
+			await this.workFlows.createIndex({
+				index: {
+					fields: ['finished']
+				}
+			})
+			await this.workFlows.createIndex({
+				index: {
+					fields: ['finished', 'created']
+				}
+			})
+			this.logger.debug(`Dispatcher: DB "workFlows" index "priority" succesfully created.`)
+		})
+		if (error) {
+		  throw new Error(`Dispatcher: could not initialize "workFlows" database: ${error.message}`)
+		}
+	}
+
+	private async initWorkStepsDB(): Promise<void> {
+		const { error } = await noTryAsync(async () => {
+			await this.workSteps.createIndex({
+				index: {
+					fields: ['workFlowId']
+				}
+			})
+			await this.workSteps.createIndex({
+				index: {
+					fields: ['status']
+				}
+			})
+			this.logger.debug(`Dispatcher: DB "workSteps" index "status" & "workFlowId" succesfully created.`)
+		})
+		if (error) {
+			throw new Error(`Dispatcher: could not initialize "workSteps" database: ${error.message}`)
 		}
 	}
 
 	async init(): Promise<void> {
-		return Promise.all([
-			this._workFlows
-				.createIndex({
-					index: {
-						fields: ['priority']
-					}
-				})
-				.then(() =>
-					this._workFlows.createIndex({
-						index: {
-							fields: ['finished']
-						}
-					})
-				)
-				.then(() =>
-					this._workFlows.createIndex({
-						index: {
-							fields: ['finished', 'created']
-						}
-					})
-				)
-				.then(() => {
-					this.emit('debug', `DB "workFlows" index "priority" succesfully created.`)
-				})
-				.catch(e => {
-					throw new Error(`Could not initialize "workFlows" database: ${e}`)
-				}),
-			this._workSteps
-				.createIndex({
-					index: {
-						fields: ['workFlowId']
-					}
-				})
-				.then(() =>
-					this._workSteps.createIndex({
-						index: {
-							fields: ['status']
-						}
-					})
-				)
-				.then(() => {
-					this.emit('debug', `DB "workSteps" index "priority" & "workFlowId" succesfully created.`)
-				})
-				.catch(e => {
-					throw new Error(`Could not initialize "workSteps" database: ${e}`)
-				})
-		])
-			.then(() => this.cleanupOldWorkflows())
-			.then(() => this.initialWorkFlowAndStepsSync())
-			.catch(e => {
-				this.emit('error', `Failed to synchronize with core`, e)
+		await this.initDB()
+		for (let i = 0; i < this.workersCount; i++) {
+			this.workers.push(
+				new Worker(this.workSteps, this.mediaDB, this.tmi, this.config, this.logger, i))
+		}
+		await this.cleanupOldWorkflows()
+		await noTryAsync(
+			() => this.initialWorkFlowSync(),
+			e => {
+				this.logger.error(`Dispatcher: failed to synchronize workFlows with core`, e)
 				process.exit(1)
 				throw e
-			})
-			.then(() => {
-				// Maintain one-to-many relationship for the WorkFlows and WorkSteps
-				// Update WorkFlows and WorkSteps in Core
-				this._workFlows
-					.changes({
-						since: 'now',
-						live: true,
-						include_docs: true
-					})
-					.on('change', change => {
-						if (change.deleted) {
-							this._workSteps
-								.find({
-									selector: {
-										workFlowId: change.id
-									}
-								})
-								.then(value => {
-									return Promise.all(value.docs.map(i => this._workSteps.remove(i))).then(() =>
-										this.emit(
-											'debug',
-											`Removed ${value.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`
-										)
-									)
-								})
-								.catch(reason => this.emit('error', `Could not remove orphaned WorkSteps`, reason))
-
-							this.pushWorkFlowToCore(change.id, null).catch(() => {})
-						} else if (change.doc) {
-							this.pushWorkFlowToCore(change.id, change.doc).catch(() => {})
-						}
-					})
-					.on('error', err => {
-						this.emit('error', `An error happened in the workFlow changes stream`, err)
-					})
-				this._workSteps
-					.changes({
-						since: 'now',
-						live: true,
-						include_docs: true
-					})
-					.on('change', change => {
-						if (change.deleted) {
-							this.pushWorkStepToCore(change.id, null).catch(() => {})
-						} else if (change.doc) {
-							this.pushWorkStepToCore(change.id, change.doc).catch(() => {})
-						}
-					})
-				// clean up old work-flows every now and then:
-				this._cronJobInterval = setInterval(() => {
-					this.cleanupOldWorkflows().catch(e =>
-						this.emit('error', 'Unhandled error in cleanupOldWorkflows', e)
-					)
-				}, this._cronJobTime)
-				this._watchdogInterval = setInterval(() => {
-					this.watchdog()
-				}, this._watchdogTime)
-			})
-			.then(() => {
-				if (this.useScanner()) {
-					return this.setScannerManualMode(true)
-				} else return Promise.resolve()
-			})
-			.then(
-				() => this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD),
-				e => {
-					this.emit('debug', `Could not place Media Scanner in manual mode`, e)
-					this._coreHandler.setProcessState(
-						'MediaScanner',
-						[
-							`Could not place Media Scanner in manual mode: ${this.convertMediaScannerExceptionToError(
-								e
-							)}`
-						],
-						P.StatusCode.WARNING_MAJOR
-					)
-
-					this.scannerManualModeBestEffort(true)
-				}
-			)
-			.then(() => Promise.all(this._availableStorage.map(st => this.attachLogEvents(st.id, st.handler))))
-			.then(() => Promise.all(this.generators.map(gen => this.attachLogEvents(gen.constructor.name, gen))))
-			.then(() => Promise.all(this.generators.map(gen => gen.init())))
-			.then(() => {
-				this.emit('debug', `Dispatcher initialized.`)
-			})
-			.then(() => {
-				this.generators.forEach(gen => {
-					gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
-					this.attachLogEvents(`WorkFlowGenerator "${gen.constructor.name}"`, gen)
-				})
-			})
-			.then(() => this.cancelLeftoverWorkSteps())
-	}
-
-	async destroy(): Promise<void> {
-		return Promise.all(this.generators.map(gen => gen.destroy()))
-			.then(() => this.emit('debug', 'WorkFlow generators destroyed'))
-			.then(() => {
-				if (this._cronJobInterval) clearInterval(this._cronJobInterval)
-				if (this._watchdogInterval) clearInterval(this._watchdogInterval)
-			})
-			.then(() => this.emit('debug', 'WorkFlow clean up task destroyed'))
-			.then(() => Promise.all(this._availableStorage.map(st => st.handler.destroy())))
-			.then(() => this.emit('debug', 'Storage handlers destroyed'))
-			.then(() => {
-				if (this.useScanner()) {
-					return this.setScannerManualMode(false)
-				} else return Promise.resolve()
-			})
-			.catch(e => this.emit('error', `Error when disabling manual mode in scanner`, e))
-			.then(() => this.emit('debug', 'Scanner placed back in automatic mode'))
-			.then(() => this.emit('debug', `Dispatcher destroyed.`))
-			.then(() => {})
-	}
-
-	private watchdog() {
-		if (this._watchdogRunning) return
-
-		this._watchdogRunning = true
-
-		this._workFlows
-			.allDocs({
-				include_docs: true
-			})
-			.then(
-				workFlows => {
-					const unfinishedWorkFlows = workFlows.rows.filter(i => i.doc && i.doc.finished === false)
-					const oldWorkFlows = unfinishedWorkFlows.filter(
-						i => i.doc && i.doc.created < getCurrentTime() - 3 * 60 * 60 * 1000
-					)
-					const recentlyFinished = workFlows.rows.filter(
-						i =>
-							i.doc &&
-							i.doc.finished &&
-							i.doc.modified &&
-							i.doc.modified > getCurrentTime() - 15 * 60 * 1000
-					)
-					const oldUnfinishedWorkFlows = unfinishedWorkFlows.filter(
-						i => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
-					)
-					if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
-						this._coreHandler.setProcessState(
-							PROCESS_NAME,
-							[`No WorkFlow has finished in the last 15 minutes`],
-							P.StatusCode.BAD
-						)
-						return
-					}
-					if (oldWorkFlows.length > 0) {
-						this._coreHandler.setProcessState(
-							PROCESS_NAME,
-							[`Some WorkFlows have been waiting more than 3hrs to be completed`],
-							P.StatusCode.BAD
-						)
-						return
-					}
-					if (unfinishedWorkFlows.length > this._warningWFQueueLength) {
-						this._coreHandler.setProcessState(
-							PROCESS_NAME,
-							[`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`],
-							P.StatusCode.WARNING_MAJOR
-						)
-						return
-					}
-					if (
-						_.compact(
-							this._workers.map(
-								i =>
-									i.lastBeginStep && i.lastBeginStep < getCurrentTime() - this._warningTaskWorkingTime
-							)
-						).length > 0
-					) {
-						this._coreHandler.setProcessState(
-							PROCESS_NAME,
-							[
-								`Some workers have been working for more than ${Math.floor(
-									this._warningTaskWorkingTime / (60 * 1000)
-								)} minutes`
-							],
-							P.StatusCode.BAD
-						)
-						return
-					}
-					// no problems found, set status to GOOD
-					this._coreHandler.setProcessState(PROCESS_NAME, [], P.StatusCode.GOOD)
-				},
-				() => {
-					this.emit('error', `Watchdog: Could not list all WorkFlows, restarting.`)
-					this._coreHandler.killProcess(1)
-				}
-			)
-			.then(() => {
-				this._watchdogRunning = false
-			})
-			.catch(e => {
-				this.emit('error', e)
-			})
-	}
-
-	private convertMediaScannerExceptionToError(e: Error) {
-		if (e.name) {
-			switch (e.name) {
-				case 'RequestError':
-					return `Could not connect to Media Scanner`
-				case 'StatusCodeError':
-					return `Invalid response from Media Scanner`
-				default:
-					return `Unknown error: ${e.name}`
 			}
+		)
+		await noTryAsync(
+			() => this.initialWorkStepsSync(),
+			e => {
+				this.logger.error(`Dispatcher: failed to synchronize workSteps with core`, e)
+				process.exit(1)
+				throw e
+			}
+		)
+		// Maintain one-to-many relationship for the WorkFlows and WorkSteps
+		// Update WorkFlows and WorkSteps in Core
+		let workflowChanges = this.workFlows.changes({
+			since: 'now',
+			live: true,
+			include_docs: true
+		})
+		workflowChanges.on('change', async change => {
+			if (change.deleted) {
+				let { result } = await noTryAsync(
+					() => this.workSteps.find({
+						selector: {
+							workFlowId: change.id
+						}
+					}),
+					(error: Error) => {
+						this.logger.error(`Dispatcher: could not find workflow with id "${change.id}" on change`, error)
+					}
+				)
+				let { error } = await noTryAsync(
+					() => Promise.all(result.docs.map(i => this.workSteps.remove(i))))
+				if (error) {
+					this.logger.error(`Dispatcher: could not remove orphaned WorkSteps`, error)
+				} else {
+					this.logger.debug(`Dispatcher: ` +
+						`removed ${result.docs.length} orphaned WorkSteps for WorkFlow "${change.id}"`)
+				}
+				noTryAsync(
+					() => this.pushWorkFlowToCore(change.id, null),
+					err => this.logger.debug(`Dispatcher: failed to push WorkFlow delete change with ID "${change.id}" to core`, err))
+			} else if (change.doc) {
+				let changeDoc = change.doc
+				noTryAsync(
+					() => this.pushWorkFlowToCore(change.id, changeDoc),
+					err => this.logger.debug(`Dispatcher: failed to push WorkFlow update change with ID "${change.id}" to core`, err))
+			}
+		})
+		workflowChanges.on('error', err => {
+			this.logger.error(`Dispatcher: an error happened in the WorkFlow changes stream`, err)
+		})
+
+		let workstepChanges = this.workSteps.changes({
+			since: 'now',
+			live: true,
+			include_docs: true
+		})
+		workstepChanges.on('change', change => {
+			if (change.deleted) {
+				noTryAsync(
+					() => this.pushWorkStepToCore(change.id, null),
+					err => this.logger.debug(`Dispatcher: failed to push WorkStep delete change with ID "${change.id}" to core`, err))
+			} else if (change.doc) {
+				let changeDoc = change.doc
+				noTryAsync(
+					() => this.pushWorkStepToCore(change.id, changeDoc),
+					err => this.logger.debug(`Dispatcher: failed to push WorkStep delete change with ID "${change.id}" to core`, err))
+			}
+		})
+		workstepChanges.on('error', err => {
+			this.logger.error(`Dispatcher: an error happened in the WorkStep changes stream`, err)
+		})
+
+		// clean up old work-flows every now and then:
+		this.cronJobInterval = setInterval(() => {
+			noTryAsync(
+				() => this.cleanupOldWorkflows(),
+				e => this.logger.error(`Dispatcher: unhandled error in cleanupOldWorkflows`, e)
+			)
+		}, this.cronJobTime)
+		this.watchdogInterval = setInterval(() => {
+			this.watchdog()
+		}, this.watchdogTime)
+
+		this.coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD),
+
+		await Promise.all(this.generators.map(gen => gen.init()))
+		this.logger.debug(`Dispatcher: initialized`)
+
+		this.generators.forEach(gen => {
+			gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
+		})
+		await this.cancelLeftoverWorkSteps()
+	}
+
+	// FIXME nothing calls this
+	async destroy(): Promise<void> {
+		const { error: genError } = await noTryAsync(
+			() => Promise.all(this.generators.map(gen => gen.destroy())))
+		if (genError) {
+			this.logger.warn(`Dispatcher: failed to dispose of one or more generators`, genError)
 		} else {
-			return `Unknown issue. See Media Manager log for details.`
+			this.logger.debug(`Dispatcher: workFlow generators destroyed`)
 		}
+
+		if (this.cronJobInterval) { clearInterval(this.cronJobInterval) }
+		if (this.watchdogInterval) { clearInterval(this.watchdogInterval) }
+		this.logger.debug(`Dispatcher: WorkFlow clean up task destroyed`)
+
+		const { error: handlerError } = await noTryAsync(
+			() => Promise.all(this.availableStorage.map(st => st.handler.destroy())))
+		if (handlerError) {
+			this.logger.warn(`Dispather: failed to dispose of one or more storage handlers`, handlerError)
+		}
+		this.logger.debug('Dispatcher: storage handlers destroyed')
+		this.logger.debug(`Dispatcher: destroyed`)
+	}
+
+	private async watchdog(): Promise<void> {
+		if (this.watchdogRunning) return
+		this.watchdogRunning = true
+
+		let { result: workflows } = await noTryAsync(() => this.workFlows.allDocs({
+				include_docs: true
+			}),
+			err => {
+				this.logger.error(`Dispatch: watchdog: could not list all WorkFlows, restarting`, err)
+				this.watchdogRunning = false
+				this.coreHandler.killProcess(1)
+				return
+			}
+		)
+
+		noTry(() => {
+			const unfinishedWorkFlows = workflows.rows.filter(i => i.doc && i.doc.finished === false)
+			const oldWorkFlows = unfinishedWorkFlows.filter(
+				i => i.doc && i.doc.created < getCurrentTime() - 3 * 60 * 60 * 1000)
+			const recentlyFinished = workflows.rows.filter(i =>
+				i.doc &&
+				i.doc.finished &&
+				i.doc.modified &&
+				i.doc.modified > getCurrentTime() - 15 * 60 * 1000
+			)
+			const oldUnfinishedWorkFlows = unfinishedWorkFlows.filter(
+				i => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
+			)
+			if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
+				this.coreHandler.setProcessState(
+					PROCESS_NAME,
+					[`No WorkFlow has finished in the last 15 minutes`],
+					P.StatusCode.BAD
+				)
+				return
+			}
+			if (oldWorkFlows.length > 0) {
+				this.coreHandler.setProcessState(
+					PROCESS_NAME,
+					[`Some WorkFlows have been waiting more than 3hrs to be completed`],
+					P.StatusCode.BAD)
+					this.watchdogRunning = false
+					return
+			}
+			if (unfinishedWorkFlows.length > this.warningWFQueueLength) {
+				this.coreHandler.setProcessState(
+					PROCESS_NAME,
+					[`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`],
+					P.StatusCode.WARNING_MAJOR)
+					this.watchdogRunning = false
+					return
+			}
+			if (
+				_.compact(this.workers.map(i =>
+						i.lastBeginStep && i.lastBeginStep < getCurrentTime() - this.warningTaskWorkingTime)
+				).length > 0
+			) {
+				this.coreHandler.setProcessState(
+					PROCESS_NAME,
+					[`Some workers have been working for more than ${Math.floor(
+							this.warningTaskWorkingTime / (60 * 1000)
+						)} minutes`
+					],
+					P.StatusCode.BAD
+				)
+				this.watchdogRunning = false
+				return
+			}
+			// no problems found, set status to GOOD
+			this.coreHandler.setProcessState(PROCESS_NAME, [], P.StatusCode.GOOD)
+		}, err => {
+			this.logger.error(`Dispatcher: watchdog: error`, err)
+		})
+		this.watchdogRunning = false
 	}
 
 	private async actionRestartAllWorkflows() {
-		const wfs = await this._workFlows.find({
+		const wfs = await this.workFlows.find({
 			selector: {
 				finished: true
 			}
@@ -401,7 +354,7 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private async actionAbortAllWorkflows() {
-		const wfs = await this._workFlows.find({
+		const wfs = await this.workFlows.find({
 			selector: {
 				finished: false
 			}
@@ -410,15 +363,17 @@ export class Dispatcher extends EventEmitter {
 	}
 
 	private async actionRestartWorkflow(workflowId: string) {
-		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+		const { result: wf, error: getError } = await noTryAsync(
+			() => this.workFlows.get<WorkFlowDB>(workflowId))
 
-		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+		if (getError || !wf)
+			throw Error(`Dispatcher: workflow "${workflowId}" not found`)
 
 		// Step 1: Abort the workflow
 		await this.actionAbortWorkflow(wf._id)
 
 		// Step 2: Reset the workflow
-		const steps = await this._workSteps.find({
+		const steps = await this.workSteps.find({
 			selector: {
 				workFlowId: workflowId
 			}
@@ -426,7 +381,7 @@ export class Dispatcher extends EventEmitter {
 		// Reset the workflow steps
 		await Promise.all(
 			steps.docs.map((step: WorkStepDB) =>
-				updateDB(this._workSteps, step._id, step => {
+				updateDB(this.workSteps, step._id, step => {
 					step.status = WorkStepStatus.IDLE
 					step.messages = [`Restarted at ${new Date().toTimeString()}`]
 					step.progress = 0
@@ -436,7 +391,7 @@ export class Dispatcher extends EventEmitter {
 				})
 			)
 		)
-		await updateDB(this._workFlows, wf._id, wf => {
+		await updateDB(this.workFlows, wf._id, wf => {
 			wf.finished = false
 			wf.success = false
 			wf.modified = getCurrentTime()
@@ -446,41 +401,44 @@ export class Dispatcher extends EventEmitter {
 
 		this.dispatchWork()
 	}
+
 	private async prioritizeWorkflow(workflowId: string) {
-		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
+		const { result: wf, error: getError } = await noTryAsync(
+			() => this.workFlows.get<WorkFlowDB>(workflowId))
+
+		if (getError || !wf) throw Error(`Workflow "${workflowId}" not found`)
 
 		const prioritized = wf.priority > 1 ? true : false
-
-		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
-
-		const result = await this._workSteps.find({
+		const result = await this.workSteps.find({
 			selector: {
 				workFlowId: workflowId
 			}
 		})
 		await Promise.all(
 			result.docs.map(item =>
-				updateDB(this._workSteps, item._id, item => {
+				updateDB(this.workSteps, item._id, item => {
 					item.priority = prioritized ? item.priority / 10 : item.priority * 10
 					item.modified = getCurrentTime()
 					item.messages = _.union(item.messages || [], [
-						`Priority changed to ${item.priority} at ${new Date(getCurrentTime())}`
+						`Dispatcher: priority changed to ${item.priority} at ${new Date(getCurrentTime())}`
 					])
 					return item
 				})
 			)
 		)
 
-		await updateDB(this._workFlows, wf._id, wf => {
+		await updateDB(this.workFlows, wf._id, wf => {
 			wf.modified = getCurrentTime()
 			wf.priority = prioritized ? wf.priority / 2 : wf.priority * 2
 			return wf
 		})
 	}
-	private async actionAbortWorkflow(workflowId: string) {
-		const wf: WorkFlowDB = await this._workFlows.get(workflowId)
 
-		if (!wf) throw Error(`Workflow "${workflowId}" not found`)
+	private async actionAbortWorkflow(workflowId: string) {
+		const { result: wf, error: getError } = await noTryAsync(
+			() => this.workFlows.get<WorkFlowDB>(workflowId))
+
+		if (getError || !wf) throw Error(`Dispatcher: workflow "${workflowId}" not found`)
 
 		// Step 1: Block all Idle steps
 		await this.blockStepsInWorkFlow(wf._id, 'Aborted')
@@ -488,7 +446,7 @@ export class Dispatcher extends EventEmitter {
 		// Step 2: Try to abort the workers and wait for them to finish
 		// Reset workers:
 		const ps: Array<Promise<any>> = []
-		this._workers.forEach((worker: Worker) => {
+		this.workers.forEach((worker: Worker) => {
 			if (worker.busy && worker.step) {
 				if (worker.step.workFlowId === workflowId) {
 					worker.tryToAbort()
@@ -500,139 +458,90 @@ export class Dispatcher extends EventEmitter {
 		// Wait for all relevant workers to finish:
 		await Promise.all(ps)
 
-		await updateDB(this._workFlows, wf._id, wf => {
+		await updateDB(this.workFlows, wf._id, wf => {
 			wf.finished = true
 			wf.success = false
 			wf.modified = getCurrentTime()
 			return wf
 		})
 	}
-	private cleanupOldWorkflows(): Promise<void> {
-		return this._workFlows
-			.find({
+
+	private async cleanupOldWorkflows(): Promise<void> {
+		const { result, error: findError } = await noTryAsync(() => this.workFlows.find(
+			{
 				selector: {
-					created: { $lt: getCurrentTime() - this._workFlowLingerTime },
+					created: { $lt: getCurrentTime() - this.workFlowLingerTime },
 					finished: true
 				}
 			})
-			.then(
-				result => {
-					return Promise.all(
-						result.docs.map(i => {
-							return this._workFlows
-								.remove(i)
-								.catch(e => this.emit('error', `Failed to remove stale workflow "${i._id}"`, e))
-						})
-					).then(
-						() => {
-							if (result.docs.length) this.emit('debug', `Removed ${result.docs.length} stale WorkFlows`)
-						},
-						e => {
-							this.emit('error', `Failed to remove stale workflows`, e)
-						}
-					)
-				},
-				reason => {
-					this.emit('error', `Could not get stale WorkFlows`, reason)
+		)
+		if (findError) {
+			this.logger.error(`Dispatcher: could not get stale WorkFlows`, findError)
+		} else {
+			const { error: removeError } = await noTryAsync(() => Promise.all(
+				result.docs.map(async (i): Promise<void> => {
+					await noTryAsync(
+						() => this.workFlows.remove(i),
+						e => this.logger.error(`Dispatcher: failed to remove stale workflow "${i._id}"`, e))
+				})))
+			if (removeError) {
+				this.logger.error(`Dispatcher: failed to remove stale workflows`, removeError)
+			} else {
+				if (result.docs.length) {
+					this.logger.debug(`Dispatcher: removed ${result.docs.length} stale WorkFlows`)
 				}
-			)
-			.then(() => {
-				return Promise.all([
-					this._workFlows.allDocs({
-						include_docs: true,
-						attachments: false
-					}),
-					this._workSteps.allDocs({
-						include_docs: true,
-						attachments: false
-					})
-				])
-			})
-			.then(result => {
-				// Remove orphaned steps
+			}
+		}
 
-				const workFlows = result[0].rows
-				const workSteps = result[1].rows
-
-				const map: { [id: string]: true } = {}
-				workFlows.forEach(workFlow => {
-					map[workFlow.id] = true
+		const { result: [workFlowResponse, workStepsResponse], error: orphanError } =
+			await noTryAsync(() => Promise.all([
+				this.workFlows.allDocs({
+					include_docs: true,
+					attachments: false
+				}),
+				this.workSteps.allDocs({
+					include_docs: true,
+					attachments: false
 				})
+			])
+		)
 
-				const ps: Array<Promise<any>> = []
-				workSteps.forEach(step => {
-					if (step.doc) {
-						if (!map[step.doc.workFlowId]) {
-							ps.push(this._workSteps.remove(step.doc))
-						}
-					}
-				})
-				if (ps.length) this.emit('debug', `Removed ${ps.length} orphaned WorkSteps`)
-
-				return Promise.all(ps).catch(error => {
-					this.emit('error', `Error when removing WorkSteps`, error)
-				})
-
-				// nothing
-			})
-			.then(() => {
-				// nothing
-			})
-	}
-
-	private attachLogEvents = (prefix: string, ee: EventEmitter) => {
-		ee.removeAllListeners('error')
-			.removeAllListeners('warn')
-			.removeAllListeners('info')
-			.removeAllListeners('debug')
-			.on('error', (e, ...args: any[]) => this.emit('error', prefix + ': ' + e, ...args))
-			.on('warn', (e, ...args: any[]) => this.emit('warn', prefix + ': ' + e, ...args))
-			.on('info', (e, ...args: any[]) => this.emit('info', prefix + ': ' + e, ...args))
-			.on('debug', (e, ...args: any[]) => this.emit('debug', prefix + ': ' + e, ...args))
-	}
-
-	/**
-	 * Continously try to place media-scanner in manual mode and set status to GOOD once that's done
-	 */
-	private scannerManualModeBestEffort(manual: boolean) {
-		this._bestEffort = undefined
-		if (!this.useScanner()) {
+		if (orphanError) {
+			this.logger.warn(`Dispatcher: error on parallel all documents query`, orphanError)
 			return
 		}
-		this.setScannerManualMode(manual).then(
-			() => {
-				this._coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD)
-				this.emit('debug', `Scanner placed in manual mode`)
-			},
-			() => {
-				// this.emit('debug', `Could not place Media Scanner in manual mode: ${e}, will retry in 5s`)
-				this._bestEffort = setTimeout(() => {
-					this.scannerManualModeBestEffort(manual)
-				}, 5000)
+
+		const workFlows = workFlowResponse.rows
+		const workSteps = workStepsResponse.rows
+
+		const map: { [id: string]: true } = {}
+		workFlows.forEach(workFlow => {
+			map[workFlow.id] = true
+		})
+
+		const ps: Array<Promise<any>> = []
+		workSteps.forEach(step => {
+			if (step.doc) {
+				if (!map[step.doc.workFlowId]) {
+					ps.push(this.workSteps.remove(step.doc))
+				}
 			}
-		)
+		})
+		if (ps.length) this.logger.debug(`Dispatcher: removed ${ps.length} orphaned WorkSteps`)
+
+		await noTryAsync(
+			() => Promise.all(ps),
+			error => this.logger.error(`Dispatcher: error when removing WorkSteps`, error))
 	}
-	private useScanner(): boolean {
-		return !!this._config.mediaScanner.host
-	}
+
 	/**
-	 * Try to place media-scanner in manual mode and reject promise if fails
+	 *  Called whenever there's a new workflow from a WorkflowGenerator
 	 */
-	private async setScannerManualMode(manual: boolean): Promise<void> {
-		if (this._bestEffort !== undefined) {
-			clearTimeout(this._bestEffort)
-			this._bestEffort = undefined
-		}
-		return request(
-			`http://${this._config.mediaScanner.host}:${this._config.mediaScanner.port}/manualMode/${
-				manual ? 'true' : 'false'
-			}`
-		).promise()
-	}
-	/**
-	 * Called whenever there's a new workflow from a WorkflowGenerator
-	 */
-	private onNewWorkFlow = atomic((finished: () => void, wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
+	private onNewWorkFlow = atomic(async (
+		finished: () => void,
+		wf: WorkFlow,
+		generator: BaseWorkFlowGenerator
+	) => {
 		// TODO: This should also handle extra workflows using a hash of the basic WorkFlow object to check if there is a WORKING or IDLE workflow that is the same
 		const hash = getFlowHash(wf)
 		const wfDb: WorkFlowDB = _.omit(wf, 'steps')
@@ -641,82 +550,70 @@ export class Dispatcher extends EventEmitter {
 
 		console.log(`Current hash: ${hash}`)
 
-		this.emit('debug', `Dispatcher caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
+		this.logger.debug(`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
 		// persist workflow to db:
-		this._workFlows
-			.allDocs({
-				include_docs: true
-			})
-			.then(docs => {
-				for (let i = 0; i < docs.rows.length; i++) {
-					const item: WorkFlowDB | undefined = docs.rows[i].doc
-					if (item === undefined) continue
-					if (!item.finished && item.hash === hash) {
-						this.emit(
-							'warn',
-							`Ignoring new workFlow: "${wf._id}", because other workflow has been found: "${item._id}".`
-						)
-						finished()
-						return
-					}
-				}
-				// Did not find an outstanding workflow with the same hash
-				this._workFlows
-					.put(wfDb)
-					.then(
-						() => {
-							this.emit('debug', `New WorkFlow successfully added to queue: "${wf._id}"`)
-							// persist the workflow steps separately to db:
-							return Promise.all(
-								wf.steps.map(step => {
-									const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
-										_id: wfDb._id + '_' + randomId(),
-										workFlowId: wfDb._id
-									})
-									stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
-									stepDb.modified = getCurrentTime()
-									return this._workSteps.put(workStepToPlain(stepDb) as WorkStepDB)
-								})
-							).then(() => {
-								finished()
-							})
-						},
-						e => {
-							this.emit('error', `New WorkFlow could not be added to queue: "${wf._id}"`, e)
-						}
-					)
-					.then(() => {
-						this.dispatchWork()
-						finished()
-					})
-					.catch(e => {
-						this.emit('error', `Adding new WorkFlow to queue failed`, e)
-						finished()
-					})
-			})
-			.catch(() => {
+		const { result: docs, error: docsError } = await noTryAsync(() => this.workFlows.allDocs({
+			include_docs: true
+		}))
+		if (docsError) {
+			this.logger.error(`Dispatcher: error when requests all WorkFlows`, docsError)
+			throw docsError // TODO too extreme?
+		}
+
+		for ( let i = 0 ; i < docs.rows.length ; i++ ) {
+			const item: WorkFlowDB | undefined = docs.rows[i].doc
+			if (item === undefined) continue
+			if (!item.finished && item.hash === hash) {
+				this.logger.warn(`Dispatcher: ignoring new workFlow: "${wf._id}", because a matching workflow has been found: "${item._id}".`)
 				finished()
-			})
+				return
+			}
+		}
+		// Did not find an outstanding workflow with the same hash
+		const { error: putError } = await noTryAsync(() => this.workFlows.put(wfDb))
+		if (putError) {
+			this.logger.error(`Dispatcher: new WorkFlow could not be added to queue: "${wf._id}"`, putError)
+		} else {
+			this.logger.debug(`Dispatcher: new WorkFlow successfully added to queue: "${wf._id}"`)
+
+			// persist the workflow steps separately to db:
+			await Promise.all(
+				wf.steps.map(step => {
+					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
+						_id: wfDb._id + '_' + randomId(),
+						workFlowId: wfDb._id
+					})
+					stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
+					stepDb.modified = getCurrentTime()
+					return noTryAsync(
+						() => this.workSteps.put(workStepToPlain(stepDb) as WorkStepDB),
+						err => this.logger.error(`Dispatcher: failed to store workStep "${step.action}" of workFlow "${wf._id}"`, err))
+				})
+			)
+		} // puterror
+		this.dispatchWork()
+		finished()
 	})
+
 	/**
-	 * Returns the work-steps that are yet to be done and return them in order of priority (highest first)
+	 *  Returns the work-steps that are yet to be done and return them in order of
+	 *  priority (highest first)
 	 */
 	private async getOutstandingWork(): Promise<WorkStepDB[]> {
-		return this._workSteps
-			.find({
-				selector: {
-					status: WorkStepStatus.IDLE
-				}
-			})
-			.then(result => {
-				return (result.docs as object[]).map(item => {
-					return plainToWorkStep(item, this._availableStorage)
-				})
-			})
-			.then(docs => {
-				return docs.sort((a, b) => b.priority - a.priority)
-			})
+		const { result, error } = await noTryAsync(() => this.workSteps.find({
+			selector: {
+				status: WorkStepStatus.IDLE
+			}
+		}))
+		if (error) {
+			this.logger.error(`Dispatcher: error finding outstanding work`, error)
+			throw error
+		}
+		let steps: Array<WorkStepDB> = (result.docs as object[]).map(item =>
+			plainToWorkStep(item, this.availableStorage))
+		return steps.sort((a, b) => b.priority - a.priority)
 	}
+
 	/**
 	 * Cancel unfinished worksteps (to be run after startup)
 	 * @private
@@ -725,14 +622,19 @@ export class Dispatcher extends EventEmitter {
 	 */
 	private async cancelLeftoverWorkSteps(): Promise<void> {
 		const wfs: string[] = []
-		const brokenItems = await this._workSteps.find({
+		const { result: brokenItems, error: findError } = await noTryAsync(() => this.workSteps.find({
 			selector: {
 				status: WorkStepStatus.WORKING
 			}
-		})
-		return Promise.all(
-			brokenItems.docs.map(i =>
-				updateDB(this._workSteps, i._id, i => {
+		}))
+		if (findError) {
+			this.logger.error(`Dispatcher: failed to find broken items`, findError)
+			throw findError
+		}
+
+		const { error: updateError } = await noTryAsync(
+			() => Promise.all(brokenItems.docs.map(i =>
+				updateDB(this.workSteps, i._id, i => {
 					i.status = WorkStepStatus.ERROR
 					i.modified = getCurrentTime()
 					i.messages = _.union(i.messages || [], ['Working on shutdown, failed.'])
@@ -741,26 +643,31 @@ export class Dispatcher extends EventEmitter {
 					}
 					return i
 				})
+		)))
+		if (updateError) {
+			this.logger.error(`Dispatcher: error during one or more broken items updates`, updateError)
+		}
+
+		const { error: blockError } = await noTryAsync(
+			() => Promise.all(brokenItems.docs.map(i => this.blockStepsInWorkFlow(i.workFlowId))))
+		if (blockError) {
+			this.logger.error('Dispatcher: error blocking one or more broken workSteps', blockError)
+		}
+
+ 		const { error: cancelError } = await noTryAsync(
+			() => Promise.all(wfs.map(i =>
+				updateDB(this.workFlows, i, wf => {
+					wf.finished = true
+					wf.success = false
+					return wf
+				}
 			)
-		)
-			.then(() => {
-				return Promise.all(brokenItems.docs.map(i => this.blockStepsInWorkFlow(i.workFlowId))).then(() => {})
-			})
-			.then(() => {
-				return Promise.all(
-					wfs.map(i =>
-						updateDB(this._workFlows, i, wf => {
-							wf.finished = true
-							wf.success = false
-							return wf
-						})
-					)
-				).then(() => {})
-			})
-			.catch(e => {
-				this.emit('error', `Unable to cancel old workSteps`, e)
-			})
+		)))
+		if (cancelError) {
+			this.logger.error(`Dispatcher: unable to cancel old workSteps`, cancelError)
+		}
 	}
+
 	/**
 	 * Set a step as WORKING
 	 * @private
@@ -769,19 +676,17 @@ export class Dispatcher extends EventEmitter {
 	 * @memberof Dispatcher
 	 */
 	private async setStepWorking(stepId: string): Promise<void> {
-		return updateDB(this._workSteps, stepId, step => {
+		const { error } = await noTryAsync(() => updateDB(this.workSteps, stepId, step => {
 			step.status = WorkStepStatus.WORKING
 			step.modified = getCurrentTime()
 			return step
-		})
-			.then(_step => {
-				// console.log('done update ' + step._id)
-			})
-			.catch(e => {
-				// console.log('Error in setStepWorking', e)
-				throw e
-			})
+		}))
+		if (error) {
+			this.logger.error(`Dispatcher: set stgp to working failed for step "${stepId}"`, error)
+			throw error
+		}
 	}
+
 	/**
 	 * Get all of the highest priority steps for each WorkFlow
 	 * @param steps sorted array of steps
@@ -797,34 +702,39 @@ export class Dispatcher extends EventEmitter {
 		})
 		return _.values(firstSteps)
 	}
+
 	/**
 	 * Block all idle steps in a workflow
 	 * @param workFlowId
 	 */
 	private async blockStepsInWorkFlow(workFlowId: string, stepMessage?: string): Promise<void> {
-		return this._workSteps
-			.find({
-				selector: {
-					workFlowId: workFlowId
-				}
+		const { result, error: findError } = await noTryAsync(() => this.workSteps.find({
+			selector: {
+				workFlowId: workFlowId
+			}
+		}))
+		if (findError) {
+			this.logger.error(`Dispatcher: find failed when trying to block steps for workFlow "${workFlowId}"`, findError)
+			throw findError
+		}
+		const { error: updateError } = await noTryAsync(() => Promise.all(
+			result.docs
+			.filter(item => item.status === WorkStepStatus.IDLE)
+			.map(item => {
+				return updateDB(this.workSteps, item._id, item => {
+					item.status = WorkStepStatus.BLOCKED
+					item.modified = getCurrentTime()
+					if (stepMessage) item.messages = [stepMessage]
+					return item
+				})
 			})
-			.then(result => {
-				return Promise.all(
-					result.docs.map(item => {
-						if (item.status === WorkStepStatus.IDLE) {
-							return updateDB(this._workSteps, item._id, item => {
-								item.status = WorkStepStatus.BLOCKED
-								item.modified = getCurrentTime()
-								if (stepMessage) item.messages = [stepMessage]
-								return item
-							}).then(() => {})
-						}
-						return Promise.resolve()
-					})
-				)
-			})
-			.then(() => {})
+		))
+		if (updateError) {
+			this.logger.error(`Dispatcher: update failed when trying to block steps for workFlow "${workFlowId}"`, updateError)
+			throw updateError
+		}
 	}
+
 	/**
 	 * Check the result of a job (work) and then set the WorkStep status accordingly
 	 * @param job
@@ -834,322 +744,284 @@ export class Dispatcher extends EventEmitter {
 		switch (result.status) {
 			case WorkStepStatus.CANCELED:
 			case WorkStepStatus.ERROR:
-				try {
-					await this.blockStepsInWorkFlow(job.workFlowId)
-				} catch (e) {
-					this.emit('error', `Could not block outstanding work steps`, e)
-				}
+				await noTryAsync(
+					() => this.blockStepsInWorkFlow(job.workFlowId),
+					err => this.logger.error(`Dispatcher: could not block outstanding work steps`, err))
 				break
 		}
 
-		return updateDB(this._workSteps, job._id, workStep => {
-			workStep.status = result.status
-			workStep.modified = getCurrentTime()
-			workStep.messages = (workStep.messages || []).concat(result.messages || [])
+		await noTryAsync(
+			() => updateDB(this.workSteps, job._id, workStep => {
+				workStep.status = result.status
+				workStep.modified = getCurrentTime()
+				workStep.messages = (workStep.messages || []).concat(result.messages || [])
 
-			this.emit(
-				'debug',
-				`Setting WorkStep "${job._id}" result to "${result.status}"` +
-					(result.messages ? ', message: ' + result.messages.join(', ') : '')
-			)
-			return workStep
-		}).then(() => {})
+				this.logger.debug(`Dispatcher: setting WorkStep "${job._id}" result to "${result.status}"` +
+						(result.messages ? ', message: ' + result.messages.join(', ') : '')
+				)
+				return workStep
+			}),
+			err => this.logger.error(`Dispatcher: failed to update database after job "${job._id}"`, err)
+		)
 	}
+
 	/**
-	 * Update the status of all non-finished work-flows
+	 * U pdate the status of all non-finished work-flows
 	 */
 	private async updateWorkFlowStatus(): Promise<void> {
 		// Get all unfinished workFlows
-		return this._workFlows
-			.find({
-				selector: {
-					finished: false
+		const { result: ongoingWork, error: findWFError } = await noTryAsync(() => this.workFlows.find({
+			selector: {
+				finished: false
+			}
+		}))
+		if (findWFError) {
+			this.logger.error(`Dispatcher: could not find ongoing work`, findWFError)
+			throw findWFError
+		}
+
+		await Promise.all(
+			ongoingWork.docs.map(async (wf: WorkFlowDB) => {
+				const { result: steps, error: findWSError } = await noTryAsync(() => this.workSteps.find({
+					selector: {
+						workFlowId: wf._id
+					}
+				}))
+				if (findWSError) {
+					this.logger.error(`Dispatcher: failed to read workSteps when updating status for workFlow "${wf._id}"`, findWSError)
 				}
-			})
-			.then(result => {
-				return Promise.all(
-					result.docs.map(async (wf: WorkFlowDB) => {
-						return this._workSteps
-							.find({
-								selector: {
-									workFlowId: wf._id
-								}
-							})
-							.then(result => {
-								// Check if all WorkSteps are finished (not WORKING or IDLE)
-								const isFinished = result.docs.reduce<boolean>((pV, workStep) => {
-									return (
-										pV &&
-										(workStep.status !== WorkStepStatus.WORKING &&
-											workStep.status !== WorkStepStatus.IDLE)
-									)
-								}, true)
 
-								if (isFinished) {
-									// if they are finished, check if all are DONE (not CANCELLED, ERROR or BLOCKED)
-									const isSuccessful = result.docs.reduce<boolean>((pV, workStep) => {
-										return (
-											pV &&
-											(workStep.status === WorkStepStatus.DONE ||
-												workStep.status === WorkStepStatus.SKIPPED)
-										)
-									}, true)
+				const isFinished = steps.docs.every((workStep) =>
+					workStep.status !== WorkStepStatus.WORKING &&
+					workStep.status !== WorkStepStatus.IDLE)
 
-									// update WorkFlow in DB
-									return this._workFlows
-										.get(wf._id)
-										.then(wf =>
-											updateDB(this._workFlows, wf._id, wf => {
-												wf.finished = isFinished
-												wf.success = isSuccessful
-												wf.modified = getCurrentTime()
-												return wf
-											})
-										)
-										.then(() =>
-											this.emit(
-												'info',
-												`WorkFlow ${wf._id} is now finished ${
-													isSuccessful ? 'successfully' : 'unsuccessfully'
-												}`
-											)
-										)
-										.catch(e => {
-											this.emit(
-												'error',
-												`Failed to save new WorkFlow "${wf._id}" state: ${wf.finished}`,
-												e
-											)
-										})
-								}
+				if (isFinished) {
+					// if they are finished, check if all are DONE (not CANCELLED, ERROR or BLOCKED)
+					const isSuccessful = steps.docs.every((workStep) =>
+						workStep.status === WorkStepStatus.DONE ||
+						workStep.status === WorkStepStatus.SKIPPED)
 
-								// if WorkFlow has unfinished WorkSteps, skip it
-								return Promise.resolve()
-							})
-					})
-				).then(() => {})
-			})
-			.catch(e => {
-				this.emit('error', `Failed to update WorkFlows' status`, e)
-			})
-	}
-	/**
-	 * Assign outstanding work to available workers and process result
-	 */
-	private dispatchWork() {
-		this.getOutstandingWork().then(
-			allJobs => {
-				if (allJobs.length === 0) return
-				this.emit('debug', `Got ${allJobs.length} outstanding jobs`)
-
-				const jobs = this.getFirstTaskForWorkFlows(allJobs)
-
-				for (let i = 0; i < this._workers.length; i++) {
-					if (!this._workers[i].busy) {
-						const nextJob = jobs.shift()
-						if (!nextJob) return // No work is left to be assigned at this moment
-
-						this._workers[i].warmup()
-
-						this.setStepWorking(nextJob._id)
-							.then(() => this._workers[i].doWork(nextJob as GeneralWorkStepDB))
-							.then(result => this.processResult(nextJob, result))
-							.then(() => this.updateWorkFlowStatus()) // Update unfinished WorkFlow statuses
-							.then(() => {
-								try {
-									this.watchdog()
-								} catch (e) {
-									this.emit('error', `Unhandled exception in watchdog`, e)
-								}
-							})
-							.then(() => this.dispatchWork()) // dispatch more work once this job is done
-							.catch(e => {
-								this.emit('error', `There was an unhandled error when handling job "${nextJob._id}"`, e)
-								console.error(e)
-
-								this._workers[i].cooldown()
-							})
+					const { error: updateError } = await noTryAsync(() => updateDB(this.workFlows, wf._id, wf => {
+						wf.finished = isFinished
+						wf.success = isSuccessful
+						wf.modified = getCurrentTime()
+						return wf
+					}))
+					if (updateError) {
+						this.logger.error(`Dispatcher: failed to save new WorkFlow "${wf._id}" state: ${wf.finished}`, updateError)
+					} else {
+						this.logger.info(`Dispatcher: workFlow ${wf._id} is now finished ${
+							isSuccessful ? 'successfully' : 'unsuccessfully'}`)
 					}
 				}
-			},
-			e => {
-				throw new Error(`Could not get outstanding work from DB: ${e}`)
-			}
-		)
+			}))
 	}
+
 	/**
-	 * Synchronize the WorkFlows and WorkSteps databases with core after connecting
+	 *  Assign outstanding work to available workers and process result
 	 */
-	private initialWorkFlowAndStepsSync() {
-		return Promise.all([
-			this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
-			this._workFlows.allDocs({
-				include_docs: true,
-				attachments: false
-			})
-		])
-			.then(([coreObjects, allDocsResponse]) => {
-				this._coreHandler.logger.info(
-					'WorkFlows: synchronizing objectlists',
-					coreObjects.length,
-					allDocsResponse.total_rows
-				)
+	private async dispatchWork(): Promise<void> {
+		const { result: allJobs, error: outstandingError } =
+			await noTryAsync(() => this.getOutstandingWork())
+		if (outstandingError) throw outstandingError
 
-				let tasks: Array<() => Promise<any>> = []
+		if (allJobs.length === 0) return
+		this.logger.debug(`Dispatcher: got ${allJobs.length} outstanding jobs`)
 
-				let coreObjRevisions: { [id: string]: string } = {}
-				_.each(coreObjects, (obj: any) => {
-					coreObjRevisions[obj._id] = obj.rev
+		const jobs = this.getFirstTaskForWorkFlows(allJobs)
+
+		for ( let i = 0 ; i < this.workers.length ; i++ ) {
+			if (!this.workers[i].busy) {
+				const nextJob = jobs.shift()
+				if (!nextJob) return // No work is left to be assigned at this moment
+
+				noTryAsync( // Don't await - set workers off in parallel
+					() => this.doWorkWithWorker(this.workers[i], nextJob),
+					error => {
+						this.logger.error(`Dispatcher: there was an unhandled error when handling job "${nextJob._id}"`, error)
+						this.workers[i].cooldown()
+					})
+			}
+		}
+	}
+
+	private async doWorkWithWorker(worker: Worker, job: WorkStepDB) {
+		worker.warmup()
+		await this.setStepWorking(job._id)
+		let workResult = await worker.doWork(job as GeneralWorkStepDB)
+		await this.processResult(job, workResult)
+		await this.updateWorkFlowStatus() // Update unfinished WorkFlow statuses
+		noTryAsync(
+			() => this.watchdog(),
+			error => this.logger.error(`Dispatcher: unhandled exception in watchdog`, error))
+		this.dispatchWork() // dispatch more work once this job is done
+	}
+
+	/**
+	 *  Synchronize the WorkFlows databases with core after connecting
+	 */
+	private async initialWorkFlowSync(): Promise<void> {
+		const { result: [coreObjects, allDocsResponse], error: queryError } =
+		  await noTryAsync(() => Promise.all([
+				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
+				this.workFlows.allDocs({
+					include_docs: true,
+					attachments: false
 				})
-				tasks = tasks.concat(
-					_.compact(
-						_.map(allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views), doc => {
-							const docId = doc.id
+			]))
+		if (queryError) {
+			this.logger.error(`Dispatcher: failed in inital workFlow sync queries`, queryError)
+			throw queryError
+		}
+		this.logger.info('Dispatcher: workFlows: synchronizing objectlists',
+			coreObjects.length, allDocsResponse.total_rows)
 
-							if (doc.value.deleted) {
-								if (coreObjRevisions[docId]) {
-									// deleted
-								}
-								return null // handled later
-							} else if (
-								!coreObjRevisions[docId] || // created
-								coreObjRevisions[docId] !== doc.value.rev // changed
-							) {
-								delete coreObjRevisions[docId]
+		let tasks: Array<() => Promise<void>> = []
 
-								return () => {
-									return this._workFlows
-										.get(doc.id)
-										.then(doc => {
-											return this.pushWorkFlowToCore(doc._id, doc)
-										})
-										.then(() => {
-											return new Promise(resolve => {
-												setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
-											})
-										})
-								}
-							} else {
-								delete coreObjRevisions[docId]
-								// identical
-								return null
+		let coreObjRevisions: { [id: string]: string } = {}
+		_.each(coreObjects, (obj: any) => {
+			coreObjRevisions[obj._id] = obj.rev
+		})
+		tasks = tasks.concat(
+			_.compact(
+				_.map(allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views), doc => {
+					const docId = doc.id
+
+					if (doc.value.deleted) {
+						return null // handled later
+					} else if (
+						!coreObjRevisions[docId] || // created
+						coreObjRevisions[docId] !== doc.value.rev // changed
+					) {
+						delete coreObjRevisions[docId]
+
+						return async (): Promise<void> => {
+							const { result: doc, error: docError } = await noTryAsync(
+								() => this.workFlows.get<WorkFlowDB>(docId))
+							if (docError) {
+								this.logger.error(`Dispatcher: workFlows: failed to retrieve document "${docId}" on sync operation`, docError)
+								throw docError
 							}
-						})
-					)
-				)
-				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
-				_.each(coreObjRevisions, (_rev, id) => {
-					// deleted
-
-					tasks.push(() => {
-						return this.pushWorkFlowToCore(id, null)
-					})
+							await this.pushWorkFlowToCore(doc._id, doc)
+							await wait(100) // slow it down a bit, maybe remove this later
+						}
+					} else {
+						delete coreObjRevisions[docId] 	// identical
+						return null
+					}
 				})
-				return PromiseSequence(tasks)
-			})
-			.then(() => {
-				this._coreHandler.logger.info('WorkFlows: Done objects sync init')
-				return
-			})
-			.then(() =>
-				Promise.all([
-					this._coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
-					this._workSteps.allDocs({
-						include_docs: true,
-						attachments: false
-					})
-				])
 			)
-			.then(([coreObjects, allDocsResponse]) => {
-				this._coreHandler.logger.info(
-					'WorkSteps: synchronizing objectlists',
-					coreObjects.length,
-					allDocsResponse.total_rows
-				)
+		)
+		// The ones left in coreObjRevisions have not been touched, ie they should be deleted
+		_.each(coreObjRevisions, (_rev, id) => { 	// deleted
+			tasks.push(() => {
+				return this.pushWorkFlowToCore(id, null)
+			})
+		})
+		let allTasks = Promise.resolve()
+		for ( let task of tasks ) {
+			allTasks = allTasks.then(task)
+		}
+		await allTasks
+		this.logger.info('Dispatcher: workFlows: done workFlow objects sync init')
+	}
 
-				let tasks: Array<() => Promise<any>> = []
-
-				let coreObjRevisions: { [id: string]: string } = {}
-				_.each(coreObjects, (obj: any) => {
-					coreObjRevisions[obj._id] = obj.rev
+	/**
+	 *  Synchronize the WorkFlows databases with core after connecting
+	 */
+	private async initialWorkStepsSync(): Promise<void> {
+		const { result: [coreObjects, allDocsResponse], error: queryError } =
+		  await noTryAsync(() => Promise.all([
+				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
+				this.workSteps.allDocs({
+					include_docs: true,
+					attachments: false
 				})
-				tasks = tasks.concat(
-					_.compact(
-						_.map(allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views), doc => {
-							const docId = doc.id
+			]))
+		if (queryError) {
+			this.logger.error(`Dispatcher: failed in inital workStep sync queries`, queryError)
+			throw queryError
+		}
 
-							if (doc.value.deleted) {
-								if (coreObjRevisions[docId]) {
-									// deleted
-								}
-								return null // handled later
-							} else if (
-								!coreObjRevisions[docId] || // created
-								coreObjRevisions[docId] !== doc.value.rev // changed
-							) {
-								delete coreObjRevisions[docId]
+		this.logger.info('Dispatcher: workSteps: synchronizing objectlists',
+			coreObjects.length, allDocsResponse.total_rows)
 
-								return () => {
-									return this._workSteps
-										.get(doc.id)
-										.then(doc => {
-											return this.pushWorkStepToCore(doc._id, doc)
-										})
-										.then(() => {
-											return new Promise(resolve => {
-												setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
-											})
-										})
-								}
-							} else {
-								delete coreObjRevisions[docId]
-								// identical
-								return null
+		let tasks: Array<() => Promise<void>> = []
+
+		let coreObjRevisions: { [id: string]: string } = {}
+		_.each(coreObjects, (obj: any) => {
+			coreObjRevisions[obj._id] = obj.rev
+		})
+		tasks = tasks.concat(
+			_.compact(
+				_.map(allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views), doc => {
+					const docId = doc.id
+
+					if (doc.value.deleted) { // deleted
+						return null // handled later
+					} else if (
+						!coreObjRevisions[docId] || // created
+						coreObjRevisions[docId] !== doc.value.rev // changed
+					) {
+						delete coreObjRevisions[docId]
+
+						return async () => {
+							const { result: doc, error: docError } = await noTryAsync(
+								() => this.workSteps.get<WorkStepDB>(docId))
+							if (docError) {
+								this.logger.error(`Dispatcher: workSteps: failed to retrieve document "${docId}" on sync operation`, docError)
+								throw docError
 							}
-						})
-					)
-				)
-				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
-				_.each(coreObjRevisions, (_rev, id) => {
-					// deleted
-
-					tasks.push(() => {
-						return this.pushWorkStepToCore(id, null)
-					})
+							await this.pushWorkStepToCore(doc._id, doc)
+							await wait(100) // slow it down a bit, maybe remove this later
+						}
+					} else { // identical
+						delete coreObjRevisions[docId]
+						return null
+					}
 				})
-				return PromiseSequence(tasks)
+			)
+		)
+		// The ones left in coreObjRevisions have not been touched, ie they should be deleted
+		_.each(coreObjRevisions, (_rev, id) => { // deleted
+			tasks.push(() => {
+				return this.pushWorkStepToCore(id, null)
 			})
-			.then(() => {
-				this._coreHandler.logger.info('WorkSteps: Done objects sync init')
-				return
-			})
+		})
+
+		let allTasks = Promise.resolve()
+		for ( let task of tasks ) {
+			allTasks = allTasks.then(task)
+		}
+		await allTasks
+		this.logger.info('Dispatcher: workSteps: done workStep objects sync init')
 	}
 
 	private pushWorkFlowToCore = throttleOnKey(
-		(id: string, wf: WorkFlowDB | null) => {
-			return this._coreHandler.core
-				.callMethod(MMPDMethods.updateMediaWorkFlow, [id, wf])
-				.then(() => {
-					this.emit('debug', `WorkFlow in core "${id}" updated`)
-				})
-				.catch(e => {
-					this.emit('error', `Could not update WorkFlow "${id}" in Core`, e)
-				})
+		async (id: string, wf: WorkFlowDB | null) => {
+			const { error } = await noTryAsync(
+				() => this.coreHandler.core.callMethod(MMPDMethods.updateMediaWorkFlow, [id, wf]))
+			if (error) {
+				this.logger.error(`Dispatcher: cound not update WorkFlow "${id}"`)
+				throw error
+			} else {
+				this.logger.debug(`Dispatcher: workFlow in core "${id}" updated`)
+			}
 		},
 		100,
 		'pushWorkFlowToCore'
 	)
 
 	private pushWorkStepToCore = throttleOnKey(
-		(id: string, ws: WorkStepDB | null) => {
-			return this._coreHandler.core
-				.callMethod(MMPDMethods.updateMediaWorkFlowStep, [id, ws])
-				.then(() => {
-					this.emit('debug', `Step in core "${id}" updated`)
-				})
-				.catch(e => {
-					this.emit('error', `Could not update WorkStep "${id}" in Core`, e)
-				})
+		async (id: string, ws: WorkStepDB | null) => {
+			const { error } = await noTryAsync(
+				() => this.coreHandler.core.callMethod(MMPDMethods.updateMediaWorkFlowStep, [id, ws]))
+			if (error) {
+				this.logger.error(`Dispatcher: could not update WorkStep "${id}" in Core`, error)
+				throw error
+			} else {
+				this.logger.debug(`Dispatcher: step in core "${id}" updated`)
+			}
 		},
 		100,
 		'pushWorkStepToCore'

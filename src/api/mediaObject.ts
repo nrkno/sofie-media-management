@@ -1,12 +1,8 @@
-export interface MediaScannerConfig {
-	host?: string
-	port?: number
-	collectionId: string
-}
 export enum MediaStreamType {
 	Audio = 'audio',
 	Video = 'video'
 }
+
 export interface MediaStreamCodec {
 	type?: MediaStreamType
 	long_name?: string
@@ -14,6 +10,7 @@ export interface MediaStreamCodec {
 	tag_string?: string
 	is_avc?: string
 }
+
 export interface MediaStream {
 	codec: MediaStreamCodec
 
@@ -42,12 +39,14 @@ export interface MediaStream {
 	max_bit_rate?: string
 	nb_frames?: string
 }
+
 export interface MediaFormat {
 	name?: string
 	long_name?: string
 	start_time?: string
-	duration?: string
-	bit_rate?: string
+	duration?: number
+	bit_rate?: number
+	max_bit_rate?: number
 }
 
 export enum FieldOrder {
@@ -57,12 +56,15 @@ export enum FieldOrder {
 	BFF = 'bff'
 }
 
-export interface MediaInfo {
-	name: string
-	field_order?: FieldOrder
-	scenes?: number[]
+export interface Metadata {
+	scenes?: Array<number>
 	blacks?: Array<Anomaly>
 	freezes?: Array<Anomaly>
+}
+
+export interface MediaInfo extends Metadata {
+	name: string
+	field_order?: FieldOrder
 	streams?: MediaStream[]
 	format?: MediaFormat
 	timebase?: number
@@ -74,14 +76,14 @@ export interface Anomaly {
 	end: number
 }
 
-export interface MediaAttachment {
-	digest: string
-	content_type: string
+export interface MediaAttachment extends PouchDB.Core.FullAttachment {
+	// digest: string - from parent
+	// content_type: string - fromt parent
 	revpos: number
-	data?: string // base64
+	data: string // base64
 }
 
-export interface MediaObject {
+export interface MediaObject extends PouchDB.Core.IdMeta, PouchDB.Core.GetMeta {
 	/** The playable reference (CasparCG clip name, quantel GUID, etc) */
 	mediaId: string
 
@@ -103,17 +105,13 @@ export interface MediaObject {
 	previewSize?: number
 	/** Thumbnail last updated timestamp */
 	previewTime?: number
-	/** Preview location */
+	/** Preview location. Has to be truthy for hoverscrub and thumbnails to work. */
 	previewPath?: string
 
 	cinf: string // useless to us
 	tinf: string // useless to us
 
-	_attachments: {
-		[key: string]: MediaAttachment // add more here
-	}
-	_id: string
-	_rev: string
+	// _attachments, _id and _rev come from PouchDB types
 }
 
 export interface DiskInfo {

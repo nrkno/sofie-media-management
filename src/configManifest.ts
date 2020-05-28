@@ -17,6 +17,7 @@ export function literal<T>(o: T) {
 export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
 	FILE_SHARE = 'file_share',
+	QUANTEL_HTTP = 'quantel_http',
 	UNKNOWN = 'unknown'
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
@@ -129,7 +130,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
 
 export enum MediaMonitorType {
 	NULL = 'null',
-	MEDIA_SCANNER = 'mediascanner',
+	WATCHER = 'watcher',
 	QUANTEL = 'quantel'
 }
 const MEDIA_MANAGER_MEDIAMONITOR_COMMON: SubDeviceConfigManifestEntry[] = [
@@ -141,17 +142,13 @@ const MEDIA_MANAGER_MEDIAMONITOR_COMMON: SubDeviceConfigManifestEntry[] = [
 ]
 const MEDIA_MANAGER_MEDIAMONITOR_CONFIG: SubDeviceConfigManifest['config'] = {}
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.NULL] = []
-MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.MEDIA_SCANNER] = [
+MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
-		id: 'host',
-		name: 'Host',
-		type: ConfigManifestEntryType.STRING
-	},
-	{
-		id: 'port',
-		name: 'Port',
-		type: ConfigManifestEntryType.STRING
+		id: 'retryLimit',
+		name: 'Maximum file scan retries',
+		type: ConfigManifestEntryType.INT,
+		placeholder: '3'
 	}
 ]
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
@@ -183,32 +180,155 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'workers',
 			name: 'No. of Available Workers',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
+			placeholder: '3'
 		},
 		{
 			id: 'lingerTime',
-			name: 'File Linger Time',
-			type: ConfigManifestEntryType.INT
+			name: 'File Linger Time (ms)',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '259200000'
 		},
 		{
 			id: 'workFlowLingerTime',
-			name: 'Workflow Linger Time',
-			type: ConfigManifestEntryType.INT
+			name: 'Workflow Linger Time (ms)',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '86400000'
 		},
 		{
 			id: 'cronJobTime',
-			name: 'Cron-Job Interval Time',
+			name: 'Cron-Job Interval Time (ms)',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '3600000'
+		},
+		{
+			id: 'httpPort',
+			name: 'HTTP port serving resources',
 			type: ConfigManifestEntryType.INT
 		},
 		{
-			id: 'mediaScanner.host',
-			name: 'Media Scanner Host',
+			id: 'httpsPort',
+			name: 'HTTPS port serving resources',
+			type: ConfigManifestEntryType.INT
+		},
+		{
+			id: 'paths.resources',
+			name: 'Parent folder for serving resources',
 			type: ConfigManifestEntryType.STRING
 		},
 		{
-			id: 'mediaScanner.port',
-			name: 'Media Scanner Port',
-			type: ConfigManifestEntryType.INT
+			id: 'thumbnails.width',
+			name: 'Thumbnail width',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '256'
+		},
+		{
+			id: 'thumbnails.height',
+			name: 'Thumbnail height, -1 preserves aspect',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '-1'
+		},
+		{
+			id: 'thumbnails.folder',
+			name: 'Thumbnail sub-folder',
+			type: ConfigManifestEntryType.STRING,
+			placeholder: 'thumbnails'
+		},
+		{
+			id: 'metadata.fieldOrder',
+			name: 'Enable field order check',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'metadata.fieldOrderScanDuration',
+			name: 'Number of frames to use to test field order',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '200'
+		},
+		{
+			id: 'metadata.scenes',
+			name: 'Enable scene change detection',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'metadata.sceneThreshold',
+			name: 'Likelihood frame introduces new scene (0.0 to 1.0)',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.4'
+		},
+		{
+			id: 'metadata.freezeDetection',
+			name: 'Enable freeze frame detection',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'metadata.freezeNoise',
+			name: 'Noise tolerance - difference ratio 0.0 upto 1.0',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.001'
+		},
+		{
+			id: 'metadata.freezeDuration',
+			name: 'Duration of freeze until notified, e.g. "2s"',
+			type: ConfigManifestEntryType.STRING,
+			placeholder: '2s'
+		},
+		{
+			id: 'metadata.blackDetection',
+			name: 'Enable black frame detection',
+			type: ConfigManifestEntryType.STRING
+		},
+		{
+			id: 'metadata.blackDuration',
+			name: 'Duration of black until notified, e.g. "2s"',
+			type: ConfigManifestEntryType.STRING,
+			placeholder: '2s'
+		},
+		{
+			id: 'metadata.blackRatio',
+			name: 'Ratio of black pixels',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.98'
+		},
+		{
+			id: 'metadata.blackThreshold',
+			name: 'Luminance threshold - pixel is black',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.1'
+		},
+		{
+			id: 'metadata.mergeBlacksAndFreezes',
+			name: 'Merge black with freeze frame',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'previews.enable',
+			name: 'Enable preview generation',
+			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'previews.width',
+			name: 'Preview width',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '160'
+		},
+		{
+			id: 'previews.height',
+			name: 'Preview height, -1 preserves aspect',
+			type: ConfigManifestEntryType.INT,
+			placeholder: '-1'
+		},
+		{
+			id: 'previews.bitrate',
+			name: 'Preview bitrate, e.g. 40k',
+			type: ConfigManifestEntryType.STRING,
+			placeholder: '40k'
+		},
+		{
+			id: 'previews.folder',
+			name: 'Preview sub-folder',
+			type: ConfigManifestEntryType.STRING,
+			placeholder: 'previews'
 		},
 		{
 			id: 'debugLogging',

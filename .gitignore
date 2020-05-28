@@ -16,3 +16,5 @@ wallaby.conf.js
 local/
 source/
 target/
+
+_media/

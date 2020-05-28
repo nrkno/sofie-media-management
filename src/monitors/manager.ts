@@ -1,7 +1,7 @@
 import { Monitor } from './_monitor'
-import { DeviceSettings, MonitorSettings, MonitorSettingsType } from '../api'
+import { DeviceSettings, MonitorSettings, MonitorSettingsType, MediaObject, StorageSettings } from '../api'
 import * as _ from 'underscore'
-import { MonitorMediaScanner } from './mediaScanner'
+import { MonitorMediaWatcher} from './mediaWatcher'
 import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
 import { MonitorQuantel } from './quantel'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
@@ -13,7 +13,7 @@ export class MonitorManager {
 
 	public settings: DeviceSettings
 
-	constructor() {}
+	constructor(private mediaDB: PouchDB.Database<MediaObject>) {}
 
 	init(coreHandler) {
 		this._coreHandler = coreHandler
@@ -30,16 +30,17 @@ export class MonitorManager {
 		const monitors: { [id: string]: MonitorSettings } = settings.monitors || {}
 		for (let monitorId in monitors) {
 			const monitorSettings = monitors[monitorId]
+			const storageSettings = this.settings.storages.find(x => x.id === monitorSettings.storageId)
 
 			const existingMonitor: Monitor | undefined = this._monitors[monitorId]
 			if (!existingMonitor) {
-				await this.addMonitor(monitorId, monitorSettings)
+				await this.addMonitor(monitorId, monitorSettings, storageSettings)
 				anythingChanged = true
 			} else {
 				if (!_.isEqual(existingMonitor.settings, monitorSettings)) {
 					// The settings differ
 					await this.removeMonitor(monitorId)
-					await this.addMonitor(monitorId, monitorSettings)
+					await this.addMonitor(monitorId, monitorSettings, storageSettings)
 					anythingChanged = true
 				}
 			}
@@ -53,18 +54,18 @@ export class MonitorManager {
 		}
 		return anythingChanged
 	}
-	private async addMonitor(deviceId: string, settings: MonitorSettings): Promise<void> {
-		if (settings.type === MonitorSettingsType.NULL) {
+	private async addMonitor(deviceId: string, monitorSettings: MonitorSettings, storageSettings?: StorageSettings): Promise<void> {
+		if (monitorSettings.type === MonitorSettingsType.NULL) {
 			// do nothing
 			return
 		}
 		const monitor: Monitor | null =
-			settings.type === MonitorSettingsType.MEDIA_SCANNER
-				? new MonitorMediaScanner(deviceId, settings, this._coreHandler.logger)
-				: settings.type === MonitorSettingsType.QUANTEL
-				? new MonitorQuantel(deviceId, settings, this._coreHandler.logger)
+			monitorSettings.type === MonitorSettingsType.WATCHER
+				? new MonitorMediaWatcher(deviceId, this.mediaDB, monitorSettings, this._coreHandler.logger, storageSettings)
+				: monitorSettings.type === MonitorSettingsType.QUANTEL
+				? new MonitorQuantel(deviceId, monitorSettings, this._coreHandler.logger)
 				: null
-		if (!monitor) throw new Error(`Monitor could not be created, type "${settings.type}" unknown`)
+		if (!monitor) throw new Error(`Monitor could not be created, type "${monitorSettings.type}" unknown`)
 
 		// Setup Core connection and tie it to the Monitor:
 		const coreMonitorHandler = new CoreMonitorHandler(this._coreHandler, monitor)

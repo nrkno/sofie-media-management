@@ -3,6 +3,7 @@ import { LocalFolderHandler } from '../../storageHandlers/localFolderHandler'
 import { StorageEventType, StorageEvent } from '../../storageHandlers/storageHandler'
 import { StorageType } from '../../api'
 import * as path from 'path'
+import * as winston from 'winston'
 
 describe('LocalFolderHandler', () => {
 	let lfh0: LocalFolderHandler
@@ -22,7 +23,7 @@ describe('LocalFolderHandler', () => {
 			options: {
 				basePath: './test'
 			}
-		})
+		}, new winston.Logger({ transports: [ new winston.transports.Console() ]}))
 		try {
 			await lfh0.init()
 			lfh0.on('error', err => fail(err))
@@ -113,7 +114,7 @@ describe('LocalFolderHandler', () => {
 				options: {
 					basePath: './test2'
 				}
-			})
+			}, new winston.Logger({ transports: [ new winston.transports.Console() ]}))
 			await lfh1.init()
 			const file = await lfh1.getFile('test-copy.txt')
 			await (lfh0.putFile(file) as Promise<any>)
@@ -147,7 +148,7 @@ describe('LocalFolderHandler', () => {
 	afterAll(async () => {
 		try {
 			await lfh0.destroy()
-			fs.removeSync('./test')
+			await fs.remove('./test')
 		} catch (e) {
 			fail()
 		}

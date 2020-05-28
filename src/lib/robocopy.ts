@@ -25,23 +25,27 @@ export namespace robocopy {
 			const errors: string[] = []
 			let output: string[] = []
 
-			rbcpy.stdout.on('data', data => {
-				const m = data
-					.toString()
-					.trim()
-					.match(/(\d+)\.?(\d+)\%$/) // match the last reported number in the output
-				if (m) {
-					const num = (parseInt(m[1], 10) + parseInt(m[2], 10) / Math.pow(10, m[2].length)) / 100
-					if (typeof progress === 'function') {
-						progress(num)
+			if (rbcpy.stdout){
+				rbcpy.stdout.on('data', data => {
+					const m = data
+						.toString()
+						.trim()
+						.match(/(\d+)\.?(\d+)\%$/) // match the last reported number in the output
+					if (m) {
+						const num = (parseInt(m[1], 10) + parseInt(m[2], 10) / Math.pow(10, m[2].length)) / 100
+						if (typeof progress === 'function') {
+							progress(num)
+						}
 					}
-				}
-				output.push(data.toString())
-			})
+					output.push(data.toString())
+				})
+			}
 
-			rbcpy.stderr.on('data', data => {
-				errors.push(data.toString().trim())
-			})
+			if (rbcpy.stderr){
+				rbcpy.stderr.on('data', data => {
+					errors.push(data.toString().trim())
+				})
+			}
 
 			rbcpy.on('close', code => {
 				rbcpy = undefined
