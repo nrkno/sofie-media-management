@@ -1,13 +1,12 @@
-import { LoggerInstance } from 'winston'
+import { EventEmitter } from 'events'
 import * as PouchDB from 'pouchdb-node'
 import * as PouchDBFind from 'pouchdb-find'
 import * as _ from 'underscore'
 import * as fs from 'fs-extra'
 import { Time, Duration } from './api'
 import { putToDBUpsert } from './lib/lib'
-import { noTryAsync } from 'no-try'
 
-export interface TrackedMediaItem extends PouchDB.Core.IdMeta {
+export interface TrackedMediaItem {
 	_id: string
 
 	expectedMediaItemId?: string[]
@@ -21,47 +20,46 @@ export interface TrackedMediaItem extends PouchDB.Core.IdMeta {
 	lingerTime: Duration
 }
 
-export interface TrackedMediaItemDB extends TrackedMediaItem, PouchDB.Core.GetMeta {
+export interface TrackedMediaItemDB extends TrackedMediaItem {
 	_rev: string
 }
 
-export class TrackedMediaItems {
-	private db: PouchDB.Database<TrackedMediaItem>
+export class TrackedMediaItems extends EventEmitter {
+	private _db: PouchDB.Database<TrackedMediaItem>
 
-	constructor(
-		private logger: LoggerInstance,
-		dbAdapter?: string,
-		dbPrefix?: string
-	) {
-		this.initDB(dbAdapter, dbPrefix)
-	}
+	constructor(dbAdapter?: string, dbPrefix?: string) {
+		super()
 
-	private async initDB(dbAdapter?: string, dbPrefix?: string): Promise<void> {
-		const { error } = await noTryAsync(async () => {
-			PouchDB.plugin(PouchDBFind)
-			await fs.ensureDir(dbPrefix || './db')
-			const PrefixedPouchDB = PouchDB.defaults({
-				prefix: dbPrefix || './db/'
-			} as PouchDB.Configuration.DatabaseConfiguration)
+		PouchDB.plugin(PouchDBFind)
 
-			this.db = new PrefixedPouchDB('trackedMediaItems', {
-				adapter: dbAdapter
-			})
-			await this.db.compact()
-			await this.db.createIndex({
-				index: {
-					fields: ['sourceStorageId']
-				}
-			})
-			await this.db.createIndex({
-				index: {
-					fields: ['mediaFlowId']
-				}
-			})
+		fs.ensureDirSync(dbPrefix || './db')
+		const PrefixedPouchDB = PouchDB.defaults({
+			prefix: dbPrefix || './db/'
+		} as any)
+
+		this._db = new PrefixedPouchDB('trackedMediaItems', {
+			adapter: dbAdapter
 		})
-		if (error) {
-			this.logger.error('Tracked Media Items: failed to initialize database', error)
-		}
+		this._db
+			.compact()
+			.then(() =>
+				this._db.createIndex({
+					index: {
+						fields: ['sourceStorageId']
+					}
+				})
+			)
+			.then(() =>
+				this._db.createIndex({
+					index: {
+						fields: ['mediaFlowId']
+					}
+				})
+			)
+			.then(() => {
+				// Index created
+			})
+			.catch(e => this.emit('error', 'trackedMediaItems: Index "sourceStorageId" could not be created.', e))
 	}
 
 	/**
@@ -71,47 +69,50 @@ export class TrackedMediaItems {
 	 */
 	async upsert(
 		id: string,
-		delta: (tmi?: TrackedMediaItemDB) => TrackedMediaItemDB | undefined
+		delta: (tmi?: TrackedMediaItem) => TrackedMediaItem | undefined
 	): Promise<TrackedMediaItem | undefined> {
-		return putToDBUpsert(
-			this.db,
-			id,
-			(original?: TrackedMediaItemDB): TrackedMediaItem | undefined => {
-				const modified: TrackedMediaItemDB | undefined = delta(original)
-				if (original && modified) {
-					modified._id = original._id
-					modified._rev = original._rev
-				}
-				return modified
+		return putToDBUpsert(this._db, id, (original?: TrackedMediaItem): TrackedMediaItem | undefined => {
+			const modified = delta(original)
+			if (original && modified) {
+				modified._id = original._id
+				// @ts-ignore
+				modified._rev = original._rev
+			}
+
+			return modified
+		})
+	}
+
+	async put(tmi: TrackedMediaItem): Promise<string> {
+		return this._db.put(tmi).then(value => value.id)
+	}
+
+	async getById(_id: string): Promise<TrackedMediaItemDB> {
+		return this._db.get(_id).then(value => {
+			return value as TrackedMediaItemDB
+		})
+	}
+
+	async getAllFromStorage(storageId: string, query?: PouchDB.Find.Selector) {
+		return this._db
+			.find({
+				selector: _.extend(
+					{
+						sourceStorageId: storageId
+					},
+					query || {}
+				)
+			})
+			.then(value => {
+				return value.docs as TrackedMediaItemDB[]
 			})
 	}
 
-	async put(tmi: TrackedMediaItem): Promise<string> { // Expected to throw on error
-		const result = await this.db.put(tmi)
-		return result.id
-	}
-
-	async getById(id: string): Promise<TrackedMediaItemDB> { // Expected to throw on error
-		const result = await this.db.get(id)
-		return result
-	}
-
-	async getAllFromStorage(storageId: string, query?: PouchDB.Find.Selector): Promise<TrackedMediaItemDB[]> {
-		const result = await this.db.find({
-			selector: _.extend({
-				sourceStorageId: storageId
-			},
-			query || {})
-		})
-		return result.docs
-	}
-
 	async remove(tmi: TrackedMediaItemDB): Promise<boolean> {
-		let result = await this.db.remove(tmi._id, tmi._rev)
-		return result.ok
+		return this._db.remove(tmi._id, tmi._rev).then(value => value.ok)
 	}
 
 	async bulkChange(tmis: TrackedMediaItem[]): Promise<void> {
-		await this.db.bulkDocs(tmis)
+		return this._db.bulkDocs(tmis).then(({}) => {})
 	}
 }

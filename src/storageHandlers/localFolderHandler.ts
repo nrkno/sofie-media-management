@@ -8,7 +8,6 @@ import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
 import { robocopy } from '../lib/robocopy'
 import { CancelablePromise } from '../lib/cancelablePromise'
-import { LoggerInstance } from 'winston'
 
 /**
  * A shared method to get the file properties from the underlying file system.
@@ -90,7 +89,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	 * @param  {boolean} [selectiveListen] The underlying FS watcher will not listen for all file changes in the basePath, but instead will await a list of monitored file paths
 	 * @memberof LocalFolderHandler
 	 */
-	constructor(settings: LocalFolderStorage, protected logger: LoggerInstance) {
+	constructor(settings: LocalFolderStorage) {
 		super()
 
 		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
@@ -120,23 +119,16 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 				interval: 3000,
 				binaryInterval: 3000
 			})
-			.on('error', (err: Error) => {
-				this.logger.error(`Local folder storage: watcher error`, err)
-			})
+			.on('error', this.onError)
 			.on('add', this.onAdd)
 			.on('change', this.onChange)
 			.on('unlink', this.onUnlink)
 
 		return new Promise<void>(resolve => {
-			if (this._selectiveListen) { // Ready event never fired
+			this._watcher.on('ready', () => {
 				this._initialized = true
-				setImmediate(resolve)
-			} else {
-				this._watcher.on('ready', () => {
-				  this._initialized = true
-					resolve()
-				})
-			}
+				resolve()
+			})
 		})
 	}
 
@@ -375,6 +367,15 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			path: filePath,
 			file: new LocalFolderFile(path.join(this._basePath, filePath), this._readable, this._writable, filePath)
 		})
+	}
+
+	/**
+	 * Handles errors from the file system watcher
+	 * @private
+	 * @memberof LocalFolderHandler
+	 */
+	private onError = (e: any) => {
+		this.emit('error', e)
 	}
 
 	/**

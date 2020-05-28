@@ -1,9 +1,8 @@
-import { buildStorageHandler } from '../../storageHandlers/storageHandlerFactory'
+import { buildStorageHandler } from '../../storageHandlers/storageHandler'
 import { StorageType, LocalFolderStorage, FileShareStorage } from '../../api'
 import { literal } from '../../lib/lib'
 import { LocalFolderHandler } from '../localFolderHandler'
 import { FileShareHandler } from '../fileShareHandler'
-import * as winston from 'winston'
 
 describe('buildStorageHandler', () => {
 	it('returns a new instance of a StorageHandler, based on the config', () => {
@@ -18,8 +17,7 @@ describe('buildStorageHandler', () => {
 				options: {
 					basePath: './'
 				}
-			}),
-			new winston.Logger({ transports: [ new winston.transports.Console() ]})
+			})
 		)
 
 		expect(localHandler).toBeInstanceOf(LocalFolderHandler)
@@ -36,8 +34,7 @@ describe('buildStorageHandler', () => {
 					basePath: '\\\\SERVER\\share',
 					mappedNetworkedDriveTarget: 'X'
 				}
-			}),
-			new winston.Logger({ transports: [ new winston.transports.Console() ]})
+			})
 		)
 
 		expect(shareHandler).toBeInstanceOf(FileShareHandler)

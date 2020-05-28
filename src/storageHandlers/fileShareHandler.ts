@@ -2,11 +2,9 @@ import * as _ from 'underscore'
 import * as networkDrive from 'windows-network-drive'
 import { LocalFolderHandler } from './localFolderHandler'
 import { FileShareStorage, LocalFolderStorage, StorageType } from '../api'
-import { LoggerInstance } from 'winston'
 
 /**
- *  File Share handles a file share mapped as a network drive. If the drive is not
- *  mapped, the drive will be mapped automatically.
+ * File Share handles a file share mapped as a network drive. If the drive is not mapped, the drive will be mapped automatically.
  */
 export class FileShareHandler extends LocalFolderHandler {
 	private _driveLetter: string
@@ -14,33 +12,25 @@ export class FileShareHandler extends LocalFolderHandler {
 	private _username: string | undefined
 	private _password: string | undefined
 
-	private static convertSettings(fsSettings: FileShareStorage): LocalFolderStorage {
-		if (!fsSettings.options.mappedNetworkedDriveTarget) {
-			throw new Error(`File share handler: "${fsSettings.id}": mappedNetworkedDriveTarget not set!`)
+	constructor(settings: FileShareStorage) {
+		if (!settings.options.mappedNetworkedDriveTarget) {
+			throw new Error(`"${settings.id}": mappedNetworkedDriveTarget not set!`)
 		}
-		if (!fsSettings.options.basePath) {
-			throw new Error(`File share handler: "${fsSettings.id}": basePath not set!`)
-		}
-		const targetBasePath = fsSettings.options.mappedNetworkedDriveTarget + ':/'
-		if (!targetBasePath.match(/[a-zA-Z]/)) {
-			throw Error(`File share handler: mappedNetworkedDriveTarget needs to be a drive letter`)
-		}
+		if (!settings.options.basePath) throw new Error(`"${settings.id}": basePath not set!`)
+		const targetBasePath = settings.options.mappedNetworkedDriveTarget + ':/'
+		if (!targetBasePath.match(/[a-zA-Z]/)) throw Error('mappedNetworkedDriveTarget needs to be a drive letter')
 		const settingsObj: LocalFolderStorage = {
-			id: fsSettings.id,
-			support: fsSettings.support,
+			id: settings.id,
+			support: settings.support,
 			type: StorageType.LOCAL_FOLDER,
 			options: {
 				basePath: targetBasePath,
 				usePolling: true,
-				onlySelectedFiles: // Needs to be false for standalone tests ... otherwise true
-					typeof fsSettings.options.onlySelectedFiles === 'boolean' ? fsSettings.options.onlySelectedFiles : true
+				onlySelectedFiles: true // settings.options.onlySelectedFiles
 			}
 		}
-		return settingsObj
-	}
 
-	constructor(settings: FileShareStorage, protected logger: LoggerInstance) {
-		super(FileShareHandler.convertSettings(settings), logger)
+		super(settingsObj)
 		this._uncPath = settings.options.basePath
 		this._driveLetter = settings.options.mappedNetworkedDriveTarget
 		this._username = settings.options.username
@@ -49,7 +39,6 @@ export class FileShareHandler extends LocalFolderHandler {
 
 	async init(): Promise<void> {
 		let usedLetters: networkDrive.Dictionary<string> = {}
-		// this.logger.debug(`File share details: ${JSON.stringify(this)}`)
 		try {
 			usedLetters = await networkDrive.list()
 		} catch (e) {
@@ -74,7 +63,6 @@ export class FileShareHandler extends LocalFolderHandler {
 		if (mounts.indexOf(this._driveLetter.toUpperCase()) < 0) {
 			await networkDrive.mount(this._uncPath, this._driveLetter, this._username, this._password)
 		}
-		this.logger.debug(`Finished mounting '${this._driveLetter}:' as '${this._uncPath}'`)
 		return super.init()
 	}
 
