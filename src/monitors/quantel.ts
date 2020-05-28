@@ -21,34 +21,50 @@ type QuantelClipSearchQuery = {
 	ClipGUID?: string
 	Title?: string
 }
+
 const QUANTEL_URL_PROTOCOL = 'quantel:'
 
-export class MonitorQuantel extends Monitor {
-	logger: LoggerInstance
-	protected _settings: MonitorSettingsQuantel
+interface QuantelMonitor {
+	[guid: string]: QuantelMonitorFile
+}
 
+interface QuantelMonitorFile {
+	title: string | undefined
+	status: QuantelMonitorFileStatus
+	lastChecked: number
+	url: string
+}
+
+enum QuantelMonitorFileStatus {
+	UNKNOWN = 0,
+	MISSING = 10,
+	PENDING = 20,
+	READY = 30
+}
+
+export class MonitorQuantel extends Monitor {
 	private expectedMediaItems: () => Collection
 	private observer: Observer
-	private _expectedMediaItemsSubscription: string
+	private expectedMediaItemsSubscription: string
 
 	private monitoredFiles: QuantelMonitor = {}
-	private _studioId: string
-	private _quantel: QuantelGateway
-	private _isDestroyed: boolean = false
-	private _watchError: string | null
-	private _cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
+	private studioId: string
+	private quantel: QuantelGateway
+	private isDestroyed: boolean = false
+	private watchError: string | null
+	private cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
 
-	constructor(deviceId: string, _settings: MonitorSettingsQuantel, logger: LoggerInstance) {
-		super(deviceId, _settings, logger)
+	constructor(deviceId: string, public settings: MonitorSettingsQuantel, logger: LoggerInstance) {
+		super(deviceId, settings, logger)
 
-		this._quantel = new QuantelGateway()
-		this._quantel.on('error', e => this.logger.error('Quantel.QuantelGateway', e))
+		this.quantel = new QuantelGateway()
+		this.quantel.on('error', e => this.logger.error('Quantel.QuantelGateway', e))
 	}
 
 	get deviceInfo(): MonitorDevice {
 		// @ts-ignore: todo: make stronger typed, via core-integration
 		return {
-			deviceName: `Quantel (${this._settings.gatewayUrl} ${this._quantel.zoneId}/${this._quantel.serverId})`,
+			deviceName: `Quantel (${this.settings.gatewayUrl} ${this.quantel.zoneId}/${this.quantel.serverId})`,
 			deviceId: this.deviceId,
 
 			deviceCategory: PeripheralDeviceAPI.DeviceCategory.MEDIA_MANAGER,
@@ -58,57 +74,59 @@ export class MonitorQuantel extends Monitor {
 			deviceSubType: 'quantel'
 		}
 	}
+
 	public async restart(): Promise<void> {
 		throw Error('Quantel restart not implemented yet')
 	}
+
 	public async init(): Promise<void> {
-		this.logger.info(`Initializing Quantel-monitor`, this._settings)
+		this.logger.info(`Initializing Quantel-monitor`, this.settings)
 
-		const device = await this._coreHandler.getParentDevice()
+		const device = await this.coreHandler.getParentDevice()
 
-		this._studioId = device.studioId
+		this.studioId = device.studioId
 
-		if (!this._studioId) throw new Error('Quantel: Device .studioId not set!')
+		if (!this.studioId) throw new Error('Quantel: Device .studioId not set!')
 
-		this.expectedMediaItems = () => this._coreHandler.core.getCollection('expectedMediaItems')
+		this.expectedMediaItems = () => this.coreHandler.core.getCollection('expectedMediaItems')
 
 		// Observe the data:
-		const observer = this._coreHandler.core.observe('expectedMediaItems')
+		const observer = this.coreHandler.core.observe('expectedMediaItems')
 		observer.added = this.wrapError(this.onExpectedAdded)
 		observer.changed = this.wrapError(this.onExpectedChanged)
 		observer.removed = this.wrapError(this.onExpectedRemoved)
 
 		// Subscribe to the data:
-		if (this._expectedMediaItemsSubscription) {
-			this._coreHandler.core.unsubscribe(this._expectedMediaItemsSubscription)
+		if (this.expectedMediaItemsSubscription) {
+			this.coreHandler.core.unsubscribe(this.expectedMediaItemsSubscription)
 		}
-		this._expectedMediaItemsSubscription = await this._coreHandler.core.subscribe('expectedMediaItems', {
-			studioId: this._studioId
+		this.expectedMediaItemsSubscription = await this.coreHandler.core.subscribe('expectedMediaItems', {
+			studioId: this.studioId
 		})
 		_.each(
 			this.expectedMediaItems().find({
-				studioId: this._studioId
+				studioId: this.studioId
 			}),
 			doc => {
 				this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
 			}
 		)
-		this.logger.debug(`Quantel: Subscribed to expectedMediaItems for studio "${this._studioId}"`)
+		this.logger.debug(`Quantel: Subscribed to expectedMediaItems for studio "${this.studioId}"`)
 
 		this.observer = observer
 
-		if (!this._settings.gatewayUrl) throw new Error('Quantel: parameter not set: gatewayUrl')
-		if (!this._settings.ISAUrl) throw new Error('Quantel: parameter not set: ISAUrl')
-		if (!this._settings.serverId) throw new Error('Quantel: parameter not set: serverId')
+		if (!this.settings.gatewayUrl) throw new Error('Quantel: parameter not set: gatewayUrl')
+		if (!this.settings.ISAUrl) throw new Error('Quantel: parameter not set: ISAUrl')
+		if (!this.settings.serverId) throw new Error('Quantel: parameter not set: serverId')
 
 		// Setup quantel connection:
-		await this._quantel.init(
-			this._settings.gatewayUrl,
-			this._settings.ISAUrl,
-			this._settings.zoneId,
-			this._settings.serverId
+		await this.quantel.init(
+			this.settings.gatewayUrl,
+			this.settings.ISAUrl,
+			this.settings.zoneId,
+			this.settings.serverId
 		)
-		this._quantel.monitorServerStatus(() => {
+		this.quantel.monitorServerStatus(() => {
 			this._updateAndSendStatus()
 		})
 
@@ -116,20 +134,22 @@ export class MonitorQuantel extends Monitor {
 		// TODO: make this work, currently there is a discrepancy in the id..
 		const objectRevisions = await this.getAllCoreObjRevisions()
 		_.each(objectRevisions, (rev, objId) => {
-			this._cachedMediaObjects[objId] = { _id: objId, _rev: rev }
+			this.cachedMediaObjects[objId] = { _id: objId, _rev: rev }
 		})
 
 		// Start watching:
 		this.triggerWatch()
 	}
+
 	async dispose(): Promise<void> {
 		await super.dispose()
 
-		this._isDestroyed = true
+		this.isDestroyed = true
 
-		this._coreHandler.core.unsubscribe(this._expectedMediaItemsSubscription)
+		this.coreHandler.core.unsubscribe(this.expectedMediaItemsSubscription)
 		this.observer.stop()
 	}
+
 	private wrapError(fcn) {
 		return (...args) => {
 			try {
@@ -139,12 +159,14 @@ export class MonitorQuantel extends Monitor {
 			}
 		}
 	}
+
 	private shouldHandleItem(obj: ExpectedMediaItem): boolean {
 		if (obj.url && obj.url.startsWith(QUANTEL_URL_PROTOCOL)) {
 			return true
 		}
 		return false
 	}
+
 	private parseUrlToQuery(queryUrl: string): QuantelClipSearchQuery {
 		const parsed = url.parse(queryUrl)
 		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`Unsupported URL format: ${queryUrl}`)
@@ -169,6 +191,7 @@ export class MonitorQuantel extends Monitor {
 		}
 		throw new Error(`Unsupported URL format: ${queryUrl}`)
 	}
+
 	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
 		let item: ExpectedMediaItem
 		if (obj) {
@@ -192,6 +215,7 @@ export class MonitorQuantel extends Monitor {
 			}
 		}
 	}
+
 	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
 		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		if (!item) throw new Error(`Could not find the changed item "${id}" in expectedMediaItems`)
@@ -212,6 +236,7 @@ export class MonitorQuantel extends Monitor {
 			}
 		}
 	}
+
 	private onExpectedRemoved = (_id: string, oldValue: ExpectedMediaItem) => {
 		if (oldValue.url) {
 			delete this.monitoredFiles[oldValue.url]
@@ -221,23 +246,24 @@ export class MonitorQuantel extends Monitor {
 	private triggerWatch(): void {
 		// This function should only be called once during init, and then upon end of this.doWatch()
 		setTimeout(() => {
-			if (!this._isDestroyed) {
+			if (!this.isDestroyed) {
 				this.doWatch().catch(e => {
 					this.logger.error('Error in Quantel doWatch:' + e)
 				})
 			}
 		}, BREATHING_ROOM)
 	}
+
 	private async doWatch(): Promise<void> {
 		try {
-			const server = await this._quantel.getServer()
+			const server = await this.quantel.getServer()
 			if (server) {
 				const mediaObjects: { [objectId: string]: MediaObject | null } = {}
 
 				// Fetch all url/GUID:s that we are to monitor
 				const urls = _.keys(this.monitoredFiles)
 				for (let url of urls) {
-					if (this._isDestroyed) return // abort checking
+					if (this.isDestroyed) return // abort checking
 
 					const monitoredFile = this.monitoredFiles[url]
 
@@ -252,7 +278,7 @@ export class MonitorQuantel extends Monitor {
 						let mediaObject: MediaObject | null = null
 
 						if (url) {
-							const clipSummaries = await this._quantel.searchClip(this.parseUrlToQuery(url))
+							const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(url))
 							if (clipSummaries.length >= 1) {
 								const clipSummary = _.find(clipSummaries, clipData => {
 									return (
@@ -267,7 +293,7 @@ export class MonitorQuantel extends Monitor {
 									this.logger.debug(`Clip "${url}" found`)
 									// TODO: perhaps use clipData.Completed ?
 
-									const clipData = await this._quantel.getClip(clipSummary.ClipID)
+									const clipData = await this.quantel.getClip(clipSummary.ClipID)
 
 									if (clipData) {
 										// Make our best effort to try to construct a mediaObject:
@@ -313,26 +339,26 @@ export class MonitorQuantel extends Monitor {
 				// Go through the mediaobjects and send changes to core:
 				const p = Promise.resolve()
 				_.each(mediaObjects, (newMediaObject: MediaObject | null, objectId: string) => {
-					const oldMediaObject = this._cachedMediaObjects[objectId]
+					const oldMediaObject = this.cachedMediaObjects[objectId]
 					if (newMediaObject) {
 						if (!oldMediaObject || newMediaObject._rev !== oldMediaObject._rev) {
 							// Added or changed
-							p.then(() => this._sendChanged(newMediaObject)).catch(e => {
+							p.then(() => this.sendChanged(newMediaObject)).catch(e => {
 								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
 							})
 						}
 					} else {
 						if (oldMediaObject) {
 							// Removed
-							p.then(() => this._sendRemoved(oldMediaObject._id)).catch(e => {
+							p.then(() => this.sendRemoved(oldMediaObject._id)).catch(e => {
 								this.logger.error(`MonitorQuantel: Failed to send changes to Core: ${e}`)
 							})
 						}
 					}
 					if (newMediaObject) {
-						this._cachedMediaObjects[objectId] = newMediaObject
+						this.cachedMediaObjects[objectId] = newMediaObject
 					} else {
-						delete this._cachedMediaObjects[objectId]
+						delete this.cachedMediaObjects[objectId]
 					}
 				})
 				await p
@@ -341,54 +367,56 @@ export class MonitorQuantel extends Monitor {
 				throw new Error('Quantel: Has no server')
 			}
 			// last:
-			this._watchError = null
+			this.watchError = null
 			await this.wait(BREATHING_ROOM)
 		} catch (e) {
-			this._watchError = e.toString()
+			this.watchError = e.toString()
 			this.logger.error('Error in Quantel doWatch:' + e)
 		}
 		this.triggerWatch()
 	}
+
 	private _updateStatus(): PeripheralDeviceAPI.StatusObject {
 		let statusSettings: PeripheralDeviceAPI.StatusObject = { statusCode: PeripheralDeviceAPI.StatusCode.GOOD }
 
-		if (!this._settings.gatewayUrl) {
+		if (!this.settings.gatewayUrl) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 				messages: ['Settings parameter "gatewayUrl" not set']
 			}
-		} else if (!this._settings.storageId) {
+		} else if (!this.settings.storageId) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 				messages: ['Settings parameter "storageId" not set']
 			}
-		} else if (!this._settings.ISAUrl) {
+		} else if (!this.settings.ISAUrl) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 				messages: ['Settings parameter "ISAUrl" not set']
 			}
-		} else if (!this._settings.serverId) {
+		} else if (!this.settings.serverId) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
 				messages: ['Settings parameter "serverId" not set']
 			}
-		} else if (!this._quantel.connected) {
+		} else if (!this.quantel.connected) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Quantel: ' + this._quantel.statusMessage]
+				messages: ['Quantel: ' + this.quantel.statusMessage]
 			}
-		} else if (this._watchError) {
+		} else if (this.watchError) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Quantel: ' + this._watchError]
+				messages: ['Quantel: ' + this.watchError]
 			}
 		}
 		return statusSettings
 	}
+
 	private _updateAndSendStatus() {
 		const status = this._updateStatus()
 
-		if (this._status.statusCode !== status.statusCode || !_.isEqual(this._status.messages, status.messages)) {
+		if (this.status.statusCode !== status.statusCode || !_.isEqual(this.status.messages, status.messages)) {
 			this._status = {
 				statusCode: status.statusCode,
 				messages: status.messages
@@ -396,27 +424,13 @@ export class MonitorQuantel extends Monitor {
 			if (status.statusCode !== PeripheralDeviceAPI.StatusCode.GOOD) {
 				this.logger.warn((status.messages || []).join(','))
 			}
-			this.emit('connectionChanged', this._status)
+			this.emit('connectionChanged', this.status)
 		}
 	}
-	private wait(time): Promise<void> {
+
+	private wait(time: number): Promise<void> {
 		return new Promise(resolve => {
 			setTimeout(resolve, time)
 		})
 	}
-}
-interface QuantelMonitor {
-	[guid: string]: QuantelMonitorFile
-}
-interface QuantelMonitorFile {
-	title: string | undefined
-	status: QuantelMonitorFileStatus
-	lastChecked: number
-	url: string
-}
-enum QuantelMonitorFileStatus {
-	UNKNOWN = 0,
-	MISSING = 10,
-	PENDING = 20,
-	READY = 30
 }

@@ -3,6 +3,7 @@ import { LocalFolderHandler } from '../../storageHandlers/localFolderHandler'
 import { StorageEventType, StorageEvent } from '../../storageHandlers/storageHandler'
 import { StorageType } from '../../api'
 import * as path from 'path'
+import * as winston from 'winston'
 
 describe('LocalFolderHandler', () => {
 	let lfh0: LocalFolderHandler
@@ -12,17 +13,20 @@ describe('LocalFolderHandler', () => {
 		fs.ensureDirSync('./test')
 		fs.writeFileSync('./test/test0.txt', '1234')
 
-		lfh0 = new LocalFolderHandler({
-			id: 'local0',
-			support: {
-				read: true,
-				write: true
+		lfh0 = new LocalFolderHandler(
+			{
+				id: 'local0',
+				support: {
+					read: true,
+					write: true
+				},
+				type: StorageType.LOCAL_FOLDER,
+				options: {
+					basePath: './test'
+				}
 			},
-			type: StorageType.LOCAL_FOLDER,
-			options: {
-				basePath: './test'
-			}
-		})
+			new winston.Logger({ transports: [new winston.transports.Console()] })
+		)
 		try {
 			await lfh0.init()
 			lfh0.on('error', err => fail(err))
@@ -103,17 +107,20 @@ describe('LocalFolderHandler', () => {
 			fs.ensureDirSync('./test2')
 			fs.writeFileSync('./test2/test-copy.txt', '1234')
 
-			const lfh1 = new LocalFolderHandler({
-				id: 'local1',
-				support: {
-					read: true,
-					write: true
+			const lfh1 = new LocalFolderHandler(
+				{
+					id: 'local1',
+					support: {
+						read: true,
+						write: true
+					},
+					type: StorageType.LOCAL_FOLDER,
+					options: {
+						basePath: './test2'
+					}
 				},
-				type: StorageType.LOCAL_FOLDER,
-				options: {
-					basePath: './test2'
-				}
-			})
+				new winston.Logger({ transports: [new winston.transports.Console()] })
+			)
 			await lfh1.init()
 			const file = await lfh1.getFile('test-copy.txt')
 			await (lfh0.putFile(file) as Promise<any>)
@@ -147,7 +154,7 @@ describe('LocalFolderHandler', () => {
 	afterAll(async () => {
 		try {
 			await lfh0.destroy()
-			fs.removeSync('./test')
+			await fs.remove('./test')
 		} catch (e) {
 			fail()
 		}

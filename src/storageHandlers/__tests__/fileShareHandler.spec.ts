@@ -2,6 +2,7 @@ import * as networkDrive from 'windows-network-drive'
 import * as chokidar from 'chokidar'
 import { FileShareHandler } from '../../storageHandlers/fileShareHandler'
 import { StorageType } from '../../api'
+import * as winston from 'winston'
 
 jest.mock('windows-network-drive')
 jest.mock('chokidar')
@@ -24,7 +25,7 @@ jest.mock('chokidar')
 describe('FileShareHandler', () => {
 	let fsh0: FileShareHandler
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		fsh0 = new FileShareHandler({
 			id: 'remote0',
 			type: StorageType.FILE_SHARE,
@@ -34,19 +35,23 @@ describe('FileShareHandler', () => {
 			},
 			options: {
 				basePath: '\\\\STORAGE\\public',
-				mappedNetworkedDriveTarget: 'U'
+				mappedNetworkedDriveTarget: 'U',
+				onlySelectedFiles: false // to make test use '.' and cause watcher to enter ready state
 			}
-		})
-	})
-
-	it('mounts the network drive automatically', async () => {
+		}, new winston.Logger({ transports: [ new winston.transports.Console() ]}))
 		try {
 			fsh0.on('error', err => fail(err))
 			await fsh0.init()
 		} catch (e) {
 			fail(e)
 		}
+	})
 
-		expect(networkDrive.mount).toBeCalled()
+	it('mounts the network drive automatically', () => {
+		expect(networkDrive.mount).toHaveBeenCalled()
+	})
+
+	afterAll(() => {
+		fsh0.destroy()
 	})
 })

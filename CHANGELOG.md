@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.1.0-1...v1.1.0) (2020-01-24)
+
+## [1.1.0-1](https://github.com/nrkno/tv-automation-media-management/compare/v1.1.0-0...v1.1.0-1) (2020-01-14)
+
+
+### Bug Fixes
+
+* **config manifest:** fix labels in manifest ([1e3fd69](https://github.com/nrkno/tv-automation-media-management/commit/1e3fd69cdb6831f809104c86e74bf7fcc237015c))
+* **config manifest:** fix manifest to work correctly ([2e41fb7](https://github.com/nrkno/tv-automation-media-management/commit/2e41fb71b74c9ce08b85433986524e1e650049d8))
+
+## [1.1.0-0](https://github.com/nrkno/tv-automation-media-management/compare/v1.0.2...v1.1.0-0) (2020-01-08)
+
+
+### Features
+
+* device config manifest ([#14](https://github.com/nrkno/tv-automation-media-management/issues/14)) ([3774e76](https://github.com/nrkno/tv-automation-media-management/commit/3774e76b52f68efb1610313c152b08603df1cb17))
+
 ### [1.0.2](https://github.com/nrkno/tv-automation-media-management/compare/v1.0.2-0...v1.0.2) (2019-11-25)
 
 ### [1.0.2-0](https://github.com/nrkno/tv-automation-media-management/compare/v1.0.1...v1.0.2-0) (2019-11-25)
