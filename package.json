@@ -1,7 +1,7 @@
 {
   "name": "tv-automation-media-management",
   "private": true,
-  "version": "0.0.0-develop",
+  "version": "1.2.0-0",
   "description": "Connect to Core, synchronize media",
   "main": "dist/index.js",
   "license": "MIT",
@@ -137,7 +137,7 @@
     "request-promise-native": "^1.0.7",
     "set-value": "^3.0.1",
     "tslib": "^1.9.2",
-    "tv-automation-server-core-integration": "^1.4.0",
+    "tv-automation-server-core-integration": "^1.5.1",
     "underscore": "^1.9.1",
     "windows-network-drive": "^3.0.0",
     "winston": "^2.4.2",
