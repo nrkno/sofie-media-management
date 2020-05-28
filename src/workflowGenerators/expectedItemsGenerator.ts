@@ -1,7 +1,6 @@
 import * as _ from 'underscore'
 import { BaseWorkFlowGenerator, WorkFlowGeneratorEventType } from './baseWorkFlowGenerator'
 export * from './baseWorkFlowGenerator'
-import { LoggerInstance } from 'winston'
 
 import { CoreHandler } from '../coreHandler'
 import {
@@ -62,18 +61,15 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	private _cachedStudioId: string | undefined = undefined
 
-	private ident: String = 'Expected media items generator:'
-
 	constructor(
 		availableStorage: StorageObject[],
 		tracked: TrackedMediaItems,
 		flows: MediaFlow[],
 		coreHandler: CoreHandler,
-		private logger: LoggerInstance,
 		lingerTime?: number,
 		cronJobTime?: number
 	) {
-		super(logger)
+		super()
 		this._allStorages = availableStorage
 		this._coreHandler = coreHandler
 		this._trackedItems = tracked
@@ -88,8 +84,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			if (item.mediaFlowType === MediaFlowType.EXPECTED_ITEMS) {
 				const storage = this._allStorages.find(i => i.id === item.sourceId)
 				if (!storage) {
-					this.logger.debug(`${this.ident} init:  ` +
-						`storage "${item.sourceId}" could not be found among available storage.`)
+					this.emit('debug', `Storage "${item.sourceId}" could not be found among available storage.`)
 					return
 				}
 
@@ -102,7 +97,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		this._coreHandler.core.onConnected(() => {
 			this.setupSubscribtionsAndObservers().catch(e => {
-				this.logger.error(`${this.ident} init: Error while resetting the subscribtions`, e)
+				this.emit('error', `Error while resetting the subscribtions`, e)
 			})
 		})
 
@@ -125,7 +120,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			},
 			studioId: this._getStudioId()
 		})
-		this.logger.debug(`${this.ident} setupSubscribtionsAndObservers: Subscribed to expectedMediaItems.`)
+		this.emit('debug', 'Subscribed to expectedMediaItems.')
 
 		this.expectedMediaItems = () => this._coreHandler.core.getCollection('expectedMediaItems')
 
@@ -136,7 +131,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		this.observer = observer
 
-		this.logger.debug(`${this.ident} setupSubscribtionsAndObservers: Observer set up`)
+		this.emit('debug', 'Observer set up')
 
 		return this.initialExpectedCheck()
 	}
@@ -146,7 +141,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			try {
 				return fcn(...args)
 			} catch (e) {
-				this.logger.error(`${this.ident} ${fcn.name}: ${e.message}`, e)
+				this.emit('error', e)
 			}
 		}
 	}
@@ -196,7 +191,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			item = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		}
 		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
-			this.logger.error(`${this.ident} onExpectedAdded: ` +
+			this.emit(
+				'error',
 				`An expected item was added called "${item.label || item.path}", but it expired on ${new Date(
 					item.lastSeen + (item.lingerTime || this.LINGER_TIME)
 				)}. Ignoring.`
@@ -204,34 +200,33 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			return
 		}
 		if (item.disabled) {
-			this.logger.warn(`${this.ident} onExpectedAdded: An expected item was added called "${item.label || item.path}", but it was disabled.`)
+			this.emit('warn', `An expected item was added called "${item.label || item.path}", but it was disabled.`)
 			return
 		}
-		if (!item) throw new Error(`${this.ident} onExpectedAdded: Could not find the new item "${id}" in expectedMediaItems`)
+		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 
 		if (!this.shouldHandleItem(item)) return
 
 		const flow = this._handledFlows[item.mediaFlowId]
 
 		if (!flow) {
-			throw new Error(`${this.ident} onExpectedAdded: Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
+			throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		}
-		if (!flow.destinationId) throw new Error(`${this.ident} onExpectedAdded: Destination not set in flow "${flow.id}".`)
+		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
 
 		const sourceStorage = this._storages.find(i => i.id === flow.sourceId)
-		if (!sourceStorage) throw new Error(`${this.ident} onExpectedAdded: Could not find source storage "${flow.sourceId}"`)
+		if (!sourceStorage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
 
 		let fileName: string
 		try {
 			fileName = sourceStorage.handler.parseUrl(item.url)
 		} catch (e) {
-			this.logger.error(`${this.ident} onExpectedAdded: Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+			this.emit('error', `Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
 			return
 		}
 
-		const baseObj: TrackedMediaItemDB = {
+		const baseObj: TrackedMediaItem = {
 			_id: fileName,
-			_rev: '', // Empty string has some effect as not provided
 			name: fileName,
 			comment: item.label,
 			expectedMediaItemId: [item._id],
@@ -241,7 +236,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			targetStorageIds: [flow.destinationId]
 		}
 		this._trackedItems
-			.upsert(baseObj._id, (tmi?: TrackedMediaItemDB) => {
+			.upsert(baseObj._id, (tmi?: TrackedMediaItem) => {
 				if (tmi) {
 					baseObj.lastSeen = Math.max(baseObj.lastSeen, tmi.lastSeen)
 					baseObj.lingerTime = Math.max(baseObj.lingerTime, tmi.lingerTime)
@@ -250,25 +245,25 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						tmi.expectedMediaItemId || []
 					)
 					baseObj.targetStorageIds = _.union(baseObj.targetStorageIds || [], tmi.targetStorageIds || [])
-					baseObj._rev = tmi._rev
 				}
 				return baseObj
 			})
 			.then(() => this.checkAndEmitCopyWorkflow(baseObj, 'onExpectedAdded'))
 			.catch(e => {
-				this.logger.error(`${this.ident} onExpectedAdded: An error happened when trying to create a copy workflow`, e)
+				this.emit('error', `An error happened when trying to create a copy workflow`, e)
 			})
 	}
 
 	/** Called when an item is changed in Core */
 	private onExpectedChanged = (id: string, _oldFields: any, clearedFields: any, newFields: any) => {
 		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
-		if (!item) throw new Error(`${this.ident} onExpectedChanged: Could not find the updated item "${id}" in expectedMediaItems`)
+		if (!item) throw new Error(`Could not find the updated item "${id}" in expectedMediaItems`)
 		if (!this.shouldHandleItem(item)) return
 
 		item = _.extend(_.omit(item, clearedFields), newFields) as ExpectedMediaItem
 		if (item.lastSeen + (item.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
-			this.logger.error(`${this.ident} onExpectedChanged: ` +
+			this.emit(
+				'error',
 				`An expected item was changed called "${item.label || item.path}", but it expired on ${new Date(
 					item.lastSeen + (item.lingerTime || this.LINGER_TIME)
 				)}. Ignoring.`
@@ -276,24 +271,24 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			return
 		}
 		if (item.disabled) {
-			this.logger.warn(`${this.ident} onExpectedChanged: An expected item was added called "${item.label || item.path}", but it was disabled.`)
+			this.emit('warn', `An expected item was added called "${item.label || item.path}", but it was disabled.`)
 			return
 		}
 		const flow = this._handledFlows[item.mediaFlowId]
 
 		if (!flow) {
-			throw new Error(`${this.ident} onExpectedChanged: Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
+			throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		}
-		if (!flow.destinationId) throw new Error(`${this.ident} onExpectedChanged: Expected media items generator: Destination not set in flow "${flow.id}".`)
+		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
 
 		const sourceStorage = this._storages.find(i => i.id === flow.sourceId)
-		if (!sourceStorage) throw new Error(`${this.ident} onExpectedChanged: Could not find source storage "${flow.sourceId}"`)
+		if (!sourceStorage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
 
 		let fileName: string
 		try {
 			fileName = sourceStorage.handler.parseUrl(item.url)
 		} catch (e) {
-			this.logger.error(`${this.ident} onExpectedChanged: Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
+			this.emit('error', `Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`)
 			return
 		}
 
@@ -327,10 +322,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						})
 						.then(() => this.checkAndEmitCopyWorkflow(update, 'onExpectedChanged, TMI existed'))
 						.catch(e => {
-							this.logger.error(`${this.ident} onExpectedChanged: An error happened when trying to create a copy workflow`, e)
+							this.emit(`An error happened when trying to create a copy workflow`, e)
 						})
 				} else {
-					this.logger.warn(`${this.ident} onExpectedChanged: ` +
+					this.emit(
+						'warn',
 						`File "${item.path}" is already tracked from a different source storage than "${flow.sourceId}".`
 					)
 				}
@@ -340,36 +336,36 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					.put(baseObj)
 					.then(() => this.checkAndEmitCopyWorkflow(baseObj, 'onExpectedChanged, TMI did not exist'))
 					.catch(e => {
-						this.logger.error(`${this.ident} onExpectedChanged: An error happened when trying to create a copy workflow`, e)
+						this.emit(`An error happened when trying to create a copy workflow`, e)
 					})
 			}
 		)
 	}
 	/** Called when an item is removed (from Core) */
 	private onExpectedRemoved = (id: string, oldValue: any) => {
-		this.logger.debug(`${this.ident} onExpectedRemoved: ${id} was removed from Core expectedMediaItems collection`)
+		this.emit('debug', `${id} was removed from Core expectedMediaItems collection`)
 
 		let item: ExpectedMediaItem = oldValue || (this.expectedMediaItems().findOne(id) as ExpectedMediaItem)
-		if (!item) throw new Error(`${this.ident} onExpectedRemoved: Could not find the new item "${id}" in expectedMediaItems`)
+		if (!item) throw new Error(`Could not find the new item "${id}" in expectedMediaItems`)
 
 		if (!this.shouldHandleItem(item)) return
 
 		const flow = this._allFlows.find(f => f.id === item.mediaFlowId)
 
 		if (!flow) {
-			throw new Error(`${this.ident} onExpectedRemoved: Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
+			throw new Error(`Could not find mediaFlow "${item.mediaFlowId}" for expected media item "${item._id}"`)
 		}
-		if (!flow.destinationId) throw new Error(`${this.ident} onExpectedRemoved: Destination not set in flow "${flow.id}".`)
+		if (!flow.destinationId) throw new Error(`Destination not set in flow "${flow.id}".`)
 
 		const storage = this._storages.find(i => i.id === flow.sourceId)
-		if (!storage) throw new Error(`${this.ident} onExpectedRemoved: Could not find source storage "${flow.sourceId}"`)
+		if (!storage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
 
 		// add the file to the list of monitored files, if the storage is an 'onlySelectedFiles' storage
 		if (storage.options.onlySelectedFiles) {
 			try {
 				storage.handler.removeMonitoredFile(storage.handler.parseUrl(item.url))
 			} catch (e) {
-				this.logger.error(`${this.ident} onExpectedRemoved: An exception occured when trying to remove monitoring for file "${item.url}": ${e}`, e)
+				this.emit('error', `An exception occured when trying to remove monitoring for file "${item.url}": ${e}`)
 				return
 			}
 		}
@@ -377,7 +373,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 	private getFile(fileName: string, sourceStorageId: string): Promise<File | undefined> {
 		const sourceStorage = this._storages.find(i => i.id === sourceStorageId)
-		if (!sourceStorage) throw new Error(`${this.ident} getFile: Source storage "${sourceStorageId}" could not be found.`)
+		if (!sourceStorage) throw new Error(`Source storage "${sourceStorageId}" could not be found.`)
 
 		return new Promise<File | undefined>((resolve, _reject) => {
 			sourceStorage.handler.getFile(fileName).then(
@@ -392,12 +388,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 	/** Called whenever a file is added (or changed) in a storage */
 	private onFileAdd = (st: StorageObject, e: StorageEvent) => {
-		if (!e.file) throw new Error(`${this.ident} onFileAdd: Event for file "${e.path}" has no file argument`)
+		if (!e.file) throw new Error(`Event for file "${e.path}" has no file argument`)
 		this._trackedItems
 			.getById(e.path)
 			.then(tracked => {
 				if (tracked.sourceStorageId !== st.id) {
-					throw new Error(`${this.ident} onFileAdd: File "${e.path}" is already sourced from a different storage.`)
+					throw new Error(`File "${e.path}" is already sourced from a different storage.`)
 				}
 
 				this._allStorages
@@ -412,7 +408,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					)
 			})
 			.catch(e => {
-				this.logger.debug(`${this.ident} onFileAdd: ` +
+				this.emit(
+					'debug',
 					`File "${e.path}" has been added to a monitored filesystem, but is not expected yet.`
 				)
 			})
@@ -425,26 +422,26 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			.getById(e.path)
 			.then(tracked => {
 				if (tracked.sourceStorageId === st.id) {
-					this.logger.warn(`${this.ident} onFileDelete: File "${e.path}" has been deleted from source storage "${st.id}".`)
+					this.emit('warn', `File "${e.path}" has been deleted from source storage "${st.id}".`)
 				}
 			})
 			.catch(_e => {})
 	}
 
 	protected cronJob() {
-		this.logger.debug(`${this.ident} cronJob: Starting cron job for ${this.constructor.name}`)
+		this.emit('debug', `Starting cron job for ${this.constructor.name}`)
 		this.purgeOldExpectedItems()
 			.then(() => {
-				this.logger.debug(`${this.ident} cronJob: Doing expected items storage check`)
+				this.emit('debug', `Doing expected items storage check`)
 				this._storages.forEach(i => this.expectedStorageCheck(i, true))
 			})
 			.catch(e => {
-				this.logger.error(`${this.ident} cronJob: There was an error running the cron job`, e)
+				this.emit('error', `There was an error running the cron job`, e)
 			})
 	}
 
 	protected registerSourceStorage(st: StorageObject) {
-		this.logger.debug(`${this.ident} registerSourceStorage: Registering source storage: "${st.id}" in ${this.constructor.name}`)
+		this.emit('debug', `Registering source storage: "${st.id}" in ${this.constructor.name}`)
 		st.handler.on(StorageEventType.add, (e: StorageEvent) => this.onFileAdd(st, e))
 		st.handler.on(StorageEventType.change, (e: StorageEvent) => this.onFileChange(st, e))
 		st.handler.on(StorageEventType.delete, (e: StorageEvent) => this.onFileDelete(st, e))
@@ -453,10 +450,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		this.initialStorageCheck(st)
 			.then(() => {
-				this.logger.debug(`${this.ident} registerSourceStorage: Initial ${this.constructor.name} scan for "${st.id}" complete.`)
+				this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" complete.`)
 			})
 			.catch(e => {
-				this.logger.error(`${this.ident} registerSourceStorage: Initial ${this.constructor.name} scan for "${st.id}" failed.`, e)
+				this.emit('debug', `Initial ${this.constructor.name} scan for "${st.id}" failed.`, e)
 			})
 	}
 
@@ -481,23 +478,24 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			const flow = this._handledFlows[i.mediaFlowId]
 			if (!flow) return
 			if (!flow.destinationId) {
-				this.logger.error(`${this.ident} initialExpectedCheck: Media flow "${flow.id}" does not have a destinationId`)
+				this.emit('error', `Media flow "${flow.id}" does not have a destinationId`)
 				return
 			}
 
 			const sourceStorage = this._storages.find(i => i.id === flow.sourceId)
-			if (!sourceStorage) throw new Error(`${this.ident} initialExpectedCheck: Could not find source storage "${flow.sourceId}"`)
+			if (!sourceStorage) throw new Error(`Could not find source storage "${flow.sourceId}"`)
 
 			let fileName: string
 			try {
 				fileName = sourceStorage.handler.parseUrl(i.url)
 			} catch (e) {
-				this.logger.error(`${this.ident} initialExpectedCheck: Assigned source storage "${sourceStorage.id}" does not support file "${i.url}"`)
+				this.emit('error', `Assigned source storage "${sourceStorage.id}" does not support file "${i.url}"`)
 				return
 			}
 
 			if (i.lastSeen + (i.lingerTime || this.LINGER_TIME) < getCurrentTime()) {
-				this.logger.warn(`${this.ident} initialExpectedCheck: ` +
+				this.emit(
+					'warn',
 					`Ignoring an expectedMediaItem "${i.url}" since it's expiration date was ${new Date(
 						i.lastSeen + (i.lingerTime || this.LINGER_TIME)
 					)}`
@@ -528,7 +526,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						expectedItem.expectedMediaItemId || []
 					)
 				} else {
-					this.logger.error(`${this.ident} initialExpectedCheck: ` +
+					this.emit(
+						'error',
 						`Only a single item of a given name can be expected across all sources. Item "${expectedItem.name}" is expected from multiple sources: "${expectedItem.sourceStorageId}" & "${overlapItem.sourceStorageId}."`
 					)
 				}
@@ -544,31 +543,31 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 						return allTrackedFiles.find(j => j.expectedMediaItemId === i.expectedMediaItemId) ? null : i
 					})
 				)
-				this.logger.debug(`${this.ident} initialExpectedCheck: New items are`, newItems)
 				this._trackedItems
 					.bulkChange(newItems)
 					.then(() => {
 						return newItems.map(item => this.checkAndEmitCopyWorkflow(item, 'initialExpectedCheck'))
 					})
 					.catch(e => {
-						this.logger.error(`${this.ident} initialExpectedCheck: There has been an error writing to tracked items database: ${e.message} ${e.stack}`)
+						this.emit('error', `There has been an error writing to tracked items database`, e)
 					})
 			})
-			.catch(e => {
-				this.logger.error(`${this.ident} initialExpectedCheck: Expected media items generator: error`, e)
+			.catch(_e => {
+				this.emit('error')
 			})
 	}
 	/**
 	 * Goes through the list of expected items and removes them if they are stale and too old (older than lingerTime)
 	 */
-	protected async purgeOldExpectedItems(): Promise<void> {
-		this.logger.debug(`${this.ident} purgeOldExpectedItems: Purging old expected items`)
-		return Promise.all(this._storages.map(s => this._trackedItems.getAllFromStorage(s.id))).then(async result => {
+	protected purgeOldExpectedItems(): Promise<void> {
+		this.emit('debug', `Purging old expected items`)
+		return Promise.all(this._storages.map(s => this._trackedItems.getAllFromStorage(s.id))).then(result => {
 			const allTrackedFiles = _.flatten(result) as TrackedMediaItemDB[]
 			const toBeDeleted = allTrackedFiles
 				.filter(i => i.lastSeen + i.lingerTime < getCurrentTime())
 				.map(i => {
-					this.logger.debug(`${this.ident} purgeOldExpectedItems:` +
+					this.emit(
+						'debug',
 						`Marking file "${i.name}" coming from "${
 							i.sourceStorageId
 						}" to be deleted because it was last seen ${new Date(
@@ -580,7 +579,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					})
 				})
 			return Promise.all(
-				toBeDeleted.map(async (i: TrackedMediaItemDB) => {
+				toBeDeleted.map((i: TrackedMediaItemDB) => {
 					return Promise.all(
 						this._allStorages
 							// get only storages that contain the file as a target storage
@@ -593,7 +592,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 										retryNumber(() => j.handler.deleteFile(f), this.RETRY_COUNT, this.RETRY_TIMEOUT)
 											.then(() => true)
 											.catch(e => {
-												this.logger.warn(`${this.ident} purgeOldExpectedItems: ` +
+												this.emit(
+													'warn',
 													`File "${i.name}" could not be deleted from source storage "${j.id}" after ${this.RETRY_COUNT} retries`,
 													e
 												)
@@ -601,7 +601,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 											})
 									)
 									.catch(e => {
-										this.logger.warn(`${this.ident} purgeOldExpectedItems: ` +
+										this.emit(
+											'warn',
 											`File "${i.name}" could not be found on source storage "${j.id}"`,
 											e
 										)
@@ -610,10 +611,10 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							)
 					)
 						.then(() => this._trackedItems.remove(i))
-						.then(() => this.logger.debug(`${this.ident} purgeOldExpectedItems: Stopped tracking file "${i.name}".`))
+						.then(() => this.emit('debug', `Stopped tracking file "${i.name}".`))
 				})
 			).then(results => {
-				this.logger.info(`${this.ident} purgeOldExpectedItems: Removed ${results.length} expired expected items.`)
+				this.emit('info', `Removed ${results.length} expired expected items.`)
 			})
 		})
 	}
@@ -674,18 +675,19 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			}),
 			this
 		)
-		this.logger.debug(`${this.ident} emitCopyWorkflow: New forkflow started for "${file.name}": "${workflowId}". ${reason.join(', ')}`)
+		this.emit('debug', `New forkflow started for "${file.name}": "${workflowId}". ${reason.join(', ')}`)
 	}
 	/**
 	 * Checks if the item exists on the storage and issues workflows
 	 * @param tmi
 	 */
 	protected checkAndEmitCopyWorkflow(tmi: TrackedMediaItem, reason: string, withRetry?: boolean) {
-		if (!tmi.sourceStorageId) throw new Error(`${this.ident} checkAndEmitCopyWorkflow: Tracked Media Item "${tmi._id}" has no source storage!`)
+		if (!tmi.sourceStorageId) throw new Error(`Tracked Media Item "${tmi._id}" has no source storage!`)
 		const storage = this._storages.find(i => i.id === tmi.sourceStorageId)
-		if (!storage) throw new Error(`${this.ident} checkAndEmitCopyWorkflow: Could not find storage "${tmi.sourceStorageId}"`)
+		if (!storage) throw new Error(`Could not find storage "${tmi.sourceStorageId}"`)
 		if (tmi.lastSeen + tmi.lingerTime < getCurrentTime()) {
-			this.logger.warn(`${this.ident} checkAndEmitCopyWorkflow: `,
+			this.emit(
+				'warn',
 				`Ignoring new WorkFlow for file "${tmi.name}" since it's expiration date is ${new Date(
 					tmi.lastSeen + tmi.lingerTime
 				)}`
@@ -726,7 +728,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 												},
 												e => {
 													// Properties could not be fetched
-													this.logger.error(`${this.ident} checkAndEmitCopyWorkflow: ` +
+													this.emit(
+														'error',
 														`File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked. Attempting to write over.`,
 														e
 													)
@@ -744,7 +747,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 											// the file not found
 											if (withRetry) {
 												setTimeout(() => {
-													this.logger.debug(`${this.ident} checkAndEmitCopyWorkflow: ` +
+													this.emit(
+														'debug',
 														`Retrying a check for a "${tmi.name}" file that wasn't found on target storage "${i.id}"`
 													)
 													this.checkAndEmitCopyWorkflow(tmi, reason)
@@ -763,14 +767,15 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 								})
 						})
 						.catch(e => {
-							this.logger.error(`${this.ident} checkAndEmitCopyWorkflow: Could not fetch file "${tmi.name}" properties from storage`, e)
+							this.emit('error', `Could not fetch file "${tmi.name}" properties from storage`, e)
 						})
 				} else {
-					this.logger.debug(`${this.ident} checkAndEmitCopyWorkflow: File "${tmi.name}" not found in source storage "${tmi.sourceStorageId}".`)
+					this.emit('debug', `File "${tmi.name}" not found in source storage "${tmi.sourceStorageId}".`)
 				}
 			})
 			.catch(e => {
-				this.logger.error(`${this.ident} checkAndEmitCopyWorkflow: ` +
+				this.emit(
+					'error',
 					`File "${tmi.name}" failed to be checked in source storage "${tmi.sourceStorageId}"`,
 					e
 				)

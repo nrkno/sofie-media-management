@@ -174,7 +174,6 @@ interface SyncFunctionFcn {
 }
 const syncFunctionFcns: Array<SyncFunctionFcn> = []
 const syncFunctionRunningFcns: { [id: string]: number } = {}
-
 /**
  * Only allow one instane of the function (and its arguments) to run at the same time
  * If trying to run several at the same time, the subsequent are put on a queue and run later
@@ -273,7 +272,6 @@ export function atomicPromise<T>(id: string, fcn: (...args: any[]) => Promise<T>
 		evaluateAtomicPromiseQueue()
 	})
 }
-
 function evaluateAtomicPromiseQueue() {
 	_.each(atomicPromiseQueue, queue => {
 		const first = _.first(queue)
@@ -345,12 +343,5 @@ export function putToDBUpsert<T>(
 				console.log('Error in putToDBUpsert ', objId)
 				throw e
 			})
-	})
-}
-
-/** Async Javascripts missing wait function. */
-export function wait (time: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, time)
 	})
 }

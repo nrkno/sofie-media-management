@@ -1,6 +1,9 @@
 import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage, QuantelHTTPStorage } from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
+import { LocalFolderHandler } from './localFolderHandler'
+import { FileShareHandler } from './fileShareHandler'
+import { QuantelHTTPHandler } from './quantelHttpHandler'
 import { CancelablePromise } from '../lib/cancelablePromise'
 
 export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage
@@ -153,4 +156,21 @@ export abstract class StorageHandler extends EventEmitter {
 	 * @memberof StorageHandler
 	 */
 	abstract destroy(): Promise<void>
+}
+
+/**
+ * A factory for storage handlers, based on the StorageSettings object
+ * @export
+ * @param  {StorageSettings} storage
+ * @return StorageHandler
+ */
+export function buildStorageHandler(storage: GeneralStorageSettings): StorageHandler {
+	switch (storage.type) {
+		case StorageType.LOCAL_FOLDER:
+			return new LocalFolderHandler(storage)
+		case StorageType.FILE_SHARE:
+			return new FileShareHandler(storage)
+		case StorageType.QUANTEL_HTTP:
+			return new QuantelHTTPHandler(storage)
+	}
 }
