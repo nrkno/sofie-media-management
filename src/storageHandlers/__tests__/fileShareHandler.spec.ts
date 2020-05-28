@@ -26,19 +26,22 @@ describe('FileShareHandler', () => {
 	let fsh0: FileShareHandler
 
 	beforeAll(async () => {
-		fsh0 = new FileShareHandler({
-			id: 'remote0',
-			type: StorageType.FILE_SHARE,
-			support: {
-				read: true,
-				write: false
+		fsh0 = new FileShareHandler(
+			{
+				id: 'remote0',
+				type: StorageType.FILE_SHARE,
+				support: {
+					read: true,
+					write: false
+				},
+				options: {
+					basePath: '\\\\STORAGE\\public',
+					mappedNetworkedDriveTarget: 'U',
+					onlySelectedFiles: false // to make test use '.' and cause watcher to enter ready state
+				}
 			},
-			options: {
-				basePath: '\\\\STORAGE\\public',
-				mappedNetworkedDriveTarget: 'U',
-				onlySelectedFiles: false // to make test use '.' and cause watcher to enter ready state
-			}
-		}, new winston.Logger({ transports: [ new winston.transports.Console() ]}))
+			new winston.Logger({ transports: [new winston.transports.Console()] })
+		)
 		try {
 			fsh0.on('error', err => fail(err))
 			await fsh0.init()
