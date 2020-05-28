@@ -25,7 +25,7 @@ jest.mock('chokidar')
 describe('FileShareHandler', () => {
 	let fsh0: FileShareHandler
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		fsh0 = new FileShareHandler({
 			id: 'remote0',
 			type: StorageType.FILE_SHARE,
