@@ -410,7 +410,7 @@ export class Worker {
 			'-i', `"${doc.mediaPath}"`
 		]
 
-		const { error: execError, result } = await noTryAsync(() => new Promise((resolve, reject) => {
+		const { error: execError, result } = await noTryAsync(() => new Promise<string>((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
 				this.logger.debug(`Worker: field order detect: output (stdout, stderr)`, stdout, stderr)
 				if (err) {
@@ -747,7 +747,7 @@ export class Worker {
 			'-print_format', 'json'
 		]
 
-		const { result: probeData, error: execError } = await noTryAsync(() => new Promise((resolve, reject) => {
+		const { result: probeData, error: execError } = await noTryAsync(() => new Promise<any>((resolve, reject) => {
 			exec(args.join(' '), (err, stdout, stderr) => {
 				this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
 				if (err) {
