@@ -252,7 +252,7 @@ export class Worker {
 			`"${doc.mediaPath}"`,
 			'-frames:v 1',
 			`-vf thumbnail,scale=${(this.config.thumbnails && this.config.thumbnails.width) || 256}:` +
-				`${(this.config.thumbnails && this.config.thumbnails.width) || -1}`,
+				`${(this.config.thumbnails && this.config.thumbnails.height) || -1}`,
 			'-threads 1',
 			`"${tmpPath}"`
 		]
