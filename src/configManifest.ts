@@ -167,7 +167,7 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 	{
 		id: 'serverId',
 		name: 'Quantel Server ID',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.NUMBER // dropdown
 	}
 ]
 

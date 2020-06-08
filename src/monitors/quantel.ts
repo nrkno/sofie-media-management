@@ -64,7 +64,7 @@ export class MonitorQuantel extends Monitor {
 	get deviceInfo(): MonitorDevice {
 		// @ts-ignore: todo: make stronger typed, via core-integration
 		return {
-			deviceName: `Quantel (${this.settings.gatewayUrl} ${this.quantel.zoneId}/${this.quantel.serverId})`,
+			deviceName: `Quantel (${this.settings.gatewayUrl} ${this.settings.zoneId}/${this.settings.serverId})`,
 			deviceId: this.deviceId,
 
 			deviceCategory: PeripheralDeviceAPI.DeviceCategory.MEDIA_MANAGER,
