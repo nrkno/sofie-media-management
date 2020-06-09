@@ -38,7 +38,7 @@
     "build:main": "tsc -p tsconfig.json",
     "generate-deps-metadata": "node generate-deps-metadata.js",
     "build-linux": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t linux-x64 -o deploy/media-manager && node copy-natives.js linux-x64",
-    "build-win32": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t windows-x64 -o deploy/media-manager.exe && node copy-natives.js win32-x64",
+    "build-win32": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t windows-x64-12.16.3 -o deploy/media-manager.exe && node copy-natives.js win32-x64",
     "lint": "tslint --project tsconfig.jest.json --config tslint.json && prettier -c --config .prettierrc src/**",
     "lint-fix": "tslint --project tsconfig.jest.json --config tslint.json --fix && prettier -c --config .prettierrc --write src/**",
     "prettier": "prettier --config .prettierrc src/**",
