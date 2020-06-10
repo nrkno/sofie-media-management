@@ -164,6 +164,7 @@ export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
 	FILE_SHARE = 'file_share',
 	QUANTEL_HTTP = 'quantel_http',
+	QUANTEL_STREAM = 'quantel_stream',
 	UNKNOWN = 'unknown'
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
@@ -193,6 +194,11 @@ export interface QuantelHTTPStorage extends StorageSettings {
 		serverId: number
 		onlySelectedFiles: true
 	}
+}
+
+export interface QuantelStream extends StorageSettings {
+	type: StorageType.QUANTEL_STREAM
+	options: {}
 }
 
 export interface LocalFolderStorage extends StorageSettings {

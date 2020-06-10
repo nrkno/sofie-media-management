@@ -588,7 +588,7 @@ export class Dispatcher {
 
 		this.logger.debug(`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
 		// persist workflow to db:
-		const { result: docs, error: docsError } = await noTryAsync(() =>
+		/* const { result: docs, error: docsError } = await noTryAsync(() =>
 			this.workFlows.allDocs({
 				include_docs: true
 			})
@@ -608,7 +608,7 @@ export class Dispatcher {
 				finished()
 				return
 			}
-		}
+		} */
 		// Did not find an outstanding workflow with the same hash
 		const { error: putError } = await noTryAsync(() => this.workFlows.put(wfDb))
 		if (putError) {
@@ -619,6 +619,7 @@ export class Dispatcher {
 			// persist the workflow steps separately to db:
 			await Promise.all(
 				wf.steps.map(step => {
+					this.logger.info(`persisting step: ${JSON.stringify(step)}`)
 					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
 						_id: wfDb._id + '_' + randomId(),
 						workFlowId: wfDb._id
@@ -960,7 +961,7 @@ export class Dispatcher {
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
-				this.workFlows.allDocs({
+				this.workFlows.allDocs<WorkFlowDB>({
 					include_docs: true,
 					attachments: false
 				})
@@ -1044,7 +1045,7 @@ export class Dispatcher {
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
-				this.workSteps.allDocs({
+				this.workSteps.allDocs<WorkStepDB>({
 					include_docs: true,
 					attachments: false
 				})
@@ -1055,10 +1056,9 @@ export class Dispatcher {
 			throw queryError
 		}
 
+		// this.logger.info(`worksteps: ${JSON.stringify(allDocsResponse)}`)
 		this.logger.info(
-			'Dispatcher: workSteps: synchronizing objectlists',
-			coreObjects.length,
-			allDocsResponse.total_rows
+			`Dispatcher: workSteps: synchronizing objectlists ${coreObjects.length}=${allDocsResponse.total_rows}`
 		)
 
 		let tasks: Array<() => Promise<void>> = []
@@ -1071,7 +1071,7 @@ export class Dispatcher {
 			_.compact(
 				_.map(
 					allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views),
-					doc => {
+					(doc) => {
 						const docId = doc.id
 
 						if (doc.value.deleted) {

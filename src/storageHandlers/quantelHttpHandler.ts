@@ -168,6 +168,28 @@ export class QuantelHTTPFile implements File {
 	}
 }
 
+// Shell File that is a simple handle to allow streaming access to Quantel-stored clips
+export class QuantelStream implements File {
+	public readonly source = StorageType.QUANTEL_STREAM
+	constructor(
+		public readonly name: string, 
+		public readonly url: string,
+		public readonly read: true
+	) { } 
+
+	getWritableStream (): Promise<stream.Writable> {
+		throw new Error('getWriteableStream: not implemented for Quantel items')
+	}
+	getReadableStream (): Promise<stream.Readable> {
+		throw new Error('getReadableStream: not implemented for Quantel items')
+	}
+	getProperties (): Promise<FileProperties> {
+		return Promise.resolve(
+			literal<FileProperties>({ size: undefined, created: undefined, modified: undefined })
+		)
+	}
+}
+
 export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 	private gatewayUrl: string
 	private ISAUrl: string

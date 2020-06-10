@@ -28,6 +28,7 @@ import { Collection, Observer } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 import { CancelablePromise } from '../lib/cancelablePromise'
+import { QuantelStream } from '../storageHandlers/quantelHttpHandler'
 
 class QuantelStorageHandlerSingleton extends StorageHandler {
 	private static instance = new QuantelStorageHandlerSingleton()
@@ -808,6 +809,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				status: WorkStepStatus.IDLE
 			})
 		)
+		// this.logger.info(`Steps are: ${JSON.stringify(steps)}`)
 		return steps
 	}
 
@@ -835,7 +837,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			this
 		)
 		this.logger.debug(
-			`${this.ident} emitCopyWorkflow: New forkflow started for "${file.name}": "${workflowId}". ${reason.join(
+			`${this.ident} emitCopyWorkflow: New workflow started for "${file.name}": "${workflowId}". ${reason.join(
 				', '
 			)}`
 		)
@@ -869,21 +871,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 
 		if (this.isQuantel(tmi.name)) {
-			const file = literal<File>({
-				name: 'fred',
-				url: tmi.name,
-				source: StorageType.QUANTEL_HTTP,
-				getWritableStream: () => {
-					throw new Error('getWriteableStream: not implemented for Quantel items')
-				},
-				getReadableStream: () => {
-					throw new Error('getReadableStream: not implemented for Quantel items')
-				},
-				getProperties: () =>
-					Promise.resolve(
-						literal<FileProperties>({ size: undefined, created: undefined, modified: undefined })
-					)
-			})
+			const file = new QuantelStream(tmi.name, tmi.name, true)
 			const st = literal<StorageObject>({
 				id: 'quantelPropertiesFromMonitor',
 				support: { read: false, write: false },

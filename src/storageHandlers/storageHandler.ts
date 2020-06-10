@@ -1,9 +1,9 @@
-import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage, QuantelHTTPStorage } from '../api'
+import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage, QuantelHTTPStorage, QuantelStream } from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
 import { CancelablePromise } from '../lib/cancelablePromise'
 
-export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage
+export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage | QuantelStream
 
 export interface StorageObject extends StorageSettings {
 	handler: StorageHandler
