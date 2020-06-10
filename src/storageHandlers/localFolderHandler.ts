@@ -128,12 +128,13 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			.on('unlink', this.onUnlink)
 
 		return new Promise<void>(resolve => {
-			if (this._selectiveListen) { // Ready event never fired
+			if (this._selectiveListen) {
+				// Ready event never fired
 				this._initialized = true
 				setImmediate(resolve)
 			} else {
 				this._watcher.on('ready', () => {
-				  this._initialized = true
+					this._initialized = true
 					resolve()
 				})
 			}
@@ -324,7 +325,10 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	deleteFile(file: File): Promise<void> {
 		if (!this._writable) throw Error('This storage is not writable.')
 		return new Promise((resolve, reject) => {
-			fs.unlink(file.url).then(() => resolve(), err => reject(err))
+			fs.unlink(file.url).then(
+				() => resolve(),
+				err => reject(err)
+			)
 		})
 	}
 

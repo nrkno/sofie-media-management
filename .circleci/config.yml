@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-      - image: circleci/node:12.15.0
+      - image: circleci/node:12
     working_directory: ~/project
     steps:
       - checkout
@@ -37,7 +37,7 @@ jobs:
 
   validate-dependencies:
     docker:
-      - image: circleci/node:12.15.0
+      - image: circleci/node:12
     working_directory: ~/project
     steps:
       - checkout
@@ -46,13 +46,13 @@ jobs:
             - yarn-cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
             - yarn-cache-{{ .Branch }}
             - yarn-cache-
-
+            
       - run: yarn install
       - run: yarn validate:dependencies
 
   build-windows:
     docker:
-      - image: circleci/node:12.15.0
+      - image: circleci/node:12
     working_directory: ~/project
     steps:
       - attach_workspace:
@@ -67,7 +67,7 @@ jobs:
 
   build-linux:
     docker:
-      - image: circleci/node:12.15.0
+      - image: circleci/node:12
     working_directory: ~/project
     steps:
       - attach_workspace:
@@ -82,7 +82,7 @@ jobs:
 
   release:
     docker:
-      - image: circleci/node:12.15.0
+      - image: circleci/node:12
     working_directory: ~/project
     steps:
       - attach_workspace:

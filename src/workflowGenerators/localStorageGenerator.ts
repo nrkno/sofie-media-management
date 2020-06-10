@@ -37,8 +37,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 
 					if (srcStorage) {
 						if (srcStorage.options.onlySelectedFiles) {
-							this.logger.error(`${this.ident} init: ` +
-								`${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`
+							this.logger.error(
+								`${this.ident} init: ` +
+									`${this.constructor.name} cannot run on a storage with onlySelectedFiles: "${srcStorage.id}"!`
 							)
 							return
 						}
@@ -61,10 +62,15 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 
 		this.initialCheck(st)
 			.then(() => {
-				this.logger.debug(`${this.ident} registerStorage: Initial ${this.constructor.name} scan for "${st.id}" complete.`)
+				this.logger.debug(
+					`${this.ident} registerStorage: Initial ${this.constructor.name} scan for "${st.id}" complete.`
+				)
 			})
 			.catch(e => {
-				this.logger.error(`${this.ident} registerStorage: Initial ${this.constructor.name} scan for "${st.id}" failed`, e)
+				this.logger.error(
+					`${this.ident} registerStorage: Initial ${this.constructor.name} scan for "${st.id}" failed`,
+					e
+				)
 			})
 	}
 
@@ -121,19 +127,22 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	}
 
 	protected onAdd(st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
-		if (e.type !== StorageEventType.add || !e.file) throw new Error(`${this.ident} onAdd: Invalid event type or arguments.`)
+		if (e.type !== StorageEventType.add || !e.file)
+			throw new Error(`${this.ident} onAdd: Invalid event type or arguments.`)
 		const localFile = e.file
 		this._tracked.getById(e.path).then(
 			tmi => {
-				this.logger.debug(`${this.ident} onAdd: ` +
-					`File "${e.path}" is already tracked, "${st.id}" ignoring. ("${tmi.sourceStorageId}")`
+				this.logger.debug(
+					`${this.ident} onAdd: ` +
+						`File "${e.path}" is already tracked, "${st.id}" ignoring. ("${tmi.sourceStorageId}")`
 				)
 			},
 			() => {
 				this.registerFile(localFile, st)
 					.then(() => {
-						this.logger.debug(`${this.ident} onAdd: ` +
-							`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`
+						this.logger.debug(
+							`${this.ident} onAdd: ` +
+								`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`
 						)
 						const workflowId = e.path + '_' + randomId()
 						this.emit(
@@ -160,7 +169,8 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	}
 
 	protected onChange(st: StorageObject, e: StorageEvent) {
-		if (e.type !== StorageEventType.change || !e.file) throw new Error(`${this.ident} onChange: Invalid event type or arguments.`)
+		if (e.type !== StorageEventType.change || !e.file)
+			throw new Error(`${this.ident} onChange: Invalid event type or arguments.`)
 		const localFile = e.file
 		this._tracked
 			.getById(e.path)
@@ -195,20 +205,23 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				if (tmi.sourceStorageId === st.id) {
 					this._tracked.remove(tmi).then(
 						() => {
-							this.logger.debug(`${this.ident} onDelete: ` +
-								`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`
+							this.logger.debug(
+								`${this.ident} onDelete: ` +
+									`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`
 							)
 						},
 						e => {
-							this.logger.error(`${this.ident} onDelete: ` +
-								`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`,
+							this.logger.error(
+								`${this.ident} onDelete: ` +
+									`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`,
 								e
 							)
 						}
 					)
 				} else {
-					this.logger.debug(`${this.ident} onDelete: ` +
-						`Tracked file "${e.path}" deleted, but .sourceStorageId is "${tmi.sourceStorageId}" (not "${st.id}")`
+					this.logger.debug(
+						`${this.ident} onDelete: ` +
+							`Tracked file "${e.path}" deleted, but .sourceStorageId is "${tmi.sourceStorageId}" (not "${st.id}")`
 					)
 				}
 				// TODO: generate a pull from sourceStorage?
@@ -234,7 +247,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 								try {
 									await this._tracked.put(trackedFile)
 								} catch (e1) {
-									this.logger.error(`${this.ident} initialCheck: Could not update "${trackedFile.name}" last seen: ${e1}`)
+									this.logger.error(
+										`${this.ident} initialCheck: Could not update "${trackedFile.name}" last seen: ${e1}`
+									)
 								}
 							}
 						} catch (e) {

@@ -39,8 +39,10 @@
     "generate-deps-metadata": "node generate-deps-metadata.js",
     "build-linux": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t linux-x64 -o deploy/media-manager && node copy-natives.js linux-x64",
     "build-win32": "trash deploy && mkdir deploy && yarn build && nexe dist/index.js -t windows-x64 -o deploy/media-manager.exe && node copy-natives.js win32-x64",
-    "lint": "tslint --project tsconfig.jest.json --config tslint.json",
-    "unit": "jest --coverage false",
+    "lint": "tslint --project tsconfig.jest.json --config tslint.json && prettier -c --config .prettierrc src/**",
+    "lint-fix": "tslint --project tsconfig.jest.json --config tslint.json --fix && prettier -c --config .prettierrc --write src/**",
+    "prettier": "prettier --config .prettierrc src/**",
+    "unit": "jest",
     "test": "yarn lint && yarn unit",
     "test:integration": "yarn lint && jest --config=jest-integration.config.js",
     "watch": "jest --watch",
@@ -56,7 +58,7 @@
     "start": "node dist/index.js",
     "unlinkall": "yarn unlink tv-automation-server-core-integration timeline-state-resolver && yarn --check-files",
     "validate:dependencies": "yarn audit && yarn license-validate",
-    "license-validate": "node-license-validator -p -d --allow-licenses MIT BSD BSD-3-Clause BSD-2-Clause ISC Apache Apache-2.0 WTFPL Unlicense --allow-packages cycle"
+    "license-validate": "node-license-validator -p -d --allow-licenses MIT BSD BSD-3-Clause BSD-2-Clause 0BSD ISC Apache Apache-2.0 WTFPL Unlicense --allow-packages cycle"
   },
   "scripts-info": {
     "info": "Display information about the scripts",
@@ -75,13 +77,13 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^8.0.1",
-    "@types/jest": "^24.0.23",
     "@types/koa": "^2.11.1",
     "@types/koa-range": "^0.3.2",
     "@types/koa-router": "^7.4.0",
     "@types/koa-send": "^4.1.2",
     "@types/koa__cors": "^3.0.1",
-    "@types/node": "12",
+    "@types/jest": "^24.9.0",
+    "@types/node": "^12.12.7",
     "@types/pouchdb-node": "^6.1.2",
     "@types/underscore": "^1.8.8",
     "codecov": "^3.0.2",
@@ -132,9 +134,10 @@
     "pouchdb-node": "^7.0.0",
     "reflect-metadata": "^0.1.12",
     "request": "^2.88.0",
+    "request-promise-native": "^1.0.7",
     "set-value": "^3.0.1",
     "tslib": "^1.9.2",
-    "tv-automation-quantel-gateway-client": "^1.0.7",
+    "tv-automation-quantel-gateway-client": "^1.0.8",
     "tv-automation-server-core-integration": "^1.5.0",
     "underscore": "^1.9.1",
     "windows-network-drive": "^3.0.0",
@@ -142,6 +145,13 @@
     "xml2js": "^0.4.19"
   },
   "resolutions": {    
-    "**/**/yargs-parser": "^13.1.2"
+    "**/**/handlebars": "^4.5.3",
+    "**/**/mem": "^4.0.0",
+    "**/**/lodash": "^4.17.12",
+    "**/**/https-proxy-agent": "^2.2.3",
+    "**/**/set-value": "^3.0.1",
+    "**/**/marked": "^0.7.0",
+    "yargs-parser": "^18.1.2",
+    "minimist": "^1.2.3"
   }
 }

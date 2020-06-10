@@ -1,7 +1,7 @@
 import { Monitor } from './_monitor'
 import { DeviceSettings, MonitorSettings, MonitorSettingsType, MediaObject, StorageSettings } from '../api'
 import * as _ from 'underscore'
-import { MonitorMediaWatcher} from './mediaWatcher'
+import { MonitorMediaWatcher } from './mediaWatcher'
 import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
 import { MonitorQuantel, isQuantelMonitor } from './quantel'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
@@ -63,15 +63,24 @@ export class MonitorManager {
 		}
 		return anythingChanged
 	}
-
-	private async addMonitor(deviceId: string, monitorSettings: MonitorSettings, storageSettings?: StorageSettings): Promise<void> {
+	private async addMonitor(
+		deviceId: string,
+		monitorSettings: MonitorSettings,
+		storageSettings?: StorageSettings
+	): Promise<void> {
 		if (monitorSettings.type === MonitorSettingsType.NULL) {
 			// do nothing
 			return
 		}
 		const monitor: Monitor | null =
 			monitorSettings.type === MonitorSettingsType.WATCHER
-				? new MonitorMediaWatcher(deviceId, this.mediaDB, monitorSettings, this._coreHandler.logger, storageSettings)
+				? new MonitorMediaWatcher(
+						deviceId,
+						this.mediaDB,
+						monitorSettings,
+						this._coreHandler.logger,
+						storageSettings
+				  )
 				: monitorSettings.type === MonitorSettingsType.QUANTEL
 				? new MonitorQuantel(deviceId, monitorSettings, this._coreHandler.logger)
 				: null

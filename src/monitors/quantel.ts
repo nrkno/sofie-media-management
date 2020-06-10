@@ -48,7 +48,6 @@ export function isQuantelMonitor(monitor: Monitor): monitor is MonitorQuantel {
 }
 
 export class MonitorQuantel extends Monitor {
-
 	private expectedMediaItems: () => Collection
 	private observer: Observer
 	private expectedMediaItemsSubscription: string
@@ -62,11 +61,7 @@ export class MonitorQuantel extends Monitor {
 
 	private ident = 'Quantel monitor:'
 
-	constructor(
-		deviceId: string,
-		public settings: MonitorSettingsQuantel,
-		logger: LoggerInstance
-	) {
+	constructor(deviceId: string, public settings: MonitorSettingsQuantel, logger: LoggerInstance) {
 		super(deviceId, settings, logger)
 
 		this.quantel = new QuantelGateway()
@@ -182,7 +177,8 @@ export class MonitorQuantel extends Monitor {
 
 	private parseUrlToQuery(queryUrl: string): QuantelClipSearchQuery {
 		const parsed = url.parse(queryUrl)
-		if (parsed.protocol !== QUANTEL_URL_PROTOCOL) throw new Error(`${this.ident} parseUrlToQuery: Unsupported URL format: ${queryUrl}`)
+		if (parsed.protocol !== QUANTEL_URL_PROTOCOL)
+			throw new Error(`${this.ident} parseUrlToQuery: Unsupported URL format: ${queryUrl}`)
 		let guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
 		// path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
 		let title = decodeURI(parsed.query || '') // query for quantel:?Clip title or quantel:?"Clip title"
@@ -212,7 +208,8 @@ export class MonitorQuantel extends Monitor {
 		} else {
 			item = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		}
-		if (!item) throw new Error(`${this.ident} onExpectedAdded: Could not find the new item "${id}" in expectedMediaItems`)
+		if (!item)
+			throw new Error(`${this.ident} onExpectedAdded: Could not find the new item "${id}" in expectedMediaItems`)
 
 		// Note: The item.url will contain the clip GUID
 		if (item.url && !this.monitoredFiles[item.url]) {
@@ -231,7 +228,10 @@ export class MonitorQuantel extends Monitor {
 
 	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
 		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
-		if (!item) throw new Error(`${this.ident} onExpectedChanged: Could not find the changed item "${id}" in expectedMediaItems`)
+		if (!item)
+			throw new Error(
+				`${this.ident} onExpectedChanged: Could not find the changed item "${id}" in expectedMediaItems`
+			)
 
 		if (item.url && !this.monitoredFiles[item.url]) {
 			const shouldHandle = this.shouldHandleItem(item)
@@ -294,9 +294,13 @@ export class MonitorQuantel extends Monitor {
 
 				if (url) {
 					const { result: clipSummaries, error: searchError } = await noTryAsync(() =>
-						this.quantel.searchClip(this.parseUrlToQuery(url)))
+						this.quantel.searchClip(this.parseUrlToQuery(url))
+					)
 					if (searchError) {
-						this.logger.error(`${this.ident} doWatch: Error requesting search for clip "${url}".`, searchError)
+						this.logger.error(
+							`${this.ident} doWatch: Error requesting search for clip "${url}".`,
+							searchError
+						)
 						continue
 					}
 					if (clipSummaries.length >= 1) {
@@ -344,26 +348,39 @@ export class MonitorQuantel extends Monitor {
 									`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
 								)
 							}
-						} else { // Clip found ... but on a different pool
-							this.logger.info(`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server. Starting clone.`)
+						} else {
+							// Clip found ... but on a different pool
+							this.logger.info(
+								`${this.ident} doWatch: Clip "${url}" found, but doesn't exist on the right server. Starting clone.`
+							)
 							if (!server.pools || server.pools.length < 1) {
-								this.logger.error(`${this.ident} doWatch: Clip "${url}" could not be copied to correct server - server pool identifiers are not known.`)
+								this.logger.error(
+									`${this.ident} doWatch: Clip "${url}" could not be copied to correct server - server pool identifiers are not known.`
+								)
 							} else {
 								let copyCreated = false
-								for ( let pool of server.pools) {
-									const { result, error } = await noTryAsync(() => 
-										this.quantel.copyClip(undefined, clipSummaries[0].ClipID, pool, 8, true)) // Note: Intra-zone copy only
+								for (let pool of server.pools) {
+									const { result, error } = await noTryAsync(() =>
+										this.quantel.copyClip(undefined, clipSummaries[0].ClipID, pool, 8, true)
+									) // Note: Intra-zone copy only
 									if (error) {
-										this.logger.warn(`${this.ident} doWatch: Failed to copy clip "${url}" to server pool "${pool}".`)
+										this.logger.warn(
+											`${this.ident} doWatch: Failed to copy clip "${url}" to server pool "${pool}".`
+										)
 										continue
 									}
-									this.logger.info(`${this.ident} doWatch: Copy of clip "${url}" started to pool "${pool}" with new clipID "${result.clipID}".`, result)
+									this.logger.info(
+										`${this.ident} doWatch: Copy of clip "${url}" started to pool "${pool}" with new clipID "${result.clipID}".`,
+										result
+									)
 									copyCreated = true
 									break
 								}
 								if (!copyCreated) {
-									this.logger.error(`${this.ident} doWatch: Failed to initiate copy of "${url}" to any of the target server pools.`)
-								}	
+									this.logger.error(
+										`${this.ident} doWatch: Failed to initiate copy of "${url}" to any of the target server pools.`
+									)
+								}
 							}
 						}
 					} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" not found`)
@@ -374,7 +391,7 @@ export class MonitorQuantel extends Monitor {
 				monitoredFile.status = newStatus
 
 				mediaObjects[url] = mediaObject
-			} // end if timeSinceLastCheck >= checkTime 
+			} // end if timeSinceLastCheck >= checkTime
 		} // End loop through URLs
 
 		// Go through the mediaobjects and send changes to core:
@@ -468,36 +485,37 @@ export class MonitorQuantel extends Monitor {
 		})
 	}
 
-	private async urlToClipID (url: string, method: string): Promise<number> {
+	private async urlToClipID(url: string, method: string): Promise<number> {
 		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(url))
 		if (clipSummaries.length < 1) {
 			throw new Error(`${this.ident} ${method}: Could not find clip with ID "${url}"`)
 		}
 
 		const clipSummary = _.find(clipSummaries, clipData => {
-			return (
-				parseInt(clipData.Frames, 10) > 0 &&
-				clipData.Completed
-			)
+			return parseInt(clipData.Frames, 10) > 0 && clipData.Completed
 		})
 		if (clipSummary) {
 			return clipSummary.ClipID
 		} else {
-			throw new Error(`${this.ident} ${method}: Could not find completed clip "${url}" on ISA with frame count greater than 0`)
+			throw new Error(
+				`${this.ident} ${method}: Could not find completed clip "${url}" on ISA with frame count greater than 0`
+			)
 		}
 	}
 
-	async toHLSUrl (mediaId: string): Promise<string> {
+	async toHLSUrl(mediaId: string): Promise<string> {
 		const clipID = await this.urlToClipID(mediaId, 'toHLSUrl')
 		return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipID}/stream.m3u8`
 	}
 
-	async toStillUrl (mediaId: string, width?: number, frame?: number): Promise<string> {
+	async toStillUrl(mediaId: string, width?: number, frame?: number): Promise<string> {
 		const clipID = await this.urlToClipID(mediaId, 'toStillUrl')
-		return `${this.settings.transformerUrl}/quantel/homezone/clips/stills/${clipID}/${frame || 0}.${width ? width + '.' : ''}jpg`
+		return `${this.settings.transformerUrl}/quantel/homezone/clips/stills/${clipID}/${frame || 0}.${
+			width ? width + '.' : ''
+		}jpg`
 	}
 
-	async toEssenceUrl (mediaId: string): Promise<string> {
+	async toEssenceUrl(mediaId: string): Promise<string> {
 		const clipID = await this.urlToClipID(mediaId, 'toEssenceUrl')
 		return `${this.settings.transformerUrl}/quantel/homezone/clips/ports/${clipID}/essence.mxf`
 	}

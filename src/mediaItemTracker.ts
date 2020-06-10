@@ -28,11 +28,7 @@ export interface TrackedMediaItemDB extends TrackedMediaItem, PouchDB.Core.GetMe
 export class TrackedMediaItems {
 	private db: PouchDB.Database<TrackedMediaItem>
 
-	constructor(
-		private logger: LoggerInstance,
-		dbAdapter?: string,
-		dbPrefix?: string
-	) {
+	constructor(private logger: LoggerInstance, dbAdapter?: string, dbPrefix?: string) {
 		this.initDB(dbAdapter, dbPrefix)
 	}
 
@@ -73,35 +69,36 @@ export class TrackedMediaItems {
 		id: string,
 		delta: (tmi?: TrackedMediaItemDB) => TrackedMediaItemDB | undefined
 	): Promise<TrackedMediaItem | undefined> {
-		return putToDBUpsert(
-			this.db,
-			id,
-			(original?: TrackedMediaItemDB): TrackedMediaItem | undefined => {
-				const modified: TrackedMediaItemDB | undefined = delta(original)
-				if (original && modified) {
-					modified._id = original._id
-					modified._rev = original._rev
-				}
-				return modified
-			})
+		return putToDBUpsert(this.db, id, (original?: TrackedMediaItemDB): TrackedMediaItem | undefined => {
+			const modified: TrackedMediaItemDB | undefined = delta(original)
+			if (original && modified) {
+				modified._id = original._id
+				modified._rev = original._rev
+			}
+			return modified
+		})
 	}
 
-	async put(tmi: TrackedMediaItem): Promise<string> { // Expected to throw on error
+	async put(tmi: TrackedMediaItem): Promise<string> {
+		// Expected to throw on error
 		const result = await this.db.put(tmi)
 		return result.id
 	}
 
-	async getById(id: string): Promise<TrackedMediaItemDB> { // Expected to throw on error
+	async getById(id: string): Promise<TrackedMediaItemDB> {
+		// Expected to throw on error
 		const result = await this.db.get(id)
 		return result
 	}
 
 	async getAllFromStorage(storageId: string, query?: PouchDB.Find.Selector): Promise<TrackedMediaItemDB[]> {
 		const result = await this.db.find({
-			selector: _.extend({
-				sourceStorageId: storageId
-			},
-			query || {})
+			selector: _.extend(
+				{
+					sourceStorageId: storageId
+				},
+				query || {}
+			)
 		})
 		return result.docs
 	}

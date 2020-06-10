@@ -119,7 +119,9 @@ export class MediaManager {
 			} catch (e2) {
 				this._logger.error(e2)
 			}
-			if (this.vac) { this.vac.stop() }
+			if (this.vac) {
+				this.vac.stop()
+			}
 			this._logger.info('Shutting down in 10 seconds!')
 			setTimeout(() => {
 				process.exit(0)
@@ -181,8 +183,18 @@ export class MediaManager {
 
 		this._workFlowGenerators = []
 		this._workFlowGenerators.push(
-			new LocalStorageGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this._logger),
-			new WatchFolderGenerator(this._availableStorage, this._trackedMedia, settings.mediaFlows || [], this._logger),
+			new LocalStorageGenerator(
+				this._availableStorage,
+				this._trackedMedia,
+				settings.mediaFlows || [],
+				this._logger
+			),
+			new WatchFolderGenerator(
+				this._availableStorage,
+				this._trackedMedia,
+				settings.mediaFlows || [],
+				this._logger
+			),
 			new ExpectedItemsGenerator(
 				this._availableStorage,
 				this._trackedMedia,
@@ -205,7 +217,6 @@ export class MediaManager {
 			this.coreHandler,
 			this._logger
 		)
-
 
 		await this._dispatcher.init()
 

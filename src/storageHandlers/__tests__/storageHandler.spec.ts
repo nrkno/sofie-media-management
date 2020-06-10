@@ -19,7 +19,7 @@ describe('buildStorageHandler', () => {
 					basePath: './'
 				}
 			}),
-			new winston.Logger({ transports: [ new winston.transports.Console() ]})
+			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)
 
 		expect(localHandler).toBeInstanceOf(LocalFolderHandler)
@@ -37,7 +37,7 @@ describe('buildStorageHandler', () => {
 					mappedNetworkedDriveTarget: 'X'
 				}
 			}),
-			new winston.Logger({ transports: [ new winston.transports.Console() ]})
+			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)
 
 		expect(shareHandler).toBeInstanceOf(FileShareHandler)

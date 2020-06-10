@@ -9,6 +9,7 @@ import {
 	DeviceConfigManifest,
 	TableConfigManifestEntry
 } from 'tv-automation-server-core-integration'
+import { MediaFlowType } from './api'
 
 export function literal<T>(o: T) {
 	return o
@@ -22,6 +23,7 @@ export enum StorageType {
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
 }
+
 const MEDIA_MANAGER_STORAGE_COMMON: SubDeviceConfigManifestEntry[] = [
 	{
 		id: 'id',
@@ -89,12 +91,6 @@ MEDIA_MANAGER_STORAGE_CONFIG[StorageType.LOCAL_FOLDER] = [
 	}
 ]
 
-export enum MediaFlowType {
-	WATCH_FOLDER = 'watch_folder',
-	LOCAL_INGEST = 'local_ingest',
-	EXPECTED_ITEMS = 'expected_items',
-	UNKNOWN = 'unknown'
-}
 const MEDIA_MANAGER_MEDIAFLOW_COMMON: SubDeviceConfigManifestEntry[] = [
 	{
 		id: 'id',
