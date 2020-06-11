@@ -588,7 +588,7 @@ export class Dispatcher {
 
 		this.logger.debug(`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
 		// persist workflow to db:
-		/* const { result: docs, error: docsError } = await noTryAsync(() =>
+		const { result: docs, error: docsError } = await noTryAsync(() =>
 			this.workFlows.allDocs({
 				include_docs: true
 			})
@@ -608,7 +608,7 @@ export class Dispatcher {
 				finished()
 				return
 			}
-		} */
+		}
 		// Did not find an outstanding workflow with the same hash
 		const { error: putError } = await noTryAsync(() => this.workFlows.put(wfDb))
 		if (putError) {
