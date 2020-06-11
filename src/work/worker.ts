@@ -334,7 +334,7 @@ export class Worker {
 					? 'ffmpeg.exe'
 					: 'ffmpeg',
 				'-hide_banner',
-				`-i' "${doc.mediaPath}"`,
+				`-i "${doc.mediaPath}"`,
 				'-frames:v 1',
 				`-vf thumbnail,scale=${(this.config.thumbnails && this.config.thumbnails.width) || 256}:` +
 					`${(this.config.thumbnails && this.config.thumbnails.height) || -1}`,
@@ -447,7 +447,7 @@ export class Worker {
 			args.push('-seekable 0')
 			args.push(`-i "${hlsUrl}"`)
 		} else {
-			args.push(`-i' "${doc.mediaPath}"`)
+			args.push(`-i "${doc.mediaPath}"`)
 		}
 		args.push('-f', 'webm')
 		args.push('-an')
@@ -577,7 +577,7 @@ export class Worker {
 			args.push('-seekable 0')
 			args.push(`-i "${hlsUrl}"`)
 		} else {
-			args.push(`-i' "${doc.mediaPath}"`)
+			args.push(`-i "${doc.mediaPath}"`)
 		}
 
 		const { error: execError, result } = await noTryAsync(
@@ -670,7 +670,7 @@ export class Worker {
 			args.push('-seekable 0')
 			args.push(`-i "${hlsUrl}"`)
 		} else {
-			args.push(`-i' "${doc.mediaPath}"`)
+			args.push(`-i "${doc.mediaPath}"`)
 		}
 		args.push('-filter:v', filterString)
 		args.push('-an')
@@ -932,26 +932,42 @@ export class Worker {
 		let docExists = true
 		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
-			const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
-			if (mediaFileDetails === false)
-				return this.failStep(
-					`failed to locate media object file with ID "${fileId}" at path "${step.target.options &&
-						step.target.options.mediaPath}"`,
-					step.action
-				)
 			docExists = false
-			doc = literal<MediaObject>({
-				_id: mediaFileDetails.mediaId,
-				_rev: '',
-				mediaId: mediaFileDetails.mediaId,
-				mediaPath: mediaFileDetails.mediaPath,
-				mediaSize: mediaFileDetails.mediaStat.size,
-				mediaTime: mediaFileDetails.mediaStat.mtime.getTime(),
-				thumbSize: 0,
-				thumbTime: 0,
-				cinf: '',
-				tinf: ''
-			})
+			if (this.isQuantel(fileId)) {
+				doc = literal<MediaObject>({
+					_id: fileId,
+					_rev: '',
+					mediaId: fileId,
+					mediaPath: step.file.name,
+					mediaSize: 0,
+					mediaTime: Date.now(),
+					thumbSize: 0,
+					thumbTime: 0,
+					cinf: '',
+					tinf: ''
+				})
+			} else {
+				const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
+				if (mediaFileDetails === false)
+					return this.failStep(
+						`failed to locate media object file with ID "${fileId}" at path "${step.target.options &&
+							step.target.options.mediaPath}"`,
+						step.action
+					)
+
+				doc = literal<MediaObject>({
+					_id: mediaFileDetails.mediaId,
+					_rev: '',
+					mediaId: mediaFileDetails.mediaId,
+					mediaPath: mediaFileDetails.mediaPath,
+					mediaSize: mediaFileDetails.mediaStat.size,
+					mediaTime: mediaFileDetails.mediaStat.mtime.getTime(),
+					thumbSize: 0,
+					thumbTime: 0,
+					cinf: '',
+					tinf: ''
+				})
+			}
 		}
 
 		const args = [
@@ -972,9 +988,9 @@ export class Worker {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
 			}
 			args.push('-seekable 0')
-			args.push(`-i' "${essenceUrl}"`)
+			args.push(`-i "${essenceUrl}"`)
 		} else {
-			args.push(`-i' "${doc.mediaPath}"`)
+			args.push(`-i "${doc.mediaPath}"`)
 		}
 		args.push('-show_streams')
 		args.push('-show_format')

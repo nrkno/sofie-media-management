@@ -584,7 +584,7 @@ export class Dispatcher {
 		wfDb.hash = hash
 		wfDb.modified = getCurrentTime()
 
-		console.log(`Current hash: ${hash}`)
+		// console.log(`Current hash: ${hash}`)
 
 		this.logger.debug(`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
 		// persist workflow to db:
@@ -594,7 +594,7 @@ export class Dispatcher {
 			})
 		)
 		if (docsError) {
-			this.logger.error(`Dispatcher: error when requests all WorkFlows`, docsError)
+			this.logger.error(`Dispatcher: error when requesting all WorkFlows`, docsError)
 			throw docsError // TODO too extreme?
 		}
 
