@@ -23,15 +23,20 @@ export class QuantelGateway extends EventEmitter {
 		super()
 	}
 
-	public async init(gatewayUrl: string, ISAUrl: string, zoneId: string | undefined, serverId: number | string): Promise<void> {
+	public async init(
+		gatewayUrl: string,
+		ISAUrl: string,
+		zoneId: string | undefined,
+		serverId: number | string
+	): Promise<void> {
 		this._gatewayUrl = gatewayUrl.replace(/\/$/, '') // trim trailing slash
 		if (!this._gatewayUrl.match(/http/)) this._gatewayUrl = 'http://' + this._gatewayUrl
 
 		// Connect to ISA:
 		await this.connectToISA(ISAUrl)
 		this._zoneId = zoneId || 'default'
-		this._serverId = (typeof serverId === 'number') ? serverId : Number.parseInt(serverId)
- 
+		this._serverId = typeof serverId === 'number' ? serverId : Number.parseInt(serverId)
+
 		// TODO: this is not implemented yet in Quantel gw:
 		// const zones = await this.getZones()
 		// const zone = _.find(zones, zone => zone.zoneName === this._zoneId)

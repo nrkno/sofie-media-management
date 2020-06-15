@@ -639,23 +639,40 @@ export class Dispatcher {
 
 	/**
 	 *  Returns the work-steps that are yet to be done and return them in order of
-	 *  priority (highest first)
+	 *  priority (highest first). Also checks that no other steps in the same workflow
+	 *  are currently working.
 	 */
 	private async getOutstandingWork(): Promise<WorkStepDB[]> {
-		const { result, error } = await noTryAsync(() =>
+		const { result: idleHands, error: idleError } = await noTryAsync(() =>
 			this.workSteps.find({
 				selector: {
 					status: WorkStepStatus.IDLE
 				}
 			})
 		)
-		if (error) {
-			this.logger.error(`Dispatcher: error finding outstanding work`, error)
-			throw error
+		if (idleError) {
+			this.logger.error(`Dispatcher: error finding outstanding work`, idleError)
+			throw idleError
 		}
-		let steps: Array<WorkStepDB> = (result.docs as object[]).map(item =>
+		const { result: runningHands, error: runningError } = await noTryAsync(() =>
+			this.workSteps.find({
+				selector: {
+					status: WorkStepStatus.WORKING
+				}
+			})
+		)
+		if (runningError) {
+			this.logger.error(`Dispatcher: error finding running work to filter outstanding work`, runningError)
+			throw runningError
+		}
+		let steps: Array<WorkStepDB> = (idleHands.docs as object[]).map(item =>
 			plainToWorkStep(item, this.availableStorage)
 		)
+		const running: Array<WorkStepDB> = (runningHands.docs as object[]).map(item =>
+			plainToWorkStep(item, this.availableStorage)
+		)
+		const runningIds = running.map(step => step.workFlowId)
+		steps = steps.filter(step => runningIds.indexOf(step.workFlowId) <= 0)
 		return steps.sort((a, b) => b.priority - a.priority)
 	}
 
