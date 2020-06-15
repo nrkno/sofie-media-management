@@ -665,15 +665,14 @@ export class Dispatcher {
 			this.logger.error(`Dispatcher: error finding running work to filter outstanding work`, runningError)
 			throw runningError
 		}
-		let steps: Array<WorkStepDB> = (idleHands.docs as object[]).map(item =>
+		const steps: Array<WorkStepDB> = (idleHands.docs as object[]).map(item =>
 			plainToWorkStep(item, this.availableStorage)
 		)
 		const running: Array<WorkStepDB> = (runningHands.docs as object[]).map(item =>
 			plainToWorkStep(item, this.availableStorage)
 		)
-		const runningIds = running.map(step => step.workFlowId)
-		steps = steps.filter(step => runningIds.indexOf(step.workFlowId) <= 0)
-		return steps.sort((a, b) => b.priority - a.priority)
+		const runningIds = new Set(running.map(step => step.workFlowId))
+		return steps.filter(step => !runningIds.has(step.workFlowId)).sort((a, b) => b.priority - a.priority)
 	}
 
 	/**
