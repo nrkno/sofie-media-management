@@ -9,6 +9,7 @@ import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
 import { getHash } from '../lib/lib'
 import { noTryAsync } from 'no-try'
+import { ClipData } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
 
 /** The minimum time to wait between polling status */
 const BREATHING_ROOM = 300
@@ -518,5 +519,10 @@ export class MonitorQuantel extends Monitor {
 	async toEssenceUrl(mediaId: string): Promise<string> {
 		const clipID = await this.urlToClipID(mediaId, 'toEssenceUrl')
 		return `${this.settings.transformerUrl}/quantel/homezone/clips/ports/${clipID}/essence.mxf`
+	}
+
+	async getClipDetails(mediaId: string): Promise<ClipData | null> {
+		const clipID = await this.urlToClipID(mediaId, 'getClipDetails')
+		return this.quantel.getClip(clipID)
 	}
 }

@@ -977,7 +977,7 @@ export class Worker {
 				: 'ffprobe',
 			'-hide_banner'
 		]
-		if (this.isQuantel(doc.mediaId)) {
+		if (this.isQuantel(doc.mediaId)) { // TODO we're going to make this up based on format code and frames
 			if (!this.quantelMonitor) {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
