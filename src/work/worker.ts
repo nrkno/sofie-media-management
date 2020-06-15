@@ -1075,6 +1075,11 @@ export class Worker {
 			}
 		})
 
+		if (this.isQuantel(doc.mediaId)) {
+			const mediaSize = Number.parseInt(probeData.format.size)
+			doc.mediaSize = isNaN(mediaSize) ? 0 : mediaSize
+		}
+
 		// Read document again ... might have been updated while we were busy working
 		if (docExists) {
 			let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
