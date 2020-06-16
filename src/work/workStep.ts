@@ -44,7 +44,7 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 			subTypes: [
 				{ value: LocalFolderFile, name: 'localFolderFile' },
 				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' },
-				{ value: QuantelStream, name: 'quantelStream '}
+				{ value: QuantelStream, name: 'quantelStream' }
 			]
 		}
 	})
@@ -120,15 +120,17 @@ export function plainToWorkStep(obj: object, availableStorage: StorageObject[]):
 				const cls = plainToClass(FileWorkStep, obj)
 				const storageId = (cls.target as any) as string
 
-				const storage = (storageId === 'quantelPropertiesFromMonitor') ?
-					literal<StorageObject>({ // Used when streams take their configuration from the Quantel monitor
-						id: 'quantelPropertiesFromMonitor',
-						support: { read: false, write: false },
-						handler: QuantelStreamHandlerSingleton.Instance,
-						type: StorageType.QUANTEL_STREAM,
-						options: {}
-					})
-					: availableStorage.find(i => i.id === storageId)
+				const storage =
+					storageId === 'quantelPropertiesFromMonitor'
+						? literal<StorageObject>({
+								// Used when streams take their configuration from the Quantel monitor
+								id: 'quantelPropertiesFromMonitor',
+								support: { read: false, write: false },
+								handler: QuantelStreamHandlerSingleton.Instance,
+								type: StorageType.QUANTEL_STREAM,
+								options: {}
+						  })
+						: availableStorage.find(i => i.id === storageId)
 				if (!storage) throw new Error(`Unknown storage: "${storageId}"`)
 				cls.target = storage
 				return (cls as any) as WorkStepDB

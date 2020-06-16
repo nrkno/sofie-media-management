@@ -16,12 +16,7 @@ import {
 	StorageType
 } from '../api'
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
-import {
-	StorageObject,
-	StorageEventType,
-	File,
-	StorageEvent
-} from '../storageHandlers/storageHandler'
+import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection, Observer } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
@@ -767,7 +762,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				target: st,
 				priority: 0.5,
 				status: WorkStepStatus.IDLE
-			}),
+			})
 			/* new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
 				file,

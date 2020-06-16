@@ -22,6 +22,7 @@ import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import * as fs from 'fs-extra'
 import * as http from 'http'
 import { MonitorQuantel } from '../monitors/quantel'
+import quantelMetadataTransform from './quantelFormats'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -970,50 +971,64 @@ export class Worker {
 			}
 		}
 
-		const args = [
-			// TODO (perf) Low priority process?
-			(this.config.paths && this.config.paths.ffprobe) || process.platform === 'win32'
-				? 'ffprobe.exe'
-				: 'ffprobe',
-			'-hide_banner'
-		]
-		if (this.isQuantel(doc.mediaId)) { // TODO we're going to make this up based on format code and frames
+		let probeData: any = {}
+		if (this.isQuantel(doc.mediaId)) {
+			// Due to issues using ffprobe with the transformer, this is generated based on format code and frames
 			if (!this.quantelMonitor) {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
-			const { result: essenceUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toEssenceUrl(doc.mediaId)
+			const { result: clipData, error: detailError } = await noTryAsync(() =>
+				this.quantelMonitor!.getClipDetails(doc.mediaId)
 			)
-			if (urlError) {
-				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
+			if (detailError) {
+				return this.failStep(
+					`Could not retrieve clip details: ${detailError.message}`,
+					step.action,
+					detailError
+				)
 			}
-			args.push('-seekable 0')
-			args.push(`-i "${essenceUrl}"`)
+			if (clipData === null) {
+				return this.failStep(`Could not find clips details for ${doc.mediaId}`, step.action)
+			}
+			probeData = quantelMetadataTransform(clipData)
 		} else {
-			args.push(`-i "${doc.mediaPath}"`)
-		}
-		args.push('-show_streams')
-		args.push('-show_format')
-		args.push('-print_format', 'json')
+			const args = [
+				// TODO (perf) Low priority process?
+				(this.config.paths && this.config.paths.ffprobe) || process.platform === 'win32'
+					? 'ffprobe.exe'
+					: 'ffprobe',
+				'-hide_banner',
+				`-i "${doc.mediaPath}"`,
+				'-show_streams',
+				'-show_format',
+				'-print_format',
+				'json'
+			]
 
-		const { result: probeData, error: execError } = await noTryAsync(
-			() =>
-				new Promise<any>((resolve, reject) => {
-					exec(args.join(' '), (err, stdout, stderr) => {
-						this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
-						if (err) {
-							return reject(err)
-						}
-						const json: any = JSON.parse(stdout)
-						if (!json.streams || !json.streams[0]) {
-							return reject(new Error('not media'))
-						}
-						resolve(json)
+			const { result: probeOutput, error: execError } = await noTryAsync(
+				() =>
+					new Promise<any>((resolve, reject) => {
+						exec(args.join(' '), (err, stdout, stderr) => {
+							this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
+							if (err) {
+								return reject(err)
+							}
+							const json: any = JSON.parse(stdout)
+							if (!json.streams || !json.streams[0]) {
+								return reject(new Error('not media'))
+							}
+							resolve(json)
+						})
 					})
-				})
-		)
-		if (execError) {
-			return this.failStep(`external process to generate metadata for "${fileId}" failed`, step.action, execError)
+			)
+			if (execError) {
+				return this.failStep(
+					`external process to generate metadata for "${fileId}" failed`,
+					step.action,
+					execError
+				)
+			}
+			probeData = probeOutput
 		}
 		this.logger.info(`Worker: metadata generate: generated metadata for "${fileId}"`)
 		this.logger.debug(`Worker: metadata generate: generated metadata details`, probeData)
@@ -1078,6 +1093,7 @@ export class Worker {
 		if (this.isQuantel(doc.mediaId)) {
 			const mediaSize = Number.parseInt(probeData.format.size)
 			doc.mediaSize = isNaN(mediaSize) ? 0 : mediaSize
+			doc.mediaTime = Date.parse(probeData.format.tags.modification_date)
 		}
 
 		// Read document again ... might have been updated while we were busy working

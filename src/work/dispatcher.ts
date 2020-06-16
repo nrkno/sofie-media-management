@@ -1071,7 +1071,7 @@ export class Dispatcher {
 			_.compact(
 				_.map(
 					allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views),
-					(doc) => {
+					doc => {
 						const docId = doc.id
 
 						if (doc.value.deleted) {

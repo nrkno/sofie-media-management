@@ -7,19 +7,15 @@ import { CancelablePromise } from '../lib/cancelablePromise'
 // Fake file that is a simple handle to allow streaming access to Quantel-stored clips
 export class QuantelStream implements File {
 	public readonly source = StorageType.QUANTEL_STREAM
-	constructor(
-		public readonly name: string, 
-		public readonly url: string,
-		public readonly read: true
-	) { } 
+	constructor(public readonly name: string, public readonly url: string, public readonly read: true) {}
 
-	getWritableStream (): Promise<stream.Writable> {
+	getWritableStream(): Promise<stream.Writable> {
 		throw new Error('getWriteableStream: not implemented for Quantel items')
 	}
-	getReadableStream (): Promise<stream.Readable> {
+	getReadableStream(): Promise<stream.Readable> {
 		throw new Error('getReadableStream: not implemented for Quantel items')
 	}
-	getProperties (): Promise<FileProperties> {
+	getProperties(): Promise<FileProperties> {
 		return Promise.resolve(
 			literal<FileProperties>({ size: undefined, created: undefined, modified: undefined })
 		)

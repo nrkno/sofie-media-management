@@ -1,4 +1,12 @@
-import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage, QuantelHTTPStorage, QuantelStream } from '../api'
+import {
+	StorageType,
+	Time,
+	StorageSettings,
+	LocalFolderStorage,
+	FileShareStorage,
+	QuantelHTTPStorage,
+	QuantelStream
+} from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
 import { CancelablePromise } from '../lib/cancelablePromise'
