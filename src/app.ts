@@ -5,9 +5,13 @@ import * as cors from '@koa/cors'
 import * as range from 'koa-range'
 import * as fs from 'fs-extra'
 import * as path from 'path'
+import { default as got } from 'got'
 import { DeviceSettings, MediaObject } from './api'
 import { LoggerInstance } from 'winston'
 import { noTryAsync } from 'no-try'
+
+// FIXME temporary reference to transformer ... get via Quantel Monitor
+const transformer = 'https://xproqhttp01'
 
 export class MediaManagerApp {
 	private app = new Koa()
@@ -87,6 +91,23 @@ export class MediaManagerApp {
 
 			ctx.body = { update_seq }
 			await next()
+		})
+
+		this.router.get('/quantel/*', async (ctx) => {
+			this.logger.debug(`Pass-through requests to transformer: ${ctx.path}`)
+			if (ctx.path.endsWith('init.mp4')) {
+				const initReq = await got(`${transformer}${ctx.path}`, { responseType: 'buffer' })
+				const initBuf = initReq.body
+				const stsc = initBuf.indexOf('stsc')
+				initBuf.writeUInt32BE(0, stsc + 8)
+				const stco = initBuf.indexOf('stco')
+				initBuf.writeUInt32BE(0, stco + 8)
+				ctx.type = initReq.headers['content-type'] || 'video/mpeg-4'
+				ctx.body = initBuf
+				return
+			}
+			let response = got.stream(`${transformer}${ctx.path}`)
+			ctx.body = response
 		})
 
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
