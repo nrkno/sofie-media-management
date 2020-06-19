@@ -6,20 +6,23 @@ import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
 import { MonitorQuantel, isQuantelMonitor } from './quantel'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Dispatcher } from '../work/dispatcher'
+import { MediaManagerApp } from '../app'
 
 export class MonitorManager {
 	private _monitors: { [id: string]: Monitor } = {}
 	private _initialized: boolean = false
 	private _coreHandler: CoreHandler
 	private _dispatcher: Dispatcher | undefined = undefined
+	private _app: MediaManagerApp | undefined = undefined
 
 	public settings: DeviceSettings
 
 	constructor(private mediaDB: PouchDB.Database<MediaObject>) {}
 
-	init(coreHandler: CoreHandler, dispatcher?: Dispatcher) {
+	init(coreHandler: CoreHandler, dispatcher?: Dispatcher, app?: MediaManagerApp) {
 		this._coreHandler = coreHandler
 		this._dispatcher = dispatcher
+		this._app = app
 		this._initialized = true
 	}
 
@@ -58,6 +61,12 @@ export class MonitorManager {
 				const monitor = this._monitors[monitorId]
 				if (isQuantelMonitor(monitor)) {
 					this._dispatcher.setQuantelMonitor(monitor)
+				}
+			}
+			if (this._app) {
+				const monitor = this._monitors[monitorId]
+				if (isQuantelMonitor(monitor)) {
+					this._app.setQuantelMonitor(monitor)
 				}
 			}
 		}

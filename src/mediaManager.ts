@@ -220,7 +220,7 @@ export class MediaManager {
 
 		await this._dispatcher.init()
 
-		this._monitorManager.init(this.coreHandler, this._dispatcher)
+		this._monitorManager.init(this.coreHandler, this._dispatcher, this._app)
 
 		await this._monitorManager.onNewSettings(settings)
 

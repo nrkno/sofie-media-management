@@ -9,13 +9,14 @@ import { default as got } from 'got'
 import { DeviceSettings, MediaObject } from './api'
 import { LoggerInstance } from 'winston'
 import { noTryAsync } from 'no-try'
+import { MonitorQuantel } from './monitors/quantel'
 
 // FIXME temporary reference to transformer ... get via Quantel Monitor
-const transformer = 'https://xproqhttp01'
 
 export class MediaManagerApp {
 	private app = new Koa()
 	private router = new Router()
+	private transformer: string | undefined = undefined
 
 	constructor(
 		private config: DeviceSettings,
@@ -93,10 +94,16 @@ export class MediaManagerApp {
 			await next()
 		})
 
-		this.router.get('/quantel/*', async (ctx) => {
+		this.router.get('/quantel/*', async ctx => {
 			this.logger.debug(`Pass-through requests to transformer: ${ctx.path}`)
+			if (this.transformer === undefined) {
+				ctx.status = 502
+				ctx.body = 'Transformer URL not set. Cannot talk to HTTP transformer.'
+				this.logger.warn('Transformer URL not set. Cannot talk to HTTP transformer.')
+				return
+			}
 			if (ctx.path.endsWith('init.mp4')) {
-				const initReq = await got(`${transformer}${ctx.path}`, { responseType: 'buffer' })
+				const initReq = await got(`${this.transformer}${ctx.path}`, { responseType: 'buffer' })
 				const initBuf = initReq.body
 				const stsc = initBuf.indexOf('stsc')
 				initBuf.writeUInt32BE(0, stsc + 8)
@@ -106,7 +113,7 @@ export class MediaManagerApp {
 				ctx.body = initBuf
 				return
 			}
-			let response = got.stream(`${transformer}${ctx.path}`)
+			let response = got.stream(`${this.transformer}${ctx.path}`)
 			ctx.body = response
 		})
 
@@ -121,5 +128,14 @@ export class MediaManagerApp {
 			}
 		})
 		// HTTPS setup through nginx
+	}
+
+	setQuantelMonitor(monitor: MonitorQuantel) {
+		this.transformer = monitor.settings.transformerUrl
+		if (this.transformer !== undefined) {
+			while (this.transformer.endsWith('/')) {
+				this.transformer = this.transformer.slice(0, -1)
+			}
+		}
 	}
 }
