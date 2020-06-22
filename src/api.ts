@@ -1,6 +1,5 @@
 export * from './api/mediaObject'
 import { WatchOptions } from 'chokidar'
-import { Dispatcher } from './work/dispatcher'
 
 /** The settings in Core (that's gonna be in the UI) */
 export interface DeviceSettings {

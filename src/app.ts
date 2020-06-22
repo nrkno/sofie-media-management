@@ -96,7 +96,7 @@ export class MediaManagerApp {
 			await next()
 		})
 
-		this.router.get('/quantel/*', async ctx => {
+		this.router.get('/(quantel|gv)/*', async ctx => {
 			this.logger.debug(`Pass-through requests to transformer: ${ctx.path}`)
 			if (this.transformer === undefined) {
 				ctx.status = 502
@@ -152,48 +152,46 @@ export class MediaManagerApp {
 
 async function manifestTransform(ssxml: string): Promise<string> {
 	const ssjs = await xmlParser(ssxml)
-	console.dir(ssjs.SmoothStreamingMedia.StreamIndex, {depth: 10 })
+	// console.dir(ssjs.SmoothStreamingMedia.StreamIndex, { depth: 10 })
 	const ssm = ssjs.SmoothStreamingMedia
 	const duration = (+ssm.$.Duration / +ssm.$.TimeScale).toFixed(3)
 	const video = ssjs.SmoothStreamingMedia.StreamIndex.find((x: any): any => x.$.Type === 'video')
-	const header = 
-	  `<?xml version="1.0" encoding="UTF-8"?>\n` +
-	  `<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:scte35="http://www.scte.org/schemas/35/2014SCTE35.xsd" xsi:schemaLocation="urn:mpeg:dash:schema:mpd:2011 DASH-MPD.xsd" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" minBufferTime="PT5.000S" maxSegmentDuration="PT3.000S" availabilityStartTime="2016-01-20T21:10:02Z" mediaPresentationDuration="PT${duration}S">\n` +
-	  `  <Period id="period0" duration="PT${duration}S">\n`
+	const header =
+		`<?xml version="1.0" encoding="UTF-8"?>\n` +
+		`<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:scte35="http://www.scte.org/schemas/35/2014SCTE35.xsd" xsi:schemaLocation="urn:mpeg:dash:schema:mpd:2011 DASH-MPD.xsd" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" minBufferTime="PT5.000S" maxSegmentDuration="PT3.000S" availabilityStartTime="2016-01-20T21:10:02Z" mediaPresentationDuration="PT${duration}S">\n` +
+		`  <Period id="period0" duration="PT${duration}S">\n`
 	let vAdapt = `    <AdaptationSet mimeType="video/mp4" segmentAlignment="true" startWithSAP="1" maxWidth="${video.$.DisplayWidth}" maxHeight="${video.$.DisplayHeight}" maxFrameRate="${video.$.Fps}" par="1:1">\n`
-	for ( let ql of video.QualityLevel ) {
-	  vAdapt += `      <Representation id="${ql.$.Bitrate}" bandwidth="${ql.$.Bitrate}" codecs="avc1.4D401E" width="${ql.$.MaxWidth}" height="${ql.$.MaxHeight}" frameRate="${video.$.Fps}" sar="1:1" scanType="progressive">\n`
-	  vAdapt += `        <BaseURL>stream-mp4/video/</BaseURL>\n`
-	  vAdapt += `        <SegmentTemplate timescale="${ssm.$.TimeScale}" initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/$Time$.mp4" duration="${ssm.$.Duration}" presentationTimeOffset="0">\n`
-	  vAdapt += `          <SegmentTimeline>\n`
-	  for ( let seg of video.c ) {
-		vAdapt += `            <S t="${seg.$.t}" d="${seg.$.d}" />\n`
-	  }
-	  vAdapt += `          </SegmentTimeline>\n`
-	  vAdapt += `        </SegmentTemplate>\n`
-	  vAdapt += `      </Representation>\n`
+	for (let ql of video.QualityLevel) {
+		vAdapt += `      <Representation id="${ql.$.Bitrate}" bandwidth="${ql.$.Bitrate}" codecs="avc1.4D401E" width="${ql.$.MaxWidth}" height="${ql.$.MaxHeight}" frameRate="${video.$.Fps}" sar="1:1" scanType="progressive">\n`
+		vAdapt += `        <BaseURL>stream-mp4/video/</BaseURL>\n`
+		vAdapt += `        <SegmentTemplate timescale="${ssm.$.TimeScale}" initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/$Time$.mp4" duration="${ssm.$.Duration}" presentationTimeOffset="0">\n`
+		vAdapt += `          <SegmentTimeline>\n`
+		for (let seg of video.c) {
+			vAdapt += `            <S t="${seg.$.t}" d="${seg.$.d}" />\n`
+		}
+		vAdapt += `          </SegmentTimeline>\n`
+		vAdapt += `        </SegmentTemplate>\n`
+		vAdapt += `      </Representation>\n`
 	}
 	vAdapt += `    </AdaptationSet>\n`
 	const audio = ssjs.SmoothStreamingMedia.StreamIndex.find((x: any): any => x.$.Type === 'audio')
 	let aAdapt = ''
-   if (audio) {
-	  const ql = audio.QualityLevel[0].$
-	  aAdapt += `    <AdaptationSet mimeType="audio/mp4" segmentAlignment="true" startWithSAP="1" lang="qaa">\n`
-	  aAdapt += `      <Representation id="a1" bandwidth="128000" codecs="mp4a.40.2" audioSamplingRate="48000">\n`
-	  aAdapt += `        <BaseURL>${audio.$.Url.slice(0, audio.$.Url.indexOf('{'))}</BaseURL>\n`
-	  aAdapt += `        <AudioChannelConfiguration schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011" value="${ql.Channels}"/>\n`
-	  aAdapt += `        <SegmentTemplate timescale="${ssm.$.TimeScale}" initialization="init.mp4" media="$Time$.mp4" duration="${ssm.$.Duration}" presentationTimeOffset="0">\n`
-	  aAdapt += `          <SegmentTimeline>\n`
-	  for ( let seg of audio.c) {
-		aAdapt += `            <S t="${seg.$.t}" d="${seg.$.d}" />\n`
-	  }
-	  aAdapt += `          </SegmentTimeline>\n`
-	  aAdapt += `        </SegmentTemplate>\n`
-	  aAdapt += `      </Representation>\n`
-	  aAdapt += `    </AdaptationSet>\n`
+	if (audio) {
+		const ql = audio.QualityLevel[0].$
+		aAdapt += `    <AdaptationSet mimeType="audio/mp4" segmentAlignment="true" startWithSAP="1" lang="qaa">\n`
+		aAdapt += `      <Representation id="a1" bandwidth="128000" codecs="mp4a.40.2" audioSamplingRate="48000">\n`
+		aAdapt += `        <BaseURL>${audio.$.Url.slice(0, audio.$.Url.indexOf('{'))}</BaseURL>\n`
+		aAdapt += `        <AudioChannelConfiguration schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011" value="${ql.Channels}"/>\n`
+		aAdapt += `        <SegmentTemplate timescale="${ssm.$.TimeScale}" initialization="init.mp4" media="$Time$.mp4" duration="${ssm.$.Duration}" presentationTimeOffset="0">\n`
+		aAdapt += `          <SegmentTimeline>\n`
+		for (let seg of audio.c) {
+			aAdapt += `            <S t="${seg.$.t}" d="${seg.$.d}" />\n`
+		}
+		aAdapt += `          </SegmentTimeline>\n`
+		aAdapt += `        </SegmentTemplate>\n`
+		aAdapt += `      </Representation>\n`
+		aAdapt += `    </AdaptationSet>\n`
 	}
-	const footer = 
-	  `  </Period>\n` +
-	  `</MPD>\n`
+	const footer = `  </Period>\n` + `</MPD>\n`
 	return header + vAdapt + aAdapt + footer
-  }
+}
