@@ -147,6 +147,11 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 		placeholder: '3'
 	}
 ]
+export enum QuantelStreamType {
+	HLS = 'hls',
+	MPEG_DASH = 'mpeg-dash',
+	SMOOTH_STREAM = 'smooth-stream'
+}
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
@@ -178,6 +183,12 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 		id: 'transformerUrl',
 		name: 'TransformerURL',
 		type: ConfigManifestEntryType.STRING
+	},
+	{
+		id: 'streamType',
+		name: 'Stream Type',
+		type: ConfigManifestEntryType.ENUM,
+		values: QuantelStreamType
 	}
 ]
 

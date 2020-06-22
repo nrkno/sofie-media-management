@@ -1,5 +1,6 @@
 export * from './api/mediaObject'
 import { WatchOptions } from 'chokidar'
+import { Dispatcher } from './work/dispatcher'
 
 /** The settings in Core (that's gonna be in the UI) */
 export interface DeviceSettings {
@@ -343,6 +344,24 @@ export interface MonitorSettingsWatcher extends MonitorSettingsBase {
 	retryLimit: number
 }
 
+/**
+ * Types of ABR stream a Grass Valley HTTP Transformer can create on-the-fly.
+ */
+export enum QuantelStreamType {
+	/** Apply HTTP Live Streaming (https://developer.apple.com/streaming/) */
+	HLS = 'hls',
+	/** Dynamic Adaptvie Streaming over HTTP (MPEG-DASH) */
+	MPEG_DASH = 'mpeg-dash',
+	/** Microsoft Smooth Streaming, deprecated by Azure Media Services */
+	SMOOTH_STREAM = 'smooth-stream'
+}
+
+/**
+ * Settings to use when monitoring media availability on Quantel servers and
+ * when streaming media into workers. The monitor is a one-stop-shop for the resolution
+ * of all `quantel:...` URLs into paths that can be used for playback control by the
+ * Quantel gateway or media resources from a transformer.
+ */
 export interface MonitorSettingsQuantel extends MonitorSettingsBase {
 	type: MonitorSettingsType.QUANTEL
 
@@ -358,4 +377,6 @@ export interface MonitorSettingsQuantel extends MonitorSettingsBase {
 	serverId: number
 	/** Base Url for Quantel transformer used for metadata generation */
 	transformerUrl?: string
+	/** Quantel stream type to use when accessing media. e.g. HLS or MPEG-DASH */
+	streamType?: QuantelStreamType
 }

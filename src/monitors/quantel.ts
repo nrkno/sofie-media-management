@@ -4,7 +4,7 @@ import { PeripheralDeviceAPI, Collection, Observer } from 'tv-automation-server-
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
 import { LoggerInstance } from 'winston'
-import { MonitorSettingsQuantel, ExpectedMediaItem } from '../api'
+import { MonitorSettingsQuantel, ExpectedMediaItem, QuantelStreamType } from '../api'
 import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
 import { getHash } from '../lib/lib'
@@ -506,7 +506,9 @@ export class MonitorQuantel extends Monitor {
 
 	async toHLSUrl(mediaId: string): Promise<string> {
 		const clipID = await this.urlToClipID(mediaId, 'toHLSUrl')
-		return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipID}/stream.m3u8`
+		return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipID}/stream.${
+			this.settings.streamType === QuantelStreamType.HLS ? 'm3u8' : 'mpd'
+		}`
 	}
 
 	async toStillUrl(mediaId: string, width?: number, frame?: number): Promise<string> {
