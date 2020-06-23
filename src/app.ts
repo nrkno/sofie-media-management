@@ -38,35 +38,22 @@ export class MediaManagerApp {
 			await next()
 		})
 
-		// TODO make it work with non-quantel images
-
-		this.router.get('/media/thumbnail/:id+', async (ctx, next) => {
-			this.logger.debug(`HTTP/S server: received thumbnail request "${ctx.params.id}"`)
-			if (ctx.params.id.startsWith('QUANTEL:')) {
-				let id = ctx.params.id.slice(8)
-				ctx.type = 'image/jpeg'
-				await send(ctx, `thumbs/${id}.jpg`)
-			} else {
-				this.logger.debug(`Making database thumbnail request for "${ctx.params.id}"`)
-				const { result, error } = await noTryAsync(() =>
-					this.mediaDB.get<MediaObject>(ctx.params.id.toUpperCase(), { attachments: true, binary: true })
-				)
-
-				if (error) {
-					this.logger.warn(`Database requests for "${ctx.params.id}" failed: ${error.message}`)
-					ctx.status = 404
-					return await next()
-				}
-				const _attachments = result._attachments
-				// this.logger.debug(`Attachments is ${JSON.stringify(_attachments)}`)
-				if (!_attachments || (_attachments && !_attachments['thumb.png'])) {
-					ctx.status = 404
-					return await next()
-				}
-
-				ctx.type = 'image/png'
-				ctx.body = (_attachments['thumb.png'] as PouchDB.Core.FullAttachment).data
+		this.router.get('/media/thumbnail/:id', async (ctx, next) => {
+			this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
+			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
+			let thumbPath = path.join(
+				(this.config.paths && this.config.paths.resources) || '',
+				(this.config.previews && this.config.previews.folder) || 'thumbs',
+				`${id}.jpg`
+			)
+			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
+			if (statError) {
+				this.logger.warning(`HTTP/S server: thumbnail requested that did not exist ${ctx.params.id}`, statError)
+				return await next()
 			}
+			ctx.type = 'image/jpeg'
+			ctx.body = await send(ctx, thumbPath)
+			ctx.length = stats.size
 		})
 
 		this.router.get('/media/preview/:id+', async (ctx, next) => {
@@ -75,7 +62,7 @@ export class MediaManagerApp {
 			ctx.type = 'video/webm'
 			let previewPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
-				(this.config.previews && this.config.previews.folder) || '',
+				(this.config.previews && this.config.previews.folder) || 'previews',
 				`${id}.webm`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
