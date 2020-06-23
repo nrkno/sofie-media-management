@@ -91,7 +91,12 @@ export class MonitorManager {
 						storageSettings
 				  )
 				: monitorSettings.type === MonitorSettingsType.QUANTEL
-				? new MonitorQuantel(deviceId, monitorSettings, this._coreHandler.logger)
+				? new MonitorQuantel(
+						deviceId,
+						monitorSettings,
+						this._coreHandler.logger,
+						(this._app && this._app.port) || undefined
+				  )
 				: null
 		if (!monitor) throw new Error(`Monitor could not be created, type "${monitorSettings.type}" unknown`)
 

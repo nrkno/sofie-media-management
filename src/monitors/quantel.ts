@@ -59,14 +59,18 @@ export class MonitorQuantel extends Monitor {
 	private isDestroyed: boolean = false
 	private watchError: string | null
 	private cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
+	private appPort: number = 8000
 
 	private ident = 'Quantel monitor:'
 
-	constructor(deviceId: string, public settings: MonitorSettingsQuantel, logger: LoggerInstance) {
+	constructor(deviceId: string, public settings: MonitorSettingsQuantel, logger: LoggerInstance, appPort?: number) {
 		super(deviceId, settings, logger)
 
 		this.quantel = new QuantelGateway()
 		this.quantel.on('error', e => this.logger.error(`${this.ident} Quantel.QuantelGateway`, e))
+		if (appPort) {
+			this.appPort = appPort
+		}
 	}
 
 	get deviceInfo(): MonitorDevice {
@@ -504,9 +508,9 @@ export class MonitorQuantel extends Monitor {
 		}
 	}
 
-	async toHLSUrl(mediaId: string): Promise<string> {
-		const clipID = await this.urlToClipID(mediaId, 'toHLSUrl')
-		return `${this.settings.transformerUrl}/quantel/homezone/clips/streams/${clipID}/stream.${
+	async toStreamUrl(mediaId: string): Promise<string> {
+		const clipID = await this.urlToClipID(mediaId, 'toStreamUrl')
+		return `http://localhost:${this.appPort}/quantel/homezone/clips/streams/${clipID}/stream.${
 			this.settings.streamType === QuantelStreamType.HLS ? 'm3u8' : 'mpd'
 		}`
 	}

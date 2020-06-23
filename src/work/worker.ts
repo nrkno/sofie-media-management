@@ -440,7 +440,7 @@ export class Worker {
 				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
 			}
 			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toHLSUrl(doc.mediaId)
+				this.quantelMonitor!.toStreamUrl(doc.mediaId)
 			)
 			if (urlError) {
 				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
@@ -570,7 +570,7 @@ export class Worker {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
 			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toHLSUrl(doc.mediaId)
+				this.quantelMonitor!.toStreamUrl(doc.mediaId)
 			)
 			if (urlError) {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
@@ -663,7 +663,7 @@ export class Worker {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
 			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toHLSUrl(doc.mediaId)
+				this.quantelMonitor!.toStreamUrl(doc.mediaId)
 			)
 			if (urlError) {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)

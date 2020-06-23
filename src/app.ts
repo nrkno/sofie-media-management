@@ -12,8 +12,6 @@ import { noTryAsync } from 'no-try'
 import { MonitorQuantel } from './monitors/quantel'
 import { parseStringPromise as xmlParser } from 'xml2js'
 
-// FIXME temporary reference to transformer ... get via Quantel Monitor
-
 export class MediaManagerApp {
 	private app = new Koa()
 	private router = new Router()
@@ -137,6 +135,10 @@ export class MediaManagerApp {
 			}
 		})
 		// HTTPS setup through nginx
+	}
+
+	get port(): number {
+		return this.config.httpPort || 8000
 	}
 
 	setQuantelMonitor(monitor: MonitorQuantel) {
