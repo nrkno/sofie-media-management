@@ -69,7 +69,7 @@ function makeVideoStream(clipData: ClipData, videoFormat: number): object {
 export function makeAudioStreams(clipData: ClipData, audioFormat: number): object[] {
 	const streams: object[] = []
 	let noOfStreams = audioFormat <= 522 ? 4 : 8
-	
+
 	for (let index = 1; index <= noOfStreams; index++) {
 		streams.push({
 			index: index,

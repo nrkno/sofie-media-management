@@ -586,7 +586,9 @@ export class Dispatcher {
 
 		// console.log(`Current hash: ${hash}`)
 
-		this.logger.debug(`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}. Hash ${hash}.`)
+		this.logger.debug(
+			`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}. Hash ${hash}.`
+		)
 		// persist workflow to db:
 		const { result: docs, error: docsError } = await noTryAsync(() =>
 			this.workFlows.allDocs({

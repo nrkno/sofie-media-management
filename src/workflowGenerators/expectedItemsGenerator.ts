@@ -833,7 +833,8 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 
 		if (this.isQuantel(tmi.name)) {
-			if (reason !== 'expectedStorageCheck') { // Avoid duplicate workflows - assuming Q clips are immutable
+			if (reason !== 'expectedStorageCheck') {
+				// Avoid duplicate workflows - assuming Q clips are immutable
 				const file = new QuantelStream(tmi.name, tmi.name, true)
 				const st = literal<StorageObject>({
 					id: 'quantelPropertiesFromMonitor',
