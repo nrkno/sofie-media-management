@@ -294,9 +294,11 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
-			`${doc.mediaId}.jpg`
+			`${doc.mediaId.replace(':', '_')}.jpg`
 		)
 		const tmpPath = destPath.slice(0, -4) + '.new.jpg'
+		await fs.mkdirp(path.dirname(tmpPath))
+
 		if (this.isQuantel(doc.mediaId)) {
 			if (!this.quantelMonitor) {
 				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
@@ -347,8 +349,6 @@ export class Worker {
 				`"${tmpPath}"`
 			]
 
-			// Not necessary ... just checking that /tmp or Windows equivalent exists
-			// await fs.mkdirp(path.dirname(tmpPath))
 			const { error: execError } = await noTryAsync(
 				() =>
 					new Promise((resolve, reject) => {

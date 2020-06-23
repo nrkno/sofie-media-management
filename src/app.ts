@@ -44,7 +44,7 @@ export class MediaManagerApp {
 			let thumbPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
 				(this.config.previews && this.config.previews.folder) || 'thumbs',
-				`${id}.jpg`
+				`${id.replace(':', '_')}.jpg`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
 			if (statError) {
