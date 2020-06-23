@@ -833,16 +833,17 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 
 		if (this.isQuantel(tmi.name)) {
-			const file = new QuantelStream(tmi.name, tmi.name, true)
-			const st = literal<StorageObject>({
-				id: 'quantelPropertiesFromMonitor',
-				support: { read: false, write: false },
-				handler: QuantelStreamHandlerSingleton.Instance,
-				type: StorageType.QUANTEL_STREAM,
-				options: {}
-			})
-			// Check if work is actually required.
-			this.emitCopyWorkflow(file, st, tmi.comment, false, reason, `Quantel item added or updated`)
+			if (reason !== 'expectedStorageCheck') { // Avoid duplicate workflows - assuming Q clips are immutable
+				const file = new QuantelStream(tmi.name, tmi.name, true)
+				const st = literal<StorageObject>({
+					id: 'quantelPropertiesFromMonitor',
+					support: { read: false, write: false },
+					handler: QuantelStreamHandlerSingleton.Instance,
+					type: StorageType.QUANTEL_STREAM,
+					options: {}
+				})
+				this.emitCopyWorkflow(file, st, tmi.comment, false, reason, `Quantel item added or updated`)
+			}
 			return
 		}
 
