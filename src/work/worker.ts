@@ -1,4 +1,4 @@
-import { literal, getID, updateDB, getCurrentTime, getHash } from '../lib/lib'
+import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
 import { LoggerInstance } from 'winston'
 import {
 	WorkStepStatus,
@@ -82,7 +82,8 @@ export class Worker {
 	private finishPromises: Array<Function> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
-	private quantelMonitor: MonitorQuantel | undefined = undefined
+	private quantelMonitorArrival: (qm: MonitorQuantel | undefined) => void
+	private quantelMonitorPromise: Promise<MonitorQuantel> | undefined = undefined
 
 	constructor(
 		private workStepDB: PouchDB.Database<WorkStepDB>,
@@ -108,7 +109,28 @@ export class Worker {
 	}
 
 	setQuantelMonitor(monitor?: MonitorQuantel) {
-		this.quantelMonitor = monitor
+		this.quantelMonitorArrival(monitor)
+	}
+
+	private async getQuantelMonitor(): Promise<MonitorQuantel> {
+		if (this.quantelMonitorPromise === undefined) {
+			this.quantelMonitorPromise = new Promise<MonitorQuantel>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					this.quantelMonitorPromise = undefined
+					reject(`Worker: getQuantelMonitor: time out waiting for monitor`)
+				}, 5000)
+				this.quantelMonitorArrival = (qm: MonitorQuantel | undefined) => {
+					clearTimeout(timeout)
+					if (qm) {
+						resolve(qm)
+					} else {
+						this.quantelMonitorPromise = undefined
+						reject(new Error(`Worker: getQuantelMonitor: empty Quantel monitor passed in`))
+					}
+				}
+			})
+		}
+		return this.quantelMonitorPromise
 	}
 
 	/**
@@ -300,11 +322,12 @@ export class Worker {
 		await fs.mkdirp(path.dirname(tmpPath))
 
 		if (this.isQuantel(doc.mediaId)) {
-			if (!this.quantelMonitor) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
 				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
 			}
 			const { result: stillUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toStillUrl(
+				qm.toStillUrl(
 					doc.mediaId,
 					(this.config.thumbnails && this.config.thumbnails.width) || 256
 				)
@@ -397,7 +420,7 @@ export class Worker {
 
 		doc2.thumbSize = thumbStat.size
 		doc2.thumbTime = thumbStat.mtime.getTime()
-		doc2.thumbPath = destPath
+		doc2.thumbPath = destPath.replace('\\', '/')
 
 		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
 		if (putError) {
@@ -436,11 +459,12 @@ export class Worker {
 
 		const args = ['-hide_banner', '-y', '-threads 1']
 		if (this.isQuantel(doc.mediaId)) {
-			if (!this.quantelMonitor) {
-				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action, qmError)
 			}
 			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toStreamUrl(doc.mediaId)
+				qm.toStreamUrl(doc.mediaId)
 			)
 			if (urlError) {
 				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
@@ -566,11 +590,12 @@ export class Worker {
 			process.platform === 'win32' ? 'NUL' : '/dev/null'
 		]
 		if (this.isQuantel(doc.mediaId)) {
-			if (!this.quantelMonitor) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
 			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toStreamUrl(doc.mediaId)
+				qm.toStreamUrl(doc.mediaId)
 			)
 			if (urlError) {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
@@ -659,11 +684,12 @@ export class Worker {
 
 		const args = ['-hide_banner']
 		if (this.isQuantel(doc.mediaId)) {
-			if (!this.quantelMonitor) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
 			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				this.quantelMonitor!.toStreamUrl(doc.mediaId)
+				qm.toStreamUrl(doc.mediaId)
 			)
 			if (urlError) {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
@@ -936,7 +962,7 @@ export class Worker {
 			docExists = false
 			if (this.isQuantel(fileId)) {
 				doc = literal<MediaObject>({
-					_id: getHash(fileId + step.file.name),
+					_id: fileId,
 					_rev: '',
 					mediaId: fileId,
 					mediaPath: step.file.name,
@@ -974,11 +1000,12 @@ export class Worker {
 		let probeData: any = {}
 		if (this.isQuantel(doc.mediaId)) {
 			// Due to issues using ffprobe with the transformer, this is generated based on format code and frames
-			if (!this.quantelMonitor) {
-				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				return this.failStep(`Quantel media but no Quantel connection details for "${doc.mediaId}"`, step.action, qmError)
 			}
 			const { result: clipData, error: detailError } = await noTryAsync(() =>
-				this.quantelMonitor!.getClipDetails(doc.mediaId)
+				qm.getClipDetails(doc.mediaId)
 			)
 			if (detailError) {
 				return this.failStep(
@@ -1034,7 +1061,7 @@ export class Worker {
 		this.logger.debug(`Worker: metadata generate: generated metadata details`, probeData)
 
 		let newInfo = literal<MediaInfo>({
-			name: doc._id,
+			name: this.isQuantel(doc.mediaId) ? probeData.name : doc._id,
 			//path: doc.mediaPath,
 			//size: doc.mediaSize,
 			//time: doc.mediaTime,
@@ -1091,10 +1118,10 @@ export class Worker {
 		})
 
 		if (this.isQuantel(doc.mediaId)) {
-			const mediaSize = Number.parseInt(probeData.format.size)
+			const mediaSize = parseInt(probeData.format.size)
 			doc.mediaSize = isNaN(mediaSize) ? 0 : mediaSize
 			doc.mediaTime = Date.parse(probeData.format.tags.modification_date)
-			// this.logger.debug('Worker: metadata generate: new info is', newInfo)
+			this.logger.debug(`Worker: metadata generate: new info size is ${mediaSize}`)
 		}
 
 		// Read document again ... might have been updated while we were busy working
@@ -1110,7 +1137,7 @@ export class Worker {
 			doc = doc2
 		}
 		doc.mediainfo = Object.assign(doc.mediainfo || {}, newInfo)
-		// this.logger.debug(`Worker: media info clip is`, doc.mediainfo)
+		this.logger.debug(`Worker: media clip is`, doc)
 
 		const { error: putError, result: putResult } = await noTryAsync(() => this.mediaDB.put(doc))
 		if (putError) {

@@ -7,7 +7,6 @@ import { LoggerInstance } from 'winston'
 import { MonitorSettingsQuantel, ExpectedMediaItem, QuantelStreamType } from '../api'
 import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
-import { getHash } from '../lib/lib'
 import { noTryAsync } from 'no-try'
 import { ClipData } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
 
@@ -57,8 +56,9 @@ export class MonitorQuantel extends Monitor {
 	private studioId: string
 	private quantel: QuantelGateway
 	private watchError: string | null
-	private cachedMediaObjects: { [objectId: string]: MediaObject | null | { _id: string; _rev: string } } = {}
+	// private cachedMediaObjects: { [objectId: string]: MediaObject | null | { _id: string; _rev: string } } = {}
 	private appPort: number = 8000
+	private waitingForInit: Promise<void> | undefined = undefined
 
 	private ident = 'Quantel monitor:'
 
@@ -139,23 +139,24 @@ export class MonitorQuantel extends Monitor {
 		if (!this.settings.serverId) throw new Error(`${this.ident} init: parameter not set: serverId`)
 
 		// Setup quantel connection:
-		await this.quantel.init(
+		this.waitingForInit = this.quantel.init(
 			this.settings.gatewayUrl,
 			this.settings.ISAUrl,
 			this.settings.ISABackupUrl,
 			this.settings.zoneId,
 			this.settings.serverId
 		)
+		await this.waitingForInit
 		this.quantel.monitorServerStatus(() => {
 			this._updateAndSendStatus()
 		})
 
 		// Sync initial file list:
 		// TODO: make this work, currently there is a discrepancy in the id..
-		const objectRevisions = await this.getAllCoreObjRevisions()
-		_.each(objectRevisions, (rev, objId) => {
-			this.cachedMediaObjects[objId] = { _id: objId, _rev: rev }
-		})
+		// const objectRevisions = await this.getAllCoreObjRevisions()
+		// _.each(objectRevisions, (rev, objId) => {
+		// 	this.cachedMediaObjects[objId] = { _id: objId, _rev: rev }
+		// })
 
 		// Start watching:
 		this.triggerWatch()
@@ -350,11 +351,11 @@ export class MonitorQuantel extends Monitor {
 									tinf: '',
 
 									_attachments: {},
-									_id: getHash(url.toUpperCase() + clipData.ClipGUID),
+									_id: url.toUpperCase(),
 									_rev: '1-created' + Date.now()
 								}
 
-								const { error: putError, result: putResult } = await noTryAsync(
+								/* const { error: putError, result: putResult } = await noTryAsync(
 									() =>
 										(mediaObject && this.db.put<MediaObject>(mediaObject)) || Promise.resolve(null)
 								)
@@ -368,7 +369,7 @@ export class MonitorQuantel extends Monitor {
 											this.ident
 										} doWatch: Stored clip "${url}" in local database: ${JSON.stringify(putResult)}`
 									)
-								}
+								} */
 							} else {
 								this.logger.warn(
 									`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
@@ -510,6 +511,7 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	private async urlToClipID(url: string, method: string): Promise<number> {
+		if (this.waitingForInit) { await this.waitingForInit }
 		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(url))
 		if (clipSummaries.length < 1) {
 			throw new Error(`${this.ident} ${method}: Could not find clip with ID "${url}"`)

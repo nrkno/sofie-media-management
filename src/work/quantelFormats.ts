@@ -175,6 +175,7 @@ export default function mapClipMetadata(clipData: ClipData): object {
 		.reverse()[0]
 
 	return {
+		name: clipData.Title,
 		streams: [makeVideoStream(clipData, videoFormat)].concat(makeAudioStreams(clipData, audioFormat)),
 		format: makeFormat(clipData, videoFormat, audioFormat)
 	}
