@@ -1,4 +1,4 @@
-import { literal, getID, updateDB, getCurrentTime } from '../lib/lib'
+import { literal, getID, updateDB, getCurrentTime, getHash } from '../lib/lib'
 import { LoggerInstance } from 'winston'
 import {
 	WorkStepStatus,
@@ -936,7 +936,7 @@ export class Worker {
 			docExists = false
 			if (this.isQuantel(fileId)) {
 				doc = literal<MediaObject>({
-					_id: fileId,
+					_id: getHash(fileId + step.file.name),
 					_rev: '',
 					mediaId: fileId,
 					mediaPath: step.file.name,
@@ -1094,6 +1094,7 @@ export class Worker {
 			const mediaSize = Number.parseInt(probeData.format.size)
 			doc.mediaSize = isNaN(mediaSize) ? 0 : mediaSize
 			doc.mediaTime = Date.parse(probeData.format.tags.modification_date)
+			// this.logger.debug('Worker: metadata generate: new info is', newInfo)
 		}
 
 		// Read document again ... might have been updated while we were busy working
@@ -1109,11 +1110,13 @@ export class Worker {
 			doc = doc2
 		}
 		doc.mediainfo = Object.assign(doc.mediainfo || {}, newInfo)
+		// this.logger.debug(`Worker: media info clip is`, doc.mediainfo)
 
-		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc))
+		const { error: putError, result: putResult } = await noTryAsync(() => this.mediaDB.put(doc))
 		if (putError) {
 			return this.failStep(`failed to write metadata to database for "${fileId}"`, step.action, putError)
 		}
+		this.logger.debug(`Worker: metadata generate: put result is`, putResult)
 
 		return literal<WorkResult>({
 			status: WorkStepStatus.DONE

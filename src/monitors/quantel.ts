@@ -56,15 +56,20 @@ export class MonitorQuantel extends Monitor {
 	private monitoredFiles: QuantelMonitor = {}
 	private studioId: string
 	private quantel: QuantelGateway
-	private isDestroyed: boolean = false
 	private watchError: string | null
-	private cachedMediaObjects: { [objectId: string]: MediaObject | { _id: string; _rev: string } } = {}
+	private cachedMediaObjects: { [objectId: string]: MediaObject | null | { _id: string; _rev: string } } = {}
 	private appPort: number = 8000
 
 	private ident = 'Quantel monitor:'
 
-	constructor(deviceId: string, public settings: MonitorSettingsQuantel, logger: LoggerInstance, appPort?: number) {
-		super(deviceId, settings, logger)
+	constructor(
+		deviceId: string,
+		db: PouchDB.Database<MediaObject>,
+		public settings: MonitorSettingsQuantel,
+		logger: LoggerInstance,
+		appPort?: number
+	) {
+		super(deviceId, db, settings, logger)
 
 		this.quantel = new QuantelGateway()
 		this.quantel.on('error', e => this.logger.error(`${this.ident} Quantel.QuantelGateway`, e))
@@ -97,6 +102,8 @@ export class MonitorQuantel extends Monitor {
 		const device = await this.coreHandler.getParentDevice()
 
 		this.studioId = device.studioId
+
+		this.restartChangesStream()
 
 		if (!this.studioId) throw new Error(`${this.ident} init: Device .studioId not set!`)
 
@@ -156,8 +163,6 @@ export class MonitorQuantel extends Monitor {
 
 	async dispose(): Promise<void> {
 		await super.dispose()
-
-		this.isDestroyed = true
 
 		this.coreHandler.core.unsubscribe(this.expectedMediaItemsSubscription)
 		this.observer.stop()
@@ -329,8 +334,8 @@ export class MonitorQuantel extends Monitor {
 								mediaObject = {
 									mediaId: url.toUpperCase(),
 									mediaPath: clipData.ClipGUID,
-									mediaSize: 1,
-									mediaTime: 0,
+									mediaSize: 0,
+									mediaTime: Date.parse(clipData.Created),
 									mediainfo: {
 										name: clipData.Title || clipData.ClipGUID
 									},
@@ -345,8 +350,24 @@ export class MonitorQuantel extends Monitor {
 									tinf: '',
 
 									_attachments: {},
-									_id: getHash(url + clipData.ClipGUID),
-									_rev: 'modified' + clipData.Modified
+									_id: getHash(url.toUpperCase() + clipData.ClipGUID),
+									_rev: '1-created' + Date.now()
+								}
+
+								const { error: putError, result: putResult } = await noTryAsync(
+									() =>
+										(mediaObject && this.db.put<MediaObject>(mediaObject)) || Promise.resolve(null)
+								)
+								if (putError) {
+									this.logger.debug(
+										`${this.ident} doWatch: Unable to store clip "${url}" in local database`
+									)
+								} else {
+									this.logger.debug(
+										`${
+											this.ident
+										} doWatch: Stored clip "${url}" in local database: ${JSON.stringify(putResult)}`
+									)
 								}
 							} else {
 								this.logger.warn(
@@ -399,16 +420,14 @@ export class MonitorQuantel extends Monitor {
 			} // end if timeSinceLastCheck >= checkTime
 		} // End loop through URLs
 
-		// Go through the mediaobjects and send changes to core:
-		const p = Promise.resolve()
+		// Go through the mediaobjects and update the media database
+		/* const p = Promise.resolve()
 		_.each(mediaObjects, (newMediaObject: MediaObject | null, objectId: string) => {
 			const oldMediaObject = this.cachedMediaObjects[objectId]
 			if (newMediaObject) {
 				if (!oldMediaObject || newMediaObject._rev !== oldMediaObject._rev) {
 					// Added or changed
-					p.then(() => this.sendChanged(newMediaObject)).catch(e => {
-						this.logger.error(`${this.ident} doWatch: Failed to send changes to Core: ${e.message}`, e)
-					})
+					await this.mediaDB.put(newMediaObject)
 				}
 			} else {
 				if (oldMediaObject) {
@@ -424,8 +443,8 @@ export class MonitorQuantel extends Monitor {
 				delete this.cachedMediaObjects[objectId]
 			}
 		})
-		await p
-		// this._cachedMediaObjects = mediaObjects
+		await p 
+		this.cachedMediaObjects = mediaObjects */
 		this.watchError = null
 		await this.wait(BREATHING_ROOM)
 
@@ -506,6 +525,10 @@ export class MonitorQuantel extends Monitor {
 				`${this.ident} ${method}: Could not find completed clip "${url}" on ISA with frame count greater than 0`
 			)
 		}
+	}
+
+	protected triggerupdateFsStats(): void {
+		// Not required for Quantel monitor
 	}
 
 	async toStreamUrl(mediaId: string): Promise<string> {

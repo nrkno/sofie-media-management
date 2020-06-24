@@ -93,6 +93,7 @@ export class MonitorManager {
 				: monitorSettings.type === MonitorSettingsType.QUANTEL
 				? new MonitorQuantel(
 						deviceId,
+						this.mediaDB,
 						monitorSettings,
 						this._coreHandler.logger,
 						(this._app && this._app.port) || undefined
