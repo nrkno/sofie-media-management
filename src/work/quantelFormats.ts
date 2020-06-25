@@ -141,7 +141,7 @@ function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number
 		format_long_name: 'MXF (Material eXchange Format)',
 		start_time: '0.000000',
 		duration: `${+clipData.Frames / 25}`,
-		size: `${Math.floor(bitrate * +clipData.Frames / 25 / 8)}`,
+		size: `${Math.floor((bitrate * +clipData.Frames) / 25 / 8)}`,
 		bit_rate: `${bitrate}`,
 		probe_score: 100,
 		tags: {
