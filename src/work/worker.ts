@@ -417,7 +417,7 @@ export class Worker {
 
 		doc2.thumbSize = thumbStat.size
 		doc2.thumbTime = thumbStat.mtime.getTime()
-		doc2.thumbPath = destPath.replace('\\', '/')
+		doc2.thumbPath = destPath.replace(/\\/gi, '/')
 
 		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
 		if (putError) {
