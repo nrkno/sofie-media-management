@@ -96,12 +96,12 @@ export class MediaManager {
 			}
 			this._logger.info('Initializing MediaManager...')
 
-			await this.initMediaManager(peripheralDevice.settings || {})
-			this._logger.info('MediaManager initialized')
-
 			this._logger.info('Initializing HTTP/S server(s)...')
 			await this.initServer(peripheralDevice.settings || {})
 			this._logger.info('HTTP/S servers initialized')
+
+			await this.initMediaManager(peripheralDevice.settings || {})
+			this._logger.info('MediaManager initialized')
 
 			this.vac = new PreviewAndThumbnailVacuum(this.mediaDB, peripheralDevice.settings || {}, this._logger)
 			this._logger.info('Preview vacuum initialized')

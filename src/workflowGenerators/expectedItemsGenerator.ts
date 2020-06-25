@@ -743,33 +743,34 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					action: WorkStepAction.SCAN,
 					file,
 					target: st,
-					priority: 1,
+					priority: 2,
+					criticalStep: true,
 					status: WorkStepStatus.IDLE
 				})
 			)
 		}
 		steps.push(
-			/* new ScannerWorkStep({
+			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_METADATA,
 				file,
 				target: st,
 				priority: 1,
 				status: WorkStepStatus.IDLE
-			}), */
+			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
 				file,
 				target: st,
 				priority: 0.5,
 				status: WorkStepStatus.IDLE
-			})
-			/* new ScannerWorkStep({
+			}),
+			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
 				file,
 				target: st,
 				priority: 0.3,
 				status: WorkStepStatus.IDLE
-			}) */
+			})
 		)
 		// this.logger.info(`Steps are: ${JSON.stringify(steps)}`)
 		return steps

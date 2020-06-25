@@ -40,7 +40,7 @@ export class MediaManagerApp {
 
 		this.router.get('/media/thumbnail/:id', async (ctx, next) => {
 			this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
-			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
+			let id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
 			let thumbPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
 				(this.config.previews && this.config.previews.folder) || 'thumbs',
@@ -58,7 +58,7 @@ export class MediaManagerApp {
 
 		this.router.get('/media/preview/:id+', async (ctx, next) => {
 			this.logger.debug(`HTTP/S server: received preview request ${ctx.params.id}`)
-			let id = ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : ctx.params.id
+			let id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
 			ctx.type = 'video/webm'
 			let previewPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
