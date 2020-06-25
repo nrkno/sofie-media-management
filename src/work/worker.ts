@@ -327,10 +327,7 @@ export class Worker {
 				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
 			}
 			const { result: stillUrl, error: urlError } = await noTryAsync(() =>
-				qm.toStillUrl(
-					doc.mediaId,
-					(this.config.thumbnails && this.config.thumbnails.width) || 256
-				)
+				qm.toStillUrl(doc.mediaId, (this.config.thumbnails && this.config.thumbnails.width) || 256)
 			)
 			if (urlError) {
 				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
@@ -461,11 +458,13 @@ export class Worker {
 		if (this.isQuantel(doc.mediaId)) {
 			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
 			if (qmError) {
-				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action, qmError)
+				return this.failStep(
+					`Quantel media but no Quantel connection details for "${fileId}"`,
+					step.action,
+					qmError
+				)
 			}
-			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				qm.toStreamUrl(doc.mediaId)
-			)
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => qm.toStreamUrl(doc.mediaId))
 			if (urlError) {
 				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
 			}
@@ -594,9 +593,7 @@ export class Worker {
 			if (qmError) {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
-			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				qm.toStreamUrl(doc.mediaId)
-			)
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => qm.toStreamUrl(doc.mediaId))
 			if (urlError) {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
 			}
@@ -688,9 +685,7 @@ export class Worker {
 			if (qmError) {
 				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
 			}
-			const { result: hlsUrl, error: urlError } = await noTryAsync(() =>
-				qm.toStreamUrl(doc.mediaId)
-			)
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => qm.toStreamUrl(doc.mediaId))
 			if (urlError) {
 				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
 			}
@@ -1002,11 +997,13 @@ export class Worker {
 			// Due to issues using ffprobe with the transformer, this is generated based on format code and frames
 			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
 			if (qmError) {
-				return this.failStep(`Quantel media but no Quantel connection details for "${doc.mediaId}"`, step.action, qmError)
+				return this.failStep(
+					`Quantel media but no Quantel connection details for "${doc.mediaId}"`,
+					step.action,
+					qmError
+				)
 			}
-			const { result: clipData, error: detailError } = await noTryAsync(() =>
-				qm.getClipDetails(doc.mediaId)
-			)
+			const { result: clipData, error: detailError } = await noTryAsync(() => qm.getClipDetails(doc.mediaId))
 			if (detailError) {
 				return this.failStep(
 					`Could not retrieve clip details: ${detailError.message}`,

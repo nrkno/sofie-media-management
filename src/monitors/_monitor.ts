@@ -3,7 +3,7 @@ import * as _ from 'underscore'
 import * as crypto from 'crypto'
 import { LoggerInstance } from 'winston'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
-import { MonitorSettings, MediaObject, StorageSettings } from '../api'
+import { MonitorSettings, MediaObject, StorageSettings, MonitorSettingsType } from '../api'
 import { MonitorDevice, CoreMonitorHandler } from '../coreHandler'
 import { FetchError } from 'node-fetch'
 
@@ -156,10 +156,17 @@ export abstract class Monitor extends EventEmitter {
 
 		let statusSettings: PeripheralDeviceAPI.StatusObject = { statusCode: PeripheralDeviceAPI.StatusCode.GOOD }
 
-		if (!this.settings.storageId || !this.storageSettings) {
-			statusSettings = {
-				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Settings parameter "storageId" not set or no corresponding storage']
+		if (this.settings.type !== MonitorSettingsType.QUANTEL) {
+			if (!this.settings.storageId || !this.storageSettings) {
+				statusSettings = {
+					statusCode: PeripheralDeviceAPI.StatusCode.BAD,
+					messages: ['Settings parameter "storageId" not set or no corresponding storage']
+				}
+			} else if (!this.initialized) {
+				statusSettings = {
+					statusCode: PeripheralDeviceAPI.StatusCode.BAD,
+					messages: ['Not initialized']
+				}
 			}
 		} else if (!this.initialized) {
 			statusSettings = {

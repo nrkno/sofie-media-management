@@ -98,68 +98,74 @@ export class MonitorQuantel extends Monitor {
 
 	public async init(): Promise<void> {
 		this.logger.info(`${this.ident} init: Initializing Quantel-monitor`, this.settings)
+		try {
 
-		const device = await this.coreHandler.getParentDevice()
+			const device = await this.coreHandler.getParentDevice()
 
-		this.studioId = device.studioId
+			this.studioId = device.studioId
 
-		this.restartChangesStream()
+			this.restartChangesStream()
 
-		if (!this.studioId) throw new Error(`${this.ident} init: Device .studioId not set!`)
+			if (!this.studioId) throw new Error(`${this.ident} init: Device .studioId not set!`)
 
-		this.expectedMediaItems = () => this.coreHandler.core.getCollection('expectedMediaItems')
+			this.expectedMediaItems = () => this.coreHandler.core.getCollection('expectedMediaItems')
 
-		// Observe the data:
-		const observer = this.coreHandler.core.observe('expectedMediaItems')
-		observer.added = this.wrapError(this.onExpectedAdded)
-		observer.changed = this.wrapError(this.onExpectedChanged)
-		observer.removed = this.wrapError(this.onExpectedRemoved)
+			// Observe the data:
+			const observer = this.coreHandler.core.observe('expectedMediaItems')
+			observer.added = this.wrapError(this.onExpectedAdded)
+			observer.changed = this.wrapError(this.onExpectedChanged)
+			observer.removed = this.wrapError(this.onExpectedRemoved)
 
-		// Subscribe to the data:
-		if (this.expectedMediaItemsSubscription) {
-			this.coreHandler.core.unsubscribe(this.expectedMediaItemsSubscription)
-		}
-		this.expectedMediaItemsSubscription = await this.coreHandler.core.subscribe('expectedMediaItems', {
-			studioId: this.studioId
-		})
-		_.each(
-			this.expectedMediaItems().find({
-				studioId: this.studioId
-			}),
-			doc => {
-				this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
+			// Subscribe to the data:
+			if (this.expectedMediaItemsSubscription) {
+				this.coreHandler.core.unsubscribe(this.expectedMediaItemsSubscription)
 			}
-		)
-		this.logger.debug(`${this.ident} init: Subscribed to expectedMediaItems for studio "${this.studioId}"`)
+			this.expectedMediaItemsSubscription = await this.coreHandler.core.subscribe('expectedMediaItems', {
+				studioId: this.studioId
+			})
+			_.each(
+				this.expectedMediaItems().find({
+					studioId: this.studioId
+				}),
+				doc => {
+					this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
+				}
+			)
+			this.logger.debug(`${this.ident} init: Subscribed to expectedMediaItems for studio "${this.studioId}"`)
 
-		this.observer = observer
+			this.observer = observer
 
-		if (!this.settings.gatewayUrl) throw new Error(`${this.ident} init: parameter not set: gatewayUrl`)
-		if (!this.settings.ISAUrl) throw new Error(`${this.ident} init: parameter not set: ISAUrl`)
-		if (!this.settings.serverId) throw new Error(`${this.ident} init: parameter not set: serverId`)
+			if (!this.settings.gatewayUrl) throw new Error(`${this.ident} init: parameter not set: gatewayUrl`)
+			if (!this.settings.ISAUrl) throw new Error(`${this.ident} init: parameter not set: ISAUrl`)
+			if (!this.settings.serverId) throw new Error(`${this.ident} init: parameter not set: serverId`)
 
-		// Setup quantel connection:
-		this.waitingForInit = this.quantel.init(
-			this.settings.gatewayUrl,
-			this.settings.ISAUrl,
-			this.settings.ISABackupUrl,
-			this.settings.zoneId,
-			this.settings.serverId
-		)
-		await this.waitingForInit
-		this.quantel.monitorServerStatus(() => {
-			this._updateAndSendStatus()
-		})
+			// Setup quantel connection:
+			this.waitingForInit = this.quantel.init(
+				this.settings.gatewayUrl,
+				this.settings.ISAUrl,
+				this.settings.ISABackupUrl,
+				this.settings.zoneId,
+				this.settings.serverId
+			)
+			await this.waitingForInit
+			this.quantel.monitorServerStatus(() => {
+				this._updateAndSendStatus()
+			})
 
-		// Sync initial file list:
-		// TODO: make this work, currently there is a discrepancy in the id..
-		// const objectRevisions = await this.getAllCoreObjRevisions()
-		// _.each(objectRevisions, (rev, objId) => {
-		// 	this.cachedMediaObjects[objId] = { _id: objId, _rev: rev }
-		// })
+			// Sync initial file list:
+			// TODO: make this work, currently there is a discrepancy in the id..
+			// const objectRevisions = await this.getAllCoreObjRevisions()
+			// _.each(objectRevisions, (rev, objId) => {
+			// 	this.cachedMediaObjects[objId] = { _id: objId, _rev: rev }
+			// })
 
-		// Start watching:
-		this.triggerWatch()
+			// Start watching:
+
+			this.triggerWatch()
+			this.initialized = true
+		} catch (err) {
+			this.logger.error('Monitor Quantel: error initializing quantel monitor', err)
+		}
 	}
 
 	async dispose(): Promise<void> {
@@ -511,7 +517,9 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	private async urlToClipID(url: string, method: string): Promise<number> {
-		if (this.waitingForInit) { await this.waitingForInit }
+		if (this.waitingForInit) {
+			await this.waitingForInit
+		}
 		const clipSummaries = await this.quantel.searchClip(this.parseUrlToQuery(url))
 		if (clipSummaries.length < 1) {
 			throw new Error(`${this.ident} ${method}: Could not find clip with ID "${url}"`)
