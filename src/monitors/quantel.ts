@@ -99,7 +99,6 @@ export class MonitorQuantel extends Monitor {
 	public async init(): Promise<void> {
 		this.logger.info(`${this.ident} init: Initializing Quantel-monitor`, this.settings)
 		try {
-
 			const device = await this.coreHandler.getParentDevice()
 
 			this.studioId = device.studioId
@@ -337,9 +336,8 @@ export class MonitorQuantel extends Monitor {
 							const clipData = await this.quantel.getClip(clipSummaryOnPool.ClipID)
 
 							if (clipData) {
-								const { result: foundObject, error: foundError } = await noTryAsync(
-									() =>
-										this.db.get<MediaObject>(url.toUpperCase())
+								const { result: foundObject, error: foundError } = await noTryAsync(() =>
+									this.db.get<MediaObject>(url.toUpperCase())
 								)
 								if (!foundError && foundObject) {
 									mediaObject = foundObject
@@ -370,7 +368,8 @@ export class MonitorQuantel extends Monitor {
 
 									const { error: putError, result: putResult } = await noTryAsync(
 										() =>
-											(mediaObject && this.db.put<MediaObject>(mediaObject)) || Promise.resolve(null)
+											(mediaObject && this.db.put<MediaObject>(mediaObject)) ||
+											Promise.resolve(null)
 									)
 									if (putError) {
 										this.logger.debug(
@@ -380,9 +379,11 @@ export class MonitorQuantel extends Monitor {
 										this.logger.debug(
 											`${
 												this.ident
-											} doWatch: Stored clip "${url}" in local database: ${JSON.stringify(putResult)}`
+											} doWatch: Stored clip "${url}" in local database: ${JSON.stringify(
+												putResult
+											)}`
 										)
-									} 
+									}
 								}
 							} else {
 								this.logger.warn(
