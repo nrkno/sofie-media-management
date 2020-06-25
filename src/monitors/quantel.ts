@@ -337,45 +337,53 @@ export class MonitorQuantel extends Monitor {
 							const clipData = await this.quantel.getClip(clipSummaryOnPool.ClipID)
 
 							if (clipData) {
-								// Make our best effort to try to construct a mediaObject:
-								mediaObject = {
-									mediaId: url.toUpperCase(),
-									mediaPath: clipData.ClipGUID,
-									mediaSize: 0,
-									mediaTime: Date.parse(clipData.Created),
-									mediainfo: {
-										name: clipData.Title || clipData.ClipGUID
-									},
-
-									thumbSize: 0,
-									thumbTime: 0,
-
-									// previewSize?: number,
-									// previewTime?: number,
-
-									cinf: '',
-									tinf: '',
-
-									_attachments: {},
-									_id: url.toUpperCase(),
-									_rev: '1-created' + Date.now()
-								}
-
-								/* const { error: putError, result: putResult } = await noTryAsync(
+								const { result: foundObject, error: foundError } = await noTryAsync(
 									() =>
-										(mediaObject && this.db.put<MediaObject>(mediaObject)) || Promise.resolve(null)
+										this.db.get<MediaObject>(url.toUpperCase())
 								)
-								if (putError) {
-									this.logger.debug(
-										`${this.ident} doWatch: Unable to store clip "${url}" in local database`
-									)
+								if (!foundError && foundObject) {
+									mediaObject = foundObject
 								} else {
-									this.logger.debug(
-										`${
-											this.ident
-										} doWatch: Stored clip "${url}" in local database: ${JSON.stringify(putResult)}`
+									// Make our best effort to try to construct a mediaObject:
+									mediaObject = {
+										mediaId: url.toUpperCase(),
+										mediaPath: clipData.ClipGUID,
+										mediaSize: 0,
+										mediaTime: Date.parse(clipData.Created),
+										mediainfo: {
+											name: clipData.Title || clipData.ClipGUID
+										},
+
+										thumbSize: 0,
+										thumbTime: 0,
+
+										// previewSize?: number,
+										// previewTime?: number,
+
+										cinf: '',
+										tinf: '',
+
+										_attachments: {},
+										_id: url.toUpperCase(),
+										_rev: '1-created' + Date.now()
+									}
+
+									const { error: putError, result: putResult } = await noTryAsync(
+										() =>
+											(mediaObject && this.db.put<MediaObject>(mediaObject)) || Promise.resolve(null)
 									)
-								} */
+									if (putError) {
+										this.logger.debug(
+											`${this.ident} doWatch: Unable to store clip "${url}" in local database`
+										)
+									} else {
+										this.logger.debug(
+											`${
+												this.ident
+											} doWatch: Stored clip "${url}" in local database: ${JSON.stringify(putResult)}`
+										)
+									} 
+								}
 							} else {
 								this.logger.warn(
 									`${this.ident} doWatch: Clip "${url}" summary found, but clip not found when asking for clipId`
