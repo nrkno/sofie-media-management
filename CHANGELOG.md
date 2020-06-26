@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0-1](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-0...v1.2.0-1) (2020-06-26)
+
+
+### Bug Fixes
+
+* config manifest has serverId as a string when number is expected ([6596dce](https://github.com/nrkno/tv-automation-media-management/commit/6596dce9ce8b89090b5d66c38f523d7dd3631100))
+* config manifest has serverId as a string when number is expected ([1d7de78](https://github.com/nrkno/tv-automation-media-management/commit/1d7de78aa09b880f49a3516d450021c828d41f53))
+* don't add a job as outstanding work when other jobs in the same workflow are running ([718c24a](https://github.com/nrkno/tv-automation-media-management/commit/718c24acac3a89893bdd312d6823837e140fdfc8))
+* nexe build not working on node >12.16.0 ([c059612](https://github.com/nrkno/tv-automation-media-management/commit/c05961235446de4bdac9f6bf73c9b14264ebf3c9))
+* release21 of core did not happen, so all changes now part of release 22.1 ([db8eb2f](https://github.com/nrkno/tv-automation-media-management/commit/db8eb2fdbba9b54ec37389ab399ce4f433d2e8e7))
+* square thumbnails when dimensions provided ([d8668ee](https://github.com/nrkno/tv-automation-media-management/commit/d8668ee36217e449d7f79a66108bbd39a03adcca))
+
 ## [1.2.0-0](https://github.com/nrkno/tv-automation-media-management/compare/v1.1.0...v1.2.0-0) (2020-05-28)
 
 
