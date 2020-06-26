@@ -68,8 +68,6 @@ export class MonitorManager {
 				if (isQuantelMonitor(monitor)) {
 					this._app.setQuantelMonitor(monitor)
 				}
-			} else {
-				console.error('******&&&******£$££$£$£ No app to set monitor for.')
 			}
 		}
 		return anythingChanged
