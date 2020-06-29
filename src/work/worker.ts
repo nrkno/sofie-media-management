@@ -82,7 +82,7 @@ export class Worker {
 	private finishPromises: Array<Function> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
-	private quantelMonitorArrival: (qm: MonitorQuantel | undefined) => void
+	private quantelMonitorArrival: ((qm: MonitorQuantel | undefined) => void) | undefined = undefined
 	private quantelMonitorPromise: Promise<MonitorQuantel> | undefined = undefined
 
 	constructor(
@@ -109,7 +109,13 @@ export class Worker {
 	}
 
 	setQuantelMonitor(monitor?: MonitorQuantel) {
-		this.quantelMonitorArrival(monitor)
+		if (!this.quantelMonitorArrival) {
+			if (monitor) {
+				this.quantelMonitorPromise = Promise.resolve(monitor)
+			}
+		} else {
+			this.quantelMonitorArrival(monitor)
+		}
 	}
 
 	private async getQuantelMonitor(): Promise<MonitorQuantel> {
@@ -117,6 +123,7 @@ export class Worker {
 			this.quantelMonitorPromise = new Promise<MonitorQuantel>((resolve, reject) => {
 				const timeout = setTimeout(() => {
 					this.quantelMonitorPromise = undefined
+					this.quantelMonitorArrival = undefined
 					reject(`Worker: getQuantelMonitor: time out waiting for monitor`)
 				}, 5000)
 				this.quantelMonitorArrival = (qm: MonitorQuantel | undefined) => {
