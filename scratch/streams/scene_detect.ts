@@ -60,5 +60,6 @@ redio<Record<string, unknown>>('/my/video', {
     .filter(f => +f.metadata['lavfi.scene_score'] > 0.2 || 
         f.metadata['lavfi.black_end'] !== undefined || 
         f.metadata['lavfi.black_start'] !== undefined ||
-        f.metadata['lavfi.freezedetect.freeze_start'] !== undefined)
-    .each(x => console.dir(x.metadata, { getters: true }))
+        f.metadata['lavfi.freezedetect.freeze_start'] !== undefined ||
+        f.metadata['lavfi.freezedetect.freeze_end'] !== undefined)
+    .each(x => console.dir({ pts: x.pts, metadata: x.metadata }, { getters: true }))
