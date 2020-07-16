@@ -2,7 +2,7 @@ import * as beamy from 'beamcoder'
 import redio, { Funnel, end } from 'redioactive'
 import { Packet } from 'beamcoder'
 
-const file = 'c:/Users/spark/Documents/media/NRK/MINISKI-XX-NO_20200630161932_1_633933.mxf'
+const file = 'c:/Users/spark/Documents/media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf'
 
 async function run() {
     let demux = await beamy.demuxer(file)
@@ -15,7 +15,7 @@ async function run() {
     redio<Packet>(readFunnel)
     .filter(x => x.stream_index < 3)
     .doto(x => console.log(x.size))
-    .http('/my/video', { 
+    .http('http://localhost:8001/my/video', { 
         httpPort: 8001, 
         blob: 'data',
         manifest: <Record<string, unknown>> (demux as unknown)

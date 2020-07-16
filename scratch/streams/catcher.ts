@@ -42,7 +42,7 @@ let muxWriter: () => Valve<Packet, Packet> = () => {
     } 
 }
 
-redio<Record<string, unknown>>('http://[fe80::4de8:69ce:5aa7:5d3c]:8001/my/video', { 
+redio<Record<string, unknown>>('/my/video', { 
         blob: 'data', 
         httpPort: 8001,
         manifest: 'streamInfo'
