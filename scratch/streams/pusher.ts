@@ -2,7 +2,7 @@ import * as beamy from 'beamcoder'
 import redio, { Funnel, end } from 'redioactive'
 import { Packet } from 'beamcoder'
 
-const file = 'c:/Users/spark/Documents/media/dpp/AS11_DPP_HD_EXAMPLE_1.mxf'
+const file = 'c:/Users/spark/Documents/media/NRK/MINISKI-XX-NO_20200630161932_1_633933.mxf'
 
 async function run() {
     let demux = await beamy.demuxer(file)
