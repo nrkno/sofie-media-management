@@ -486,7 +486,7 @@ export class Worker {
 		args.push('-b:v', (this.config.previews && this.config.previews.bitrate) || '40k')
 		args.push('-auto-alt-ref 0')
 		args.push(
-			`-vf scale=${(this.config.previews && this.config.previews.width) || 190}:` +
+			`-vf scale=${(this.config.previews && this.config.previews.width) || 160}:` +
 				`${(this.config.previews && this.config.previews.height) || -1}`
 		)
 		args.push('-deadline realtime')

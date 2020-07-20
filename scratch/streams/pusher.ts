@@ -13,7 +13,7 @@ async function run() {
         return p ? p : end
     }
     redio<Packet>(readFunnel)
-    .filter(x => x.stream_index < 3)
+    .filter(x => x.stream_index === 0)
     .doto(x => console.log(x.size))
     .http('http://localhost:8001/my/video', { 
         httpPort: 8001, 
