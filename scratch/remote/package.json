@@ -1,0 +1,13 @@
+{
+  "name": "remote-worker",
+  "version": "0.0.1",
+  "description": "Media manager remote working container",
+  "main": "index.js",
+  "author": "Richard Cartwright <spark@superfly.tv>",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "beamcoder": "^0.5.3",
+    "redioactive": "^0.0.7"
+  }
+}
