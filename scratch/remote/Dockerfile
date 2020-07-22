@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt/remote-worker
 COPY . .
 RUN yarn install --check-files --frozen-lockfile
-CMD ["node"]
+RUN yarn build:main
+CMD ["yarn", "start"]
 # RUN yarn build
 # RUN yarn install --check-files --frozen-lockfile --production --force # purge dev-dependencies
 
