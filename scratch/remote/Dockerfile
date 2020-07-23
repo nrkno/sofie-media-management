@@ -11,19 +11,16 @@ WORKDIR /opt/remote-worker
 COPY . .
 RUN yarn install --check-files --frozen-lockfile
 RUN yarn build:main
-CMD ["yarn", "start"]
-# RUN yarn build
-# RUN yarn install --check-files --frozen-lockfile --production --force # purge dev-dependencies
+RUN yarn install --check-files --frozen-lockfile --production --force # purge dev-dependencies
 
 # DEPLOY IMAGE
-# FROM node:12-slim
+FROM node:12-buster-slim
 
-# RUN apt-get update && apt-get install -y \
-#    libomniorb4-1 \
-#    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    libavcodec58 libavformat58 libavdevice58 libavfilter7 libavutil56 libpostproc55 libswresample3 libswscale5 \
+    && rm -rf /var/lib/apt/lists/*
 
-# COPY --from=0 /opt/quantel-gateway /opt/quantel-gateway
-# WORKDIR /opt/quantel-gateway
-
-# EXPOSE 3000
-# CMD ["yarn", "start"]
+COPY --from=0 /opt/remote-worker /opt/remote-worker
+WORKDIR /opt/quantel-gateway
+EXPOSE 4200 4201 4202 4203 4204 4205
+CMD ["yarn", "start"]

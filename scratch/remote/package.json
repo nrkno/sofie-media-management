@@ -10,7 +10,8 @@
     "build": "trash dist && yarn build:main",
     "build:main": "tsc -p tsconfig.json",
     "start": "node dist/app.js",
-    "build-win32": "trash deploy && mkdir deploy && yarn build && nexe dist/app.js -t windows-x64-12.18.1 -o deploy/worker.exe && node deploy-modules.js"
+    "build-win32": "trash deploy && mkdir deploy && yarn build && nexe dist/app.js -t windows-x64-12.18.1 -o deploy/worker.exe && node deploy-modules.js",
+    "build-docker": "docker build ."
   },
   "dependencies": {
     "@koa/cors": "^3.1.0",

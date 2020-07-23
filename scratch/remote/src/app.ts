@@ -4,9 +4,12 @@ import * as cors from '@koa/cors'
 import * as bodyParser from 'koa-bodyparser'
 import { NodeVM, CompilerFunction } from 'vm2'
 import * as ts from 'typescript'
+import * as os from 'os'
 
 let tsc: CompilerFunction = (source: string, _filename: string) => {
-    return ts.transpile(source)
+    const madeByTranspile = ts.transpile(source)
+    // console.log(madeByTranny)
+    return madeByTranspile
 }
 
 interface Job {
@@ -28,7 +31,8 @@ const makeVM = (sandbox: Record<string, unknown>) => new NodeVM({
     compiler: tsc,
     require: {
         external: ['redioactive', 'beamcoder'],
-        import: ['redioactive', 'beamcoder']
+        import: ['redioactive', 'beamcoder'],
+        builtin: os.platform() === 'win32' ? ['*'] : [''] // FIXME crude way to detect local vs container
     }
 })
 const jobs: Map<number, Job> = new Map
