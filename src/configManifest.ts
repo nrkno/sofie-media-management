@@ -109,7 +109,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.UNKNOWN] = [...MEDIA_MANAGER_MEDIAF
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.WATCH_FOLDER] = [
 	...MEDIA_MANAGER_MEDIAFLOW_COMMON,
 	{
-		id: 'targetId',
+		id: 'destinationId',
 		name: 'Target Storage',
 		type: ConfigManifestEntryType.STRING // dropdown
 	}
@@ -118,7 +118,7 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.LOCAL_INGEST] = [...MEDIA_MANAGER_M
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
 	...MEDIA_MANAGER_MEDIAFLOW_COMMON,
 	{
-		id: 'targetId',
+		id: 'destinationId',
 		name: 'Target Storage',
 		type: ConfigManifestEntryType.STRING // dropdown
 	}
