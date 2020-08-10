@@ -6,9 +6,14 @@ import { NodeVM, CompilerFunction } from 'vm2'
 import * as ts from 'typescript'
 import * as os from 'os'
 
+const tsOptions: ts.CompilerOptions = {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2017
+}
+
 let tsc: CompilerFunction = (source: string, _filename: string) => {
-    const madeByTranspile = ts.transpile(source)
-    // console.log(madeByTranny)
+    const madeByTranspile = ts.transpile(source, tsOptions)
+    console.log(madeByTranspile)
     return madeByTranspile
 }
 
@@ -63,10 +68,13 @@ router.post('/job', async (ctx) => {
         runner: Promise.resolve(),
         timeout
     }
+    console.log('Hello World!!!')
     j.vm.on('console.log', (...s: Array<string>) => {
+        console.log('>>>', s)
         j.loggerOut += (j.loggerOut.length > 0 ? '\n' : '') + s.join(' ')
     })
     j.vm.on('console.error', (...s: Array<string>) => {
+        console.error('>>>', s)
         j.errorOut += (j.errorOut.length > 0 ? '\n' : '') + s.join(' ')
     })
     j.runner = new Promise((resolve, reject) => {

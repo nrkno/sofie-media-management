@@ -21,6 +21,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=0 /opt/remote-worker /opt/remote-worker
-WORKDIR /opt/quantel-gateway
+WORKDIR /opt/remote-worker
 EXPOSE 4200 4201 4202 4203 4204 4205
 CMD ["yarn", "start"]

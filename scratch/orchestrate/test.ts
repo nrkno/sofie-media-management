@@ -1,8 +1,8 @@
 import * as beamy from 'beamcoder'
 
-let done = () => { console.log('DONE!') }
+let done = () => { console.log('DONE!') };
 
-console.log('Starting')
+console.log('Starting');
 
 let inputParams = new Array({
     width: 1920,
@@ -10,8 +10,10 @@ let inputParams = new Array({
     pixelFormat: 'yuv420p',
     timeBase: [1, 25],
     pixelAspect: [1, 1]
-}) 
-console.log('Is it an array?', Array.isArray(inputParams))
+});
+
+console.log('Is it an array?', Array.isArray(inputParams));
+
 beamy.filterer({
     filterType: 'video',
     inputParams,
@@ -19,4 +21,4 @@ beamy.filterer({
         pixelFormat: 'yuv422'
     } ],
     filterSpec: 'scale=160:-1'
-}).then(console.log, console.error).then(done, done)
+}).then(console.log, console.error).then(done, done);
