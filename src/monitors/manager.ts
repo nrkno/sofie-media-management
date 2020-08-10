@@ -3,20 +3,26 @@ import { DeviceSettings, MonitorSettings, MonitorSettingsType, MediaObject, Stor
 import * as _ from 'underscore'
 import { MonitorMediaWatcher } from './mediaWatcher'
 import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
-import { MonitorQuantel } from './quantel'
+import { MonitorQuantel, isQuantelMonitor } from './quantel'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
+import { Dispatcher } from '../work/dispatcher'
+import { MediaManagerApp } from '../app'
 
 export class MonitorManager {
 	private _monitors: { [id: string]: Monitor } = {}
 	private _initialized: boolean = false
 	private _coreHandler: CoreHandler
+	private _dispatcher: Dispatcher | undefined = undefined
+	private _app: MediaManagerApp | undefined = undefined
 
 	public settings: DeviceSettings
 
 	constructor(private mediaDB: PouchDB.Database<MediaObject>) {}
 
-	init(coreHandler) {
+	init(coreHandler: CoreHandler, dispatcher?: Dispatcher, app?: MediaManagerApp) {
 		this._coreHandler = coreHandler
+		this._dispatcher = dispatcher
+		this._app = app
 		this._initialized = true
 	}
 
@@ -51,6 +57,18 @@ export class MonitorManager {
 				await this.removeMonitor(monitorId)
 				anythingChanged = true
 			}
+			if (this._dispatcher) {
+				const monitor = this._monitors[monitorId]
+				if (isQuantelMonitor(monitor)) {
+					this._dispatcher.setQuantelMonitor(monitor)
+				}
+			}
+			if (this._app) {
+				const monitor = this._monitors[monitorId]
+				if (isQuantelMonitor(monitor)) {
+					this._app.setQuantelMonitor(monitor)
+				}
+			}
 		}
 		return anythingChanged
 	}
@@ -73,7 +91,13 @@ export class MonitorManager {
 						storageSettings
 				  )
 				: monitorSettings.type === MonitorSettingsType.QUANTEL
-				? new MonitorQuantel(deviceId, monitorSettings, this._coreHandler.logger)
+				? new MonitorQuantel(
+						deviceId,
+						this.mediaDB,
+						monitorSettings,
+						this._coreHandler.logger,
+						(this._app && this._app.port) || undefined
+				  )
 				: null
 		if (!monitor) throw new Error(`Monitor could not be created, type "${monitorSettings.type}" unknown`)
 
@@ -96,6 +120,7 @@ export class MonitorManager {
 			await coreMonitorHandler.dispose(true)
 		}
 	}
+
 	private async removeMonitor(monitorId: string) {
 		if (this._monitors[monitorId]) {
 			await this._monitors[monitorId].dispose()

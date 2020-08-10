@@ -17,6 +17,10 @@ export function buildStorageHandler(storage: GeneralStorageSettings, logger: Log
 			return new LocalFolderHandler(storage, logger)
 		case StorageType.FILE_SHARE:
 			return new FileShareHandler(storage, logger)
+		case StorageType.QUANTEL_STREAM:
+			throw new Error(
+				'Not an actual storage handler. Storage type should not be instanciated as it has no file access.'
+			)
 		case StorageType.QUANTEL_HTTP:
 			return new QuantelHTTPHandler(storage)
 	}

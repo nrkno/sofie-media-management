@@ -17,9 +17,11 @@ import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
 import { CancelHandler } from '../lib/cancelablePromise'
 import { noTryAsync } from 'no-try'
 import * as path from 'path'
-import * as os from 'os'
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import * as fs from 'fs-extra'
+import * as http from 'http'
+import { MonitorQuantel } from '../monitors/quantel'
+import quantelMetadataTransform from './quantelFormats'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -40,6 +42,34 @@ interface MediaFileDetails {
 	mediaId: string
 }
 
+const FixedQuantelStats = literal<fs.Stats>({
+	isFile: () => false,
+	isDirectory: () => false,
+	isBlockDevice: () => false,
+	isCharacterDevice: () => false,
+	isSymbolicLink: () => false,
+	isFIFO: () => false,
+	isSocket: () => false,
+	dev: 0,
+	ino: 0,
+	mode: 0,
+	nlink: 0,
+	uid: 0,
+	gid: 0,
+	rdev: 0,
+	size: 0,
+	blksize: 0,
+	blocks: 0,
+	atimeMs: 0,
+	mtimeMs: 0,
+	ctimeMs: 0,
+	birthtimeMs: 0,
+	atime: new Date(),
+	mtime: new Date(),
+	ctime: new Date(),
+	birthtime: new Date()
+})
+
 /**
  * A worker is given a work-step, and will perform actions, using that step
  * The workers are kept by the dispatcher and given work from it
@@ -52,6 +82,8 @@ export class Worker {
 	private finishPromises: Array<Function> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
+	private quantelMonitorArrival: ((qm: MonitorQuantel | undefined) => void) | undefined = undefined
+	private quantelMonitorPromise: Promise<MonitorQuantel> | undefined = undefined
 
 	constructor(
 		private workStepDB: PouchDB.Database<WorkStepDB>,
@@ -74,6 +106,38 @@ export class Worker {
 
 	get lastBeginStep(): Time | undefined {
 		return this._busy ? this._lastBeginStep : undefined
+	}
+
+	setQuantelMonitor(monitor?: MonitorQuantel) {
+		if (!this.quantelMonitorArrival) {
+			if (monitor) {
+				this.quantelMonitorPromise = Promise.resolve(monitor)
+			}
+		} else {
+			this.quantelMonitorArrival(monitor)
+		}
+	}
+
+	private async getQuantelMonitor(): Promise<MonitorQuantel> {
+		if (this.quantelMonitorPromise === undefined) {
+			this.quantelMonitorPromise = new Promise<MonitorQuantel>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					this.quantelMonitorPromise = undefined
+					this.quantelMonitorArrival = undefined
+					reject(`Worker: getQuantelMonitor: time out waiting for monitor`)
+				}, 5000)
+				this.quantelMonitorArrival = (qm: MonitorQuantel | undefined) => {
+					clearTimeout(timeout)
+					if (qm) {
+						resolve(qm)
+					} else {
+						this.quantelMonitorPromise = undefined
+						reject(new Error(`Worker: getQuantelMonitor: empty Quantel monitor passed in`))
+					}
+				}
+			})
+		}
+		return this.quantelMonitorPromise
 	}
 
 	/**
@@ -213,10 +277,19 @@ export class Worker {
 	}
 
 	private async lookForFile(mediaGeneralId: string, config: StorageSettings): Promise<MediaFileDetails | false> {
+		if (this.isQuantel(mediaGeneralId)) {
+			return literal<MediaFileDetails>({
+				mediaPath: mediaGeneralId,
+				mediaId: mediaGeneralId,
+				mediaStat: FixedQuantelStats
+			})
+		}
 		const storagePath = (config.options && config.options.mediaPath) || ''
 		const mediaPath = path.join(storagePath, mediaGeneralId)
 		this.logger.debug(
-			`Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(
+			`${
+				this.ident
+			}: Media path is "${mediaPath}" with storagePath "${storagePath}" and relative "${path.relative(
 				storagePath,
 				mediaPath
 			)}"`
@@ -233,6 +306,10 @@ export class Worker {
 		})
 	}
 
+	private isQuantel(id: string): boolean {
+		return id.toUpperCase().startsWith('QUANTEL:')
+	}
+
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
 		// if (step.target.options && step.target.options.mediaPath) {
@@ -243,51 +320,96 @@ export class Worker {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 
-		const tmpPath = path.join(os.tmpdir(), `${Math.random().toString(16)}.png`)
-		const args = [
-			// TODO (perf) Low priority process?
-			(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-			'-hide_banner',
-			'-i',
-			`"${doc.mediaPath}"`,
-			'-frames:v 1',
-			`-vf thumbnail,scale=${(this.config.thumbnails && this.config.thumbnails.width) || 256}:` +
-				`${(this.config.thumbnails && this.config.thumbnails.width) || -1}`,
-			'-threads 1',
-			`"${tmpPath}"`
-		]
-
-		// Not necessary ... just checking that /tmp or Windows equivalent exists
-		// await fs.mkdirp(path.dirname(tmpPath))
-		const { error: execError } = await noTryAsync(
-			() =>
-				new Promise((resolve, reject) => {
-					exec(args.join(' '), (err, stdout, stderr) => {
-						this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
-						if (err) {
-							return reject(err)
-						}
-						resolve()
-					})
-				})
+		const destPath = path.join(
+			(this.config.paths && this.config.paths.resources) || '',
+			(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
+			`${doc.mediaId.replace(/:/gi, '_')}.jpg`
 		)
-		if (execError) {
-			return this.failStep(
-				`external process to generate thumbnail for "${fileId}" failed`,
-				step.action,
-				execError
+		const tmpPath = destPath.slice(0, -4) + '.new.jpg'
+		await fs.mkdirp(path.dirname(tmpPath))
+
+		if (this.isQuantel(doc.mediaId)) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				return this.failStep(`Quantel media but no Quantel connection details for "${fileId}"`, step.action)
+			}
+			const { result: stillUrl, error: urlError } = await noTryAsync(() =>
+				qm.toStillUrl(doc.mediaId, (this.config.thumbnails && this.config.thumbnails.width) || 256)
 			)
-		}
-		this.logger.info(`Worker: thumbnail generate: generated thumbnail for "${fileId}" at path "${tmpPath}"`)
+			if (urlError) {
+				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
+			}
+			// TODO make an request for the thumbnail
+			const { error: httpError } = await noTryAsync(
+				() =>
+					new Promise((resolve, reject) => {
+						const thumbStream = fs.createWriteStream(tmpPath)
+						http.get(stillUrl, res => {
+							if (res.statusCode !== 200) {
+								return reject(new Error(`Expected status code of 200, got ${res.statusCode}`))
+							}
+							res.pipe(thumbStream)
+							res.on('error', reject)
+							res.on('close', resolve)
+						}).on('error', reject)
+					})
+			)
+			if (httpError) {
+				return this.failStep(
+					`external request to HTTP transformer to generate thumbnail for "${fileId}" failed`,
+					step.action,
+					httpError
+				)
+			}
+		} else {
+			const args = [
+				// TODO (perf) Low priority process?
+				(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32'
+					? 'ffmpeg.exe'
+					: 'ffmpeg',
+				'-hide_banner',
+				`-i "${doc.mediaPath}"`,
+				'-frames:v 1',
+				`-vf thumbnail,scale=${(this.config.thumbnails && this.config.thumbnails.width) || 256}:` +
+					`${(this.config.thumbnails && this.config.thumbnails.height) || -1}`,
+				'-threads 1',
+				`"${tmpPath}"`
+			]
+
+			const { error: execError } = await noTryAsync(
+				() =>
+					new Promise((resolve, reject) => {
+						exec(args.join(' '), (err, stdout, stderr) => {
+							this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
+							if (err) {
+								return reject(err)
+							}
+							resolve()
+						})
+					})
+			)
+			if (execError) {
+				return this.failStep(
+					`external process to generate thumbnail for "${fileId}" failed`,
+					step.action,
+					execError
+				)
+			}
+			this.logger.info(`Worker: thumbnail generate: generated thumbnail for "${fileId}" at path "${tmpPath}"`)
+		} // Not a Quantel clip
 
 		const { result: thumbStat, error: statError } = await noTryAsync(() => fs.stat(tmpPath))
 		if (statError) {
 			return this.failStep(`failed to stat generated thumbmail for "${fileId}"`, step.action, statError)
 		}
 
-		const { result: data, error: readError } = await noTryAsync(() => fs.readFile(tmpPath))
-		if (readError) {
-			return this.failStep(`failed to read data from thumbnail file "${tmpPath}"`, step.action, readError)
+		const { error: renameError } = await noTryAsync(() => fs.rename(tmpPath, destPath))
+		if (renameError) {
+			return this.failStep(
+				`failed to remname tmp file from "${tmpPath}" to "${destPath}"`,
+				step.action,
+				renameError
+			)
 		}
 
 		// Read document again ... might have been updated while we were busy working
@@ -302,20 +424,12 @@ export class Worker {
 
 		doc2.thumbSize = thumbStat.size
 		doc2.thumbTime = thumbStat.mtime.getTime()
-		doc2._attachments = {
-			'thumb.png': {
-				content_type: 'image/png',
-				data
-			}
-		}
+		doc2.thumbPath = destPath.replace(/\\/gi, '/')
+
 		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc2))
 		if (putError) {
-			return this.failStep(`failed to write thumbnail to database for "${fileId}"`, step.action, putError)
+			return this.failStep(`failed to write thumbnail details to database for "${fileId}"`, step.action, putError)
 		}
-		await noTryAsync(
-			() => fs.unlink(tmpPath),
-			error => this.logger.warn(`Worked: thumbnail generate: failed to delete temporary file "${tmpPath}"`, error)
-		)
 
 		return literal<WorkResult>({
 			status: WorkStepStatus.DONE
@@ -334,7 +448,7 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.previews && this.config.previews.folder) || 'previews',
-			`${doc.mediaId}.webm`
+			`${doc.mediaId.replace(/:/gi, '_')}.webm`
 		)
 		const tmpPath = destPath + '.new'
 
@@ -347,26 +461,36 @@ export class Worker {
 			})
 		}
 
-		const args = [
-			'-hide_banner',
-			'-y',
-			'-threads 1',
-			'-i',
-			`"${doc.mediaPath}"`,
-			'-f',
-			'webm',
-			'-an',
-			'-c:v',
-			'libvpx',
-			'-b:v',
-			(this.config.previews && this.config.previews.bitrate) || '40k',
-			'-auto-alt-ref',
-			'0',
+		const args = ['-hide_banner', '-y', '-threads 1']
+		if (this.isQuantel(doc.mediaId)) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				return this.failStep(
+					`Quantel media but no Quantel connection details for "${fileId}"`,
+					step.action,
+					qmError
+				)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => qm.toStreamUrl(doc.mediaId))
+			if (urlError) {
+				return this.failStep(`Could not resolve Quantel ID to stream URL`, step.action, urlError)
+			}
+			args.push('-seekable 0')
+			args.push(`-i "${hlsUrl}"`)
+		} else {
+			args.push(`-i "${doc.mediaPath}"`)
+		}
+		args.push('-f', 'webm')
+		args.push('-an')
+		args.push('-c:v', 'libvpx')
+		args.push('-b:v', (this.config.previews && this.config.previews.bitrate) || '40k')
+		args.push('-auto-alt-ref 0')
+		args.push(
 			`-vf scale=${(this.config.previews && this.config.previews.width) || 190}:` +
-				`${(this.config.previews && this.config.previews.height) || -1}`,
-			'-deadline realtime',
-			`"${tmpPath}"`
-		]
+				`${(this.config.previews && this.config.previews.height) || -1}`
+		)
+		args.push('-deadline realtime')
+		args.push(`"${tmpPath}"`)
 
 		await fs.mkdirp(path.dirname(tmpPath))
 		this.logger.info(`Worker: preview generate: starting preview generation for "${fileId}" at path "${tmpPath}"`)
@@ -469,11 +593,22 @@ export class Worker {
 			'-f',
 			'rawvideo',
 			'-y',
-			process.platform === 'win32' ? 'NUL' : '/dev/null',
-			// '-threads 1', // Not needed. This is very quick even for big files.
-			'-i',
-			`"${doc.mediaPath}"`
+			process.platform === 'win32' ? 'NUL' : '/dev/null'
 		]
+		if (this.isQuantel(doc.mediaId)) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => qm.toStreamUrl(doc.mediaId))
+			if (urlError) {
+				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
+			}
+			args.push('-seekable 0')
+			args.push(`-i "${hlsUrl}"`)
+		} else {
+			args.push(`-i "${doc.mediaPath}"`)
+		}
 
 		const { error: execError, result } = await noTryAsync(
 			() =>
@@ -551,19 +686,26 @@ export class Worker {
 			filterString += `"select='gt(scene,${metaconf.sceneThreshold || 0.4})',showinfo"`
 		}
 
-		const args = [
-			'-hide_banner',
-			'-i',
-			`"${doc.mediaPath}"`,
-			'-filter:v',
-			filterString,
-			'-an',
-			'-f',
-			'null',
-			'-threads',
-			'1',
-			'-'
-		]
+		const args = ['-hide_banner']
+		if (this.isQuantel(doc.mediaId)) {
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				throw new Error(`Quantel media but no Quantel connection details for "${doc.mediaId}"`)
+			}
+			const { result: hlsUrl, error: urlError } = await noTryAsync(() => qm.toStreamUrl(doc.mediaId))
+			if (urlError) {
+				throw new Error(`Could not resolve Quantel ID to stream URL: ${urlError.message}`)
+			}
+			args.push('-seekable 0')
+			args.push(`-i "${hlsUrl}"`)
+		} else {
+			args.push(`-i "${doc.mediaPath}"`)
+		}
+		args.push('-filter:v', filterString)
+		args.push('-an')
+		args.push('-f null')
+		args.push('-threads 1')
+		args.push('-')
 
 		let infoProcess: ChildProcessWithoutNullStreams = spawn(
 			(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
@@ -742,8 +884,18 @@ export class Worker {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 
-		const fieldOrder: FieldOrder = await this.getFieldOrder(doc)
-		const metadata: Metadata = await this.getMetadata(doc)
+		const { result: fieldOrder, error: foError } = await noTryAsync(() => this.getFieldOrder(doc))
+		if (foError) {
+			return this.failStep(
+				`Unable to determine field order for media object with ID "${fileId}"`,
+				step.action,
+				foError
+			)
+		}
+		const { result: metadata, error: mdError } = await noTryAsync(() => this.getMetadata(doc))
+		if (mdError) {
+			return this.failStep(`Unable to get metadata for media object with ID "${fileId}"`, step.action, mdError)
+		}
 
 		if (this.config.metadata && this.config.metadata.mergeBlacksAndFreezes) {
 			if (metadata.blacks && metadata.blacks.length && metadata.freezes && metadata.freezes.length) {
@@ -809,66 +961,111 @@ export class Worker {
 		let docExists = true
 		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
-			const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
-			if (mediaFileDetails === false)
-				return this.failStep(
-					`failed to locate media object file with ID "${fileId}" at path "${step.target.options &&
-						step.target.options.mediaPath}"`,
-					step.action
-				)
 			docExists = false
-			doc = literal<MediaObject>({
-				_id: mediaFileDetails.mediaId,
-				_rev: '',
-				mediaId: mediaFileDetails.mediaId,
-				mediaPath: mediaFileDetails.mediaPath,
-				mediaSize: mediaFileDetails.mediaStat.size,
-				mediaTime: mediaFileDetails.mediaStat.mtime.getTime(),
-				thumbSize: 0,
-				thumbTime: 0,
-				cinf: '',
-				tinf: ''
-			})
+			if (this.isQuantel(fileId)) {
+				doc = literal<MediaObject>({
+					_id: fileId,
+					_rev: '',
+					mediaId: fileId,
+					mediaPath: step.file.name,
+					mediaSize: 0,
+					mediaTime: Date.now(),
+					thumbSize: 0,
+					thumbTime: 0,
+					cinf: '',
+					tinf: ''
+				})
+			} else {
+				const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
+				if (mediaFileDetails === false)
+					return this.failStep(
+						`failed to locate media object file with ID "${fileId}" at path "${step.target.options &&
+							step.target.options.mediaPath}"`,
+						step.action
+					)
+
+				doc = literal<MediaObject>({
+					_id: mediaFileDetails.mediaId,
+					_rev: '',
+					mediaId: mediaFileDetails.mediaId,
+					mediaPath: mediaFileDetails.mediaPath,
+					mediaSize: mediaFileDetails.mediaStat.size,
+					mediaTime: mediaFileDetails.mediaStat.mtime.getTime(),
+					thumbSize: 0,
+					thumbTime: 0,
+					cinf: '',
+					tinf: ''
+				})
+			}
 		}
 
-		const args = [
-			// TODO (perf) Low priority process?
-			(this.config.paths && this.config.paths.ffprobe) || process.platform === 'win32'
-				? 'ffprobe.exe'
-				: 'ffprobe',
-			'-hide_banner',
-			'-i',
-			`"${doc.mediaPath}"`,
-			'-show_streams',
-			'-show_format',
-			'-print_format',
-			'json'
-		]
+		let probeData: any = {}
+		if (this.isQuantel(doc.mediaId)) {
+			// Due to issues using ffprobe with the transformer, this is generated based on format code and frames
+			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
+			if (qmError) {
+				return this.failStep(
+					`Quantel media but no Quantel connection details for "${doc.mediaId}"`,
+					step.action,
+					qmError
+				)
+			}
+			const { result: clipData, error: detailError } = await noTryAsync(() => qm.getClipDetails(doc.mediaId))
+			if (detailError) {
+				return this.failStep(
+					`Could not retrieve clip details: ${detailError.message}`,
+					step.action,
+					detailError
+				)
+			}
+			if (clipData === null) {
+				return this.failStep(`Could not find clips details for ${doc.mediaId}`, step.action)
+			}
+			probeData = quantelMetadataTransform(clipData)
+		} else {
+			const args = [
+				// TODO (perf) Low priority process?
+				(this.config.paths && this.config.paths.ffprobe) || process.platform === 'win32'
+					? 'ffprobe.exe'
+					: 'ffprobe',
+				'-hide_banner',
+				`-i "${doc.mediaPath}"`,
+				'-show_streams',
+				'-show_format',
+				'-print_format',
+				'json'
+			]
 
-		const { result: probeData, error: execError } = await noTryAsync(
-			() =>
-				new Promise<any>((resolve, reject) => {
-					exec(args.join(' '), (err, stdout, stderr) => {
-						this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
-						if (err) {
-							return reject(err)
-						}
-						const json: any = JSON.parse(stdout)
-						if (!json.streams || !json.streams[0]) {
-							return reject(new Error('not media'))
-						}
-						resolve(json)
+			const { result: probeOutput, error: execError } = await noTryAsync(
+				() =>
+					new Promise<any>((resolve, reject) => {
+						exec(args.join(' '), (err, stdout, stderr) => {
+							this.logger.debug(`Worker: metadata generate: output (stdout, stderr)`, stdout, stderr)
+							if (err) {
+								return reject(err)
+							}
+							const json: any = JSON.parse(stdout)
+							if (!json.streams || !json.streams[0]) {
+								return reject(new Error('not media'))
+							}
+							resolve(json)
+						})
 					})
-				})
-		)
-		if (execError) {
-			return this.failStep(`external process to generate metadata for "${fileId}" failed`, step.action, execError)
+			)
+			if (execError) {
+				return this.failStep(
+					`external process to generate metadata for "${fileId}" failed`,
+					step.action,
+					execError
+				)
+			}
+			probeData = probeOutput
 		}
 		this.logger.info(`Worker: metadata generate: generated metadata for "${fileId}"`)
 		this.logger.debug(`Worker: metadata generate: generated metadata details`, probeData)
 
 		let newInfo = literal<MediaInfo>({
-			name: doc._id,
+			name: this.isQuantel(doc.mediaId) ? probeData.name : doc._id,
 			//path: doc.mediaPath,
 			//size: doc.mediaSize,
 			//time: doc.mediaTime,
@@ -924,6 +1121,13 @@ export class Worker {
 			}
 		})
 
+		if (this.isQuantel(doc.mediaId)) {
+			const mediaSize = parseInt(probeData.format.size)
+			doc.mediaSize = isNaN(mediaSize) ? 0 : mediaSize
+			doc.mediaTime = Date.parse(probeData.format.tags.modification_date)
+			this.logger.debug(`Worker: metadata generate: new info size is ${mediaSize}`)
+		}
+
 		// Read document again ... might have been updated while we were busy working
 		if (docExists) {
 			let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
@@ -937,11 +1141,13 @@ export class Worker {
 			doc = doc2
 		}
 		doc.mediainfo = Object.assign(doc.mediainfo || {}, newInfo)
+		this.logger.debug(`Worker: media clip is`, doc)
 
-		const { error: putError } = await noTryAsync(() => this.mediaDB.put(doc))
+		const { error: putError, result: putResult } = await noTryAsync(() => this.mediaDB.put(doc))
 		if (putError) {
 			return this.failStep(`failed to write metadata to database for "${fileId}"`, step.action, putError)
 		}
+		this.logger.debug(`Worker: metadata generate: put result is`, putResult)
 
 		return literal<WorkResult>({
 			status: WorkStepStatus.DONE

@@ -1,8 +1,10 @@
 import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
-import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial } from '../api'
+import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial, StorageType } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
 import { QuantelHTTPFile } from '../storageHandlers/quantelHttpHandler'
+import { literal } from '../lib/lib'
+import { QuantelStreamHandlerSingleton, QuantelStream } from '../storageHandlers/quantelStreamHandler'
 
 export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
 
@@ -41,7 +43,8 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 			property: '__type',
 			subTypes: [
 				{ value: LocalFolderFile, name: 'localFolderFile' },
-				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' }
+				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' },
+				{ value: QuantelStream, name: 'quantelStream' }
 			]
 		}
 	})
@@ -84,7 +87,8 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 			property: '__type',
 			subTypes: [
 				{ value: LocalFolderFile, name: 'localFolderFile' },
-				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' }
+				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' },
+				{ value: QuantelStream, name: 'quantelStream' }
 			]
 		}
 	})
@@ -115,7 +119,18 @@ export function plainToWorkStep(obj: object, availableStorage: StorageObject[]):
 			try {
 				const cls = plainToClass(FileWorkStep, obj)
 				const storageId = (cls.target as any) as string
-				const storage = availableStorage.find(i => i.id === storageId)
+
+				const storage =
+					storageId === 'quantelPropertiesFromMonitor'
+						? literal<StorageObject>({
+								// Used when streams take their configuration from the Quantel monitor
+								id: 'quantelPropertiesFromMonitor',
+								support: { read: false, write: false },
+								handler: QuantelStreamHandlerSingleton.Instance,
+								type: StorageType.QUANTEL_STREAM,
+								options: {}
+						  })
+						: availableStorage.find(i => i.id === storageId)
 				if (!storage) throw new Error(`Unknown storage: "${storageId}"`)
 				cls.target = storage
 				return (cls as any) as WorkStepDB

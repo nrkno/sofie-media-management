@@ -25,6 +25,7 @@ import { StorageObject } from '../storageHandlers/storageHandler'
 import { Worker, WorkResult } from './worker'
 import { TrackedMediaItems } from '../mediaItemTracker'
 import { CoreHandler } from '../coreHandler'
+import { MonitorQuantel } from '../monitors/quantel'
 
 const CRON_JOB_INTERVAL = 10 * 60 * 60 * 1000 // 10 hours (ms)
 const WARNING_WF_QUEUE_LENGTH = 10 // 10 items
@@ -59,6 +60,8 @@ export class Dispatcher {
 
 	private warningWFQueueLength: number
 	private warningTaskWorkingTime: number
+
+	private quantelMonitor: MonitorQuantel | undefined
 
 	constructor(
 		private mediaDB: PouchDB.Database<MediaObject>,
@@ -581,9 +584,11 @@ export class Dispatcher {
 		wfDb.hash = hash
 		wfDb.modified = getCurrentTime()
 
-		console.log(`Current hash: ${hash}`)
+		// console.log(`Current hash: ${hash}`)
 
-		this.logger.debug(`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}`)
+		this.logger.debug(
+			`Dispatcher: caught new workFlow: "${wf._id}" from ${generator.constructor.name}. Hash ${hash}.`
+		)
 		// persist workflow to db:
 		const { result: docs, error: docsError } = await noTryAsync(() =>
 			this.workFlows.allDocs({
@@ -591,7 +596,7 @@ export class Dispatcher {
 			})
 		)
 		if (docsError) {
-			this.logger.error(`Dispatcher: error when requests all WorkFlows`, docsError)
+			this.logger.error(`Dispatcher: error when requesting all WorkFlows`, docsError)
 			throw docsError // TODO too extreme?
 		}
 
@@ -616,6 +621,7 @@ export class Dispatcher {
 			// persist the workflow steps separately to db:
 			await Promise.all(
 				wf.steps.map(step => {
+					this.logger.info(`persisting step: ${JSON.stringify(step)}`)
 					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
 						_id: wfDb._id + '_' + randomId(),
 						workFlowId: wfDb._id
@@ -957,7 +963,7 @@ export class Dispatcher {
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
-				this.workFlows.allDocs({
+				this.workFlows.allDocs<WorkFlowDB>({
 					include_docs: true,
 					attachments: false
 				})
@@ -1041,7 +1047,7 @@ export class Dispatcher {
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
-				this.workSteps.allDocs({
+				this.workSteps.allDocs<WorkStepDB>({
 					include_docs: true,
 					attachments: false
 				})
@@ -1052,10 +1058,9 @@ export class Dispatcher {
 			throw queryError
 		}
 
+		// this.logger.info(`worksteps: ${JSON.stringify(allDocsResponse)}`)
 		this.logger.info(
-			'Dispatcher: workSteps: synchronizing objectlists',
-			coreObjects.length,
-			allDocsResponse.total_rows
+			`Dispatcher: workSteps: synchronizing objectlists ${coreObjects.length}=${allDocsResponse.total_rows}`
 		)
 
 		let tasks: Array<() => Promise<void>> = []
@@ -1150,4 +1155,11 @@ export class Dispatcher {
 		100,
 		'pushWorkStepToCore'
 	)
+
+	setQuantelMonitor(monitor: MonitorQuantel) {
+		this.quantelMonitor = monitor
+		this.workers.forEach(w => {
+			w.setQuantelMonitor(this.quantelMonitor)
+		})
+	}
 }

@@ -12,7 +12,6 @@ import {
 	FileShareStorage
 } from '../api'
 import { LoggerInstance } from 'winston'
-import { FetchError } from 'node-fetch'
 import { promisify } from 'util'
 import { exec as execCB } from 'child_process'
 import { Watcher } from './watcher'
@@ -27,42 +26,28 @@ function isFileShareStorage(sets: StorageSettings): sets is FileShareStorage {
 }
 
 export class MonitorMediaWatcher extends Monitor {
-	private changes: PouchDB.Core.Changes<MediaObject>
 	private triggerupdateFsStatsTimeout?: NodeJS.Timer
 	private checkFsStatsInterval?: NodeJS.Timer
-
-	private lastSequenceNr: number = 0
-
-	private monitorConnectionTimeout: NodeJS.Timer | null = null
-
-	private statusDisk: PeripheralDeviceAPI.StatusObject = {
-		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
-		messages: []
-	}
-
-	private statusConnection: PeripheralDeviceAPI.StatusObject = {
-		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
-		messages: []
-	}
-
-	private isDestroyed: boolean = false
-	private initialized: boolean = false
 
 	private watcher: Watcher
 
 	constructor(
 		deviceId: string,
-		private db: PouchDB.Database<MediaObject>,
+		db: PouchDB.Database<MediaObject>,
 		public monitorSettings: MonitorSettingsWatcher,
 		logger: LoggerInstance,
-		private storageSettings?: StorageSettings
+		storageSettings?: StorageSettings
 	) {
-		super(deviceId, monitorSettings, logger)
+		super(deviceId, db, monitorSettings, logger, storageSettings)
 
-		if (storageSettings && (isFileShareStorage(storageSettings) || isLocalFolderStorage(storageSettings))) {
-			this.watcher = new Watcher(db, monitorSettings, logger, storageSettings)
+		if (
+			this.storageSettings &&
+			(isFileShareStorage(this.storageSettings) || isLocalFolderStorage(this.storageSettings))
+		) {
+			this.watcher = new Watcher(db, monitorSettings, logger, this.storageSettings)
 			this.watcher.init()
 		}
+
 		this.updateStatus()
 	}
 
@@ -164,13 +149,9 @@ export class MonitorMediaWatcher extends Monitor {
 	public async dispose(): Promise<void> {
 		await super.dispose()
 
-		this.isDestroyed = true
 		if (this.checkFsStatsInterval) {
 			clearInterval(this.checkFsStatsInterval)
 			this.checkFsStatsInterval = undefined
-		}
-		if (this.changes) {
-			this.changes.cancel()
 		}
 		// await this.db.close()
 		if (this.watcher) {
@@ -178,7 +159,7 @@ export class MonitorMediaWatcher extends Monitor {
 		}
 	}
 
-	private triggerupdateFsStats(): void {
+	protected triggerupdateFsStats(): void {
 		if (!this.triggerupdateFsStatsTimeout) {
 			this.triggerupdateFsStatsTimeout = setTimeout(() => {
 				this.triggerupdateFsStatsTimeout = undefined
@@ -296,153 +277,5 @@ export class MonitorMediaWatcher extends Monitor {
 			this.statusDisk.messages = [`Media watcher: error when trying to determine disk usage stats.`]
 			this.updateAndSendStatus()
 		}
-	}
-
-	private getChangesOptions() {
-		return {
-			since: this.lastSequenceNr || 'now',
-			include_docs: true,
-			live: true,
-			attachments: true
-		}
-	}
-
-	private setConnectionStatus(connected: boolean) {
-		let status = connected ? PeripheralDeviceAPI.StatusCode.GOOD : PeripheralDeviceAPI.StatusCode.BAD
-		let messages = connected ? [] : ['MediaScanner not connected']
-		if (status !== this.statusConnection.statusCode) {
-			this.statusConnection.statusCode = status
-			this.statusConnection.messages = messages
-			this.updateAndSendStatus()
-		}
-	}
-
-	private updateStatus(): PeripheralDeviceAPI.StatusObject {
-		let statusCode: PeripheralDeviceAPI.StatusCode = PeripheralDeviceAPI.StatusCode.GOOD
-		let messages: Array<string> = []
-
-		let statusSettings: PeripheralDeviceAPI.StatusObject = { statusCode: PeripheralDeviceAPI.StatusCode.GOOD }
-
-		if (!this.monitorSettings.storageId || !this.storageSettings) {
-			statusSettings = {
-				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Settings parameter "storageId" not set or no corresponding storage']
-			}
-		} else if (!this.initialized) {
-			statusSettings = {
-				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Not initialized']
-			}
-		}
-
-		_.each([statusSettings, this.statusConnection, this.statusDisk], s => {
-			if (s.statusCode > statusCode) {
-				messages = s.messages || []
-				statusCode = s.statusCode
-			} else if (s.statusCode === statusCode) {
-				if (s.messages) {
-					messages = messages.concat(s.messages)
-				}
-			}
-		})
-		return {
-			statusCode,
-			messages
-		}
-	}
-
-	private updateAndSendStatus() {
-		const status = this.updateStatus()
-
-		if (this.status.statusCode !== status.statusCode || !_.isEqual(this.status.messages, status.messages)) {
-			this._status = {
-				statusCode: status.statusCode,
-				messages: status.messages
-			}
-			this.emit('connectionChanged', this.status)
-		}
-	}
-
-	private triggerMonitorConnection() {
-		if (!this.monitorConnectionTimeout) {
-			this.monitorConnectionTimeout = setTimeout(() => {
-				this.monitorConnectionTimeout = null
-				this.monitorConnection()
-			}, 10 * 1000)
-		}
-	}
-
-	private monitorConnection() {
-		if (this.isDestroyed) return
-
-		if (this.statusConnection.statusCode === PeripheralDeviceAPI.StatusCode.BAD) {
-			this.restartChangesStream(true)
-
-			this.triggerMonitorConnection()
-		}
-	}
-
-	private restartChangesStream(rewindSequence?: boolean) {
-		if (rewindSequence) {
-			if (this.lastSequenceNr > 0) {
-				this.lastSequenceNr--
-			}
-		}
-		// restart the changes stream
-		if (this.changes) {
-			this.changes.cancel()
-		}
-		const opts = this.getChangesOptions()
-		this.logger.info(`Media watcher: restarting changes stream (since ${opts.since})`)
-		this.changes = this.db
-			.changes<MediaObject>(opts)
-			.on('change', changes => this.changeHandler(changes))
-			.on('error', error => this.errorHandler(error))
-	}
-
-	private changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
-		const newSequenceNr: string | number = changes.seq
-		if (_.isNumber(newSequenceNr)) this.lastSequenceNr = newSequenceNr
-		else this.logger.warn(`Expected changes.seq to be number, got "${newSequenceNr}"`)
-
-		if (changes.deleted) {
-			if (!(changes.id + '').match(/watchdogIgnore/i)) {
-				// Ignore watchdog file changes
-
-				this.logger.debug('Media watcher: deleteMediaObject', changes.id, newSequenceNr)
-				this.sendRemoved(changes.id).catch(e => {
-					this.logger.error('Media watcher: error sending deleted doc', e)
-				})
-			}
-		} else if (changes.doc) {
-			const md: MediaObject = changes.doc
-			if (!(md._id + '').match(/watchdogIgnore/i)) {
-				// Ignore watchdog file changes
-
-				this.logger.debug('Media watcher: updateMediaObject', newSequenceNr, md._id, md.mediaId)
-				md.mediaId = md._id
-				this.sendChanged(md).catch(e => {
-					this.logger.error('Media watcher: error sending changed doc', e)
-				})
-			}
-		}
-
-		this.setConnectionStatus(true)
-
-		this.triggerupdateFsStats()
-	}
-
-	private errorHandler(err) {
-		if (err instanceof SyntaxError || err instanceof FetchError || err.type === 'invalid-json') {
-			this.logger.warn('Media watcher: terminated (' + err.message + ')') // not a connection issue
-			this.restartChangesStream(true)
-			return // restart silently, since PouchDB connections can drop from time to time and are not a very big issue
-		} else {
-			this.logger.error('Media watcher: Error', err)
-		}
-
-		this.setConnectionStatus(false)
-
-		this.triggerMonitorConnection()
 	}
 }

@@ -12,13 +12,15 @@ import {
 	WorkStepAction,
 	WorkStep,
 	WorkFlow,
-	WorkStepStatus
+	WorkStepStatus,
+	StorageType
 } from '../api'
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
 import { Collection, Observer } from 'tv-automation-server-core-integration'
 import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
+import { QuantelStream, QuantelStreamHandlerSingleton } from '../storageHandlers/quantelStreamHandler'
 
 /**
  * Monitors the expected items from Core and generates workflows needed to make it so
@@ -114,6 +116,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		return this.setupSubscribtionsAndObservers()
 	}
+
 	/**
 	 * Subscribe to the data from Core
 	 */
@@ -165,6 +168,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		let peripheralDevices = this._coreHandler.core.getCollection('peripheralDevices')
 		return peripheralDevices.findOne(this._coreHandler.core.deviceId)
 	}
+
 	private _getStudio(): any | null {
 		let peripheralDevice = this._getPeripheralDevice()
 		if (peripheralDevice) {
@@ -173,6 +177,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		return null
 	}
+
 	private _getStudioId(): string | null {
 		if (this._cachedStudioId) return this._cachedStudioId
 
@@ -183,10 +188,18 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		return null
 	}
+
 	private shouldHandleItem(item: ExpectedMediaItem): boolean {
 		return (
 			this._handledFlows[item.mediaFlowId] && item.studioId === this._getStudioId() // if the item is in the list of handled flows // if the item is in the right studio
 		)
+	}
+
+	private isQuantel(url: string): boolean {
+		return url
+			.slice(0, 8)
+			.toLowerCase()
+			.startsWith('quantel:')
 	}
 
 	/** Called when an item is added (from Core) */
@@ -234,7 +247,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		let fileName: string
 		try {
-			fileName = sourceStorage.handler.parseUrl(item.url)
+			if (this.isQuantel(item.url)) {
+				fileName = item.url
+			} else {
+				fileName = sourceStorage.handler.parseUrl(item.url)
+			}
 		} catch (e) {
 			this.logger.error(
 				`${this.ident} onExpectedAdded: Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`
@@ -320,7 +337,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 		let fileName: string
 		try {
-			fileName = sourceStorage.handler.parseUrl(item.url)
+			if (this.isQuantel(item.url)) {
+				fileName = item.url
+			} else {
+				fileName = sourceStorage.handler.parseUrl(item.url)
+			}
 		} catch (e) {
 			this.logger.error(
 				`${this.ident} onExpectedChanged: Assigned source storage "${sourceStorage.id}" does not support file "${item.url}"`
@@ -383,6 +404,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			}
 		)
 	}
+
 	/** Called when an item is removed (from Core) */
 	private onExpectedRemoved = (id: string, oldValue: any) => {
 		this.logger.debug(`${this.ident} onExpectedRemoved: ${id} was removed from Core expectedMediaItems collection`)
@@ -412,7 +434,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		// add the file to the list of monitored files, if the storage is an 'onlySelectedFiles' storage
 		if (storage.options.onlySelectedFiles) {
 			try {
-				storage.handler.removeMonitoredFile(storage.handler.parseUrl(item.url))
+				storage.handler.removeMonitoredFile(
+					this.isQuantel(item.url) ? item.url : storage.handler.parseUrl(item.url)
+				)
 			} catch (e) {
 				this.logger.error(
 					`${this.ident} onExpectedRemoved: An exception occured when trying to remove monitoring for file "${item.url}": ${e}`,
@@ -458,6 +482,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							e.file as File,
 							target,
 							tracked.comment,
+							!!e.file && this.isQuantel(e.file.name),
 							'Monitored file was added to source storage'
 						)
 					)
@@ -554,7 +579,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 
 			let fileName: string
 			try {
-				fileName = sourceStorage.handler.parseUrl(i.url)
+				if (this.isQuantel(i.url)) {
+					fileName = i.url
+				} else {
+					fileName = sourceStorage.handler.parseUrl(i.url)
+				}
 			} catch (e) {
 				this.logger.error(
 					`${this.ident} initialExpectedCheck: Assigned source storage "${sourceStorage.id}" does not support file "${i.url}"`
@@ -695,16 +724,32 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		})
 	}
 
-	protected generateNewFileWorkSteps(file: File, st: StorageObject): WorkStep[] {
-		return [
-			new FileWorkStep({
-				action: WorkStepAction.COPY,
-				file: file,
-				target: st,
-				priority: 2,
-				criticalStep: true,
-				status: WorkStepStatus.IDLE
-			}),
+	protected generateNewFileWorkSteps(file: File, st: StorageObject, doCopy?: boolean): WorkStep[] {
+		const steps: WorkStep[] = []
+		if (doCopy) {
+			steps.push(
+				new FileWorkStep({
+					action: WorkStepAction.COPY,
+					file: file,
+					target: st,
+					priority: 2,
+					criticalStep: true,
+					status: WorkStepStatus.IDLE
+				})
+			)
+		} else {
+			steps.push(
+				new ScannerWorkStep({
+					action: WorkStepAction.SCAN,
+					file,
+					target: st,
+					priority: 2,
+					criticalStep: true,
+					status: WorkStepStatus.IDLE
+				})
+			)
+		}
+		steps.push(
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_METADATA,
 				file,
@@ -726,13 +771,16 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				priority: 0.3,
 				status: WorkStepStatus.IDLE
 			})
-		]
+		)
+		// this.logger.info(`Steps are: ${JSON.stringify(steps)}`)
+		return steps
 	}
 
 	protected emitCopyWorkflow(
 		file: File,
 		targetStorage: StorageObject,
 		comment: string | undefined,
+		doCopy: boolean,
 		...reason: string[]
 	) {
 		const workflowId = file.name + '_' + randomId()
@@ -745,18 +793,19 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				finished: false,
 				priority: 1,
 				source: WorkFlowSource.EXPECTED_MEDIA_ITEM,
-				steps: this.generateNewFileWorkSteps(file, targetStorage),
+				steps: this.generateNewFileWorkSteps(file, targetStorage, doCopy),
 				created: getCurrentTime(),
 				success: false
 			}),
 			this
 		)
 		this.logger.debug(
-			`${this.ident} emitCopyWorkflow: New forkflow started for "${file.name}": "${workflowId}". ${reason.join(
+			`${this.ident} emitCopyWorkflow: New workflow started for "${file.name}": "${workflowId}". ${reason.join(
 				', '
 			)}`
 		)
 	}
+
 	/**
 	 * Checks if the item exists on the storage and issues workflows
 	 * @param tmi
@@ -784,6 +833,22 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			storage.handler.addMonitoredFile(tmi.name)
 		}
 
+		if (this.isQuantel(tmi.name)) {
+			if (reason !== 'expectedStorageCheck') {
+				// Avoid duplicate workflows - assuming Q clips are immutable
+				const file = new QuantelStream(tmi.name, tmi.name, true)
+				const st = literal<StorageObject>({
+					id: 'quantelPropertiesFromMonitor',
+					support: { read: false, write: false },
+					handler: QuantelStreamHandlerSingleton.Instance,
+					type: StorageType.QUANTEL_STREAM,
+					options: {}
+				})
+				this.emitCopyWorkflow(file, st, tmi.comment, false, reason, `Quantel item added or updated`)
+			}
+			return
+		}
+
 		// get file from source storage
 		this.getFile(tmi.name, tmi.sourceStorageId)
 			.then(file => {
@@ -805,6 +870,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 															file,
 															i,
 															tmi.comment,
+															true,
 															reason,
 															`File size doesn't match on target storage`
 														)
@@ -821,6 +887,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 														file,
 														i,
 														tmi.comment,
+														true,
 														reason,
 														`Could not fetch target file properties`
 													)
@@ -842,6 +909,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 													file,
 													i,
 													tmi.comment,
+													true,
 													reason,
 													`File not found on target storage`
 												)

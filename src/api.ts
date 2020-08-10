@@ -164,6 +164,7 @@ export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
 	FILE_SHARE = 'file_share',
 	QUANTEL_HTTP = 'quantel_http',
+	QUANTEL_STREAM = 'quantel_stream',
 	UNKNOWN = 'unknown'
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
@@ -188,10 +189,16 @@ export interface QuantelHTTPStorage extends StorageSettings {
 		transformerUrl: string
 		gatewayUrl: string
 		ISAUrl: string
+		ISABackupUrl?: string
 		zoneId: string | undefined
 		serverId: number
 		onlySelectedFiles: true
 	}
+}
+
+export interface QuantelStream extends StorageSettings {
+	type: StorageType.QUANTEL_STREAM
+	options: {}
 }
 
 export interface LocalFolderStorage extends StorageSettings {
@@ -336,15 +343,39 @@ export interface MonitorSettingsWatcher extends MonitorSettingsBase {
 	retryLimit: number
 }
 
+/**
+ * Types of ABR stream a Grass Valley HTTP Transformer can create on-the-fly.
+ */
+export enum QuantelStreamType {
+	/** Apply HTTP Live Streaming (https://developer.apple.com/streaming/) */
+	HLS = 'hls',
+	/** Dynamic Adaptvie Streaming over HTTP (MPEG-DASH) */
+	MPEG_DASH = 'mpeg-dash',
+	/** Microsoft Smooth Streaming, deprecated by Azure Media Services */
+	SMOOTH_STREAM = 'smooth-stream'
+}
+
+/**
+ * Settings to use when monitoring media availability on Quantel servers and
+ * when streaming media into workers. The monitor is a one-stop-shop for the resolution
+ * of all `quantel:...` URLs into paths that can be used for playback control by the
+ * Quantel gateway or media resources from a transformer.
+ */
 export interface MonitorSettingsQuantel extends MonitorSettingsBase {
 	type: MonitorSettingsType.QUANTEL
 
 	/** Url to the quantel gateway  */
 	gatewayUrl: string
-	/** Address to the ISA, for the gateway to connect to */
+	/** Address to the master ISA, for the gateway to connect to */
 	ISAUrl: string
+	/** Address to the backup ISA, for the gateway to failover to */
+	ISABackupUrl?: string
 	/** The ID of the zone to use. If omitted, will be using "default" */
 	zoneId?: string
 	/** The id of the server to control. An Ingeter */
 	serverId: number
+	/** Base Url for Quantel transformer used for metadata generation */
+	transformerUrl?: string
+	/** Quantel stream type to use when accessing media. e.g. HLS or MPEG-DASH */
+	streamType?: QuantelStreamType
 }

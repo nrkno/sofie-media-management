@@ -147,27 +147,48 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 		placeholder: '3'
 	}
 ]
+export enum QuantelStreamType {
+	HLS = 'hls',
+	MPEG_DASH = 'mpeg-dash',
+	SMOOTH_STREAM = 'smooth-stream'
+}
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
 		id: 'gatewayUrl',
 		name: 'Gateway URL',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
 	},
 	{
 		id: 'ISAUrl',
 		name: 'ISA URL',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
+	},
+	{
+		id: 'ISABackupUrl',
+		name: 'ISA Backup URL',
+		type: ConfigManifestEntryType.STRING
 	},
 	{
 		id: 'zoneId',
 		name: 'Zone ID (leave blank for default)',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.STRING
 	},
 	{
 		id: 'serverId',
 		name: 'Quantel Server ID',
-		type: ConfigManifestEntryType.STRING // dropdown
+		type: ConfigManifestEntryType.NUMBER
+	},
+	{
+		id: 'transformerUrl',
+		name: 'TransformerURL',
+		type: ConfigManifestEntryType.STRING
+	},
+	{
+		id: 'streamType',
+		name: 'Stream Type',
+		type: ConfigManifestEntryType.ENUM,
+		values: QuantelStreamType
 	}
 ]
 
@@ -228,7 +249,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			id: 'thumbnails.folder',
 			name: 'Thumbnail sub-folder',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: 'thumbnails'
+			placeholder: 'thumbs'
 		},
 		{
 			id: 'metadata.fieldOrder',

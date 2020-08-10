@@ -1,9 +1,17 @@
-import { StorageType, Time, StorageSettings, LocalFolderStorage, FileShareStorage, QuantelHTTPStorage } from '../api'
+import {
+	StorageType,
+	Time,
+	StorageSettings,
+	LocalFolderStorage,
+	FileShareStorage,
+	QuantelHTTPStorage,
+	QuantelStream
+} from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
 import { CancelablePromise } from '../lib/cancelablePromise'
 
-export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage
+export type GeneralStorageSettings = LocalFolderStorage | FileShareStorage | QuantelHTTPStorage | QuantelStream
 
 export interface StorageObject extends StorageSettings {
 	handler: StorageHandler
@@ -73,7 +81,7 @@ export interface StorageEvent {
 /**
  * Handler for storage device/service
  * A StorageHandler represents some kind of storage, to unify the interface.
- * ( to abstract storage to local folders, network shared, FTP:s, Amazon G3 etc...)
+ * ( to abstract storage to local folders, network shared, FTP:s, Amazon S3 etc...)
  */
 export abstract class StorageHandler extends EventEmitter {
 	on(
