@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0-2](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-1...v1.2.0-2) (2020-08-10)
+
+
+### Bug Fixes
+
+* deal with a quantel monitor set before work has started ([1e41e7c](https://github.com/nrkno/tv-automation-media-management/commit/1e41e7cc075885d32e04e277d32b31464eb2a091))
+* metadata generation for quantel simulated rather than via ffprobe ([1752ee7](https://github.com/nrkno/tv-automation-media-management/commit/1752ee71c5b41b3d935a014b2703b10b153e513f))
+* previews folder default should be set in app ([509288b](https://github.com/nrkno/tv-automation-media-management/commit/509288bb0725ebf74ed9efdd4c2523ec858780bc))
+* reporting of sub-device status for Quantel devices ([1a7ae87](https://github.com/nrkno/tv-automation-media-management/commit/1a7ae87d1ddf8c8f05fa438b39b39b01acdc96b5))
+* revert Quantel Gateway client typescript version to 3.8 ([c6eb749](https://github.com/nrkno/tv-automation-media-management/commit/c6eb7490bafd7be6677191abd827c40f78bf7a81))
+
 ## [1.2.0-1](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-0...v1.2.0-1) (2020-06-26)
 
 
