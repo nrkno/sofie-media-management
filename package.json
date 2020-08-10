@@ -87,7 +87,7 @@
     "@types/pouchdb-node": "^6.1.2",
     "@types/underscore": "^1.8.8",
     "@types/xml2js": "^0.4.5",
-    "codecov": "^3.0.2",
+    "codecov": "^3.7.1",
     "find": "^0.3.0",
     "jest": "^24.9.0",
     "nexe": "^3.3.3",
