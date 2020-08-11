@@ -307,7 +307,7 @@ export class Worker {
 	}
 
 	private isQuantel(id: string): boolean {
-		return id.toUpperCase().startsWith('QUANTEL:')
+		return typeof id === 'string' && id.toUpperCase().startsWith('QUANTEL:')
 	}
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
