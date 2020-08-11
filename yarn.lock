@@ -791,7 +791,7 @@
   resolved "https://registry.yarnpkg.com/@types/stack-utils/-/stack-utils-1.0.1.tgz#0a851d3bd96498fa25c33ab7278ed3bd65f06c3e"
   integrity sha512-l42BggppR6zLmpfU6fq9HEa2oGPEI8yrSPL3GITjfRInppYFahObbIQOQK3UGxEnyQpltZLaPe75046NOZQikw==
 
-"@types/underscore@^1.8.8":
+"@types/underscore@^1.9.1":
   version "1.10.20"
   resolved "https://registry.yarnpkg.com/@types/underscore/-/underscore-1.10.20.tgz#4685206bcb2c9e2338fa6d89d678a8b916315f7f"
   integrity sha512-UiLhTLijxQ6sKP2aQbextgPVovrrxqXFP+UO/l90o1Ytguc85UWtbHcmnZDRe8hQ2MHeA+BJglgbYsgtll/zyw==

@@ -580,8 +580,7 @@ export class Dispatcher {
 	private onNewWorkFlow = atomic(async (finished: () => void, wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
 		// TODO: This should also handle extra workflows using a hash of the basic WorkFlow object to check if there is a WORKING or IDLE workflow that is the same
 		const hash = getFlowHash(wf)
-		const wfDb: WorkFlowDB = _.omit(wf, 'steps')
-		wfDb.hash = hash
+		const wfDb: WorkFlowDB = Object.assign(wf, { hash, _rev: '', steps: undefined })
 		wfDb.modified = getCurrentTime()
 
 		// console.log(`Current hash: ${hash}`)

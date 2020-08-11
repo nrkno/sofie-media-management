@@ -71,7 +71,7 @@ export class LocalFolderFile implements File {
 	}
 }
 
-interface NestedFiles extends Array<Promise<File | NestedFiles | null>> {}
+type NestedFiles = Array<File | NestedFiles | null>
 
 export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _basePath: string
@@ -399,7 +399,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	}
 
 	/**
-	 * Gathers all the file in a folder recursively
+	 * Gathers all the files in a folder recursively
 	 * @private
 	 * @param  {string} folder
 	 * @param  {string} [accumulatedPath]
@@ -410,7 +410,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return new Promise((resolve, reject) => {
 			fs.readdir(folder).then(
 				files => {
-					const result: NestedFiles = files.map(entry => {
+					const result: Promise<File | NestedFiles | null>[] = files.map(entry => {
 						const entryUrl = path.join(folder, entry)
 						return new Promise((resolve, reject) => {
 							fs.stat(entryUrl).then(

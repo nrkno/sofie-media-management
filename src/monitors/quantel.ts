@@ -8,7 +8,7 @@ import { MonitorSettingsQuantel, ExpectedMediaItem, QuantelStreamType } from '..
 import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
 import { noTryAsync } from 'no-try'
-import { ClipData } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
+import { ClipData, ClipDataSummary } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
 
 /** The minimum time to wait between polling status */
 const BREATHING_ROOM = 300
@@ -320,12 +320,13 @@ export class MonitorQuantel extends Monitor {
 						continue
 					}
 					if (clipSummaries.length >= 1) {
-						const clipSummaryOnPool = _.find(clipSummaries, clipData => {
+						const clipSummaryOnPool = _.find(clipSummaries, (clipData: ClipDataSummary): boolean => {
 							return (
-								clipData.PoolID &&
+								typeof clipData.PoolID === 'number' &&
 								(server.pools || []).indexOf(clipData.PoolID) !== -1 && // If present in any of the pools of the server
 								parseInt(clipData.Frames, 10) > 0 &&
-								clipData.Completed // Nore from Richard: Completed might not necessarily mean that it's completed on the right server
+								clipData.Completed !== null &&
+								clipData.Completed.length > 0 // Note from Richard: Completed might not necessarily mean that it's completed on the right server
 							)
 						})
 						if (clipSummaryOnPool) {
@@ -535,7 +536,7 @@ export class MonitorQuantel extends Monitor {
 		}
 
 		const clipSummary = _.find(clipSummaries, clipData => {
-			return parseInt(clipData.Frames, 10) > 0 && clipData.Completed
+			return parseInt(clipData.Frames, 10) > 0 && clipData.Completed !== null && clipData.Completed.length > 0
 		})
 		if (clipSummary) {
 			return clipSummary.ClipID
