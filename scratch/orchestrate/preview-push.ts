@@ -145,7 +145,7 @@ let muxFrames: () => Spout<Packet> = () => {
 }
 
 async function run() {
-    redio<Record<string, unknown>>('http://grace:4201/my/video', { 
+    redio<Record<string, unknown>>('/my/video2', { 
         blob: 'data', 
         httpPort: 4201,
         manifest: 'streamInfo'
@@ -170,7 +170,7 @@ run()
 
 async function run() {
     // console.log(ts.transpile(work))
-    let result = await got.post('http://perlman:4200/job?timeout=120000', { 
+    let result = await got.post('http://acosta:4200/job?timeout=120000', { 
         headers: {
             'Content-Type': 'text/plain'
         },
