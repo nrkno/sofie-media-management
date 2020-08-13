@@ -293,7 +293,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 		{
 			id: 'metadata.blackDetection',
 			name: 'Enable black frame detection',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.BOOLEAN
 		},
 		{
 			id: 'metadata.blackDuration',
