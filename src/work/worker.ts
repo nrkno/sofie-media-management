@@ -531,6 +531,9 @@ export class Worker {
 
 		let filterString = ''
 		if (metaconf.blackDetection) {
+			if (metaconf.blackDuration && metaconf.blackDuration?.endsWith('s')) {
+				metaconf.blackDuration = metaconf.blackDuration.slice(0, -1) 
+			}
 			filterString +=
 				`blackdetect=d=${metaconf.blackDuration || '2.0'}:` +
 				`pic_th=${metaconf.blackRatio || 0.98}:` +
