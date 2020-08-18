@@ -310,6 +310,8 @@ export class Worker {
 		return typeof id === 'string' && id.toUpperCase().startsWith('QUANTEL:')
 	}
 
+	/* {"message":"Worker 0: TypeError: Cannot read property 'replace' of undefined","stack":"TypeError: Cannot read property 'replace' of undefined\n at Worker.<anonymous> (C:\\casparcg\\media-manager\\dist\\work\\worker.js:259:184)\n at Generator.next (<anonymous>)\n at fulfilled (C:\\casparcg\\media-manager\\node_modules\\tslib\\tslib.js:112:62)\n at runMicrotasks (<anonymous>)\n at processTicksAndRejections (internal/process/task_queues.js:97:5)","level":"error","localTimestamp":"2020-08-18T13:31:13.153Z"} */
+
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
 		let fileId = getID(step.file.name)
 		// if (step.target.options && step.target.options.mediaPath) {
@@ -320,10 +322,12 @@ export class Worker {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
 
+		this.logger.debug(`${this.ident}: generate thumbnail: doc is ${JSON.stringify(doc)}`)
+		/* {"level":"debug","message":"Worker 0:: generate thumbnail: doc is {\"mediaPath\":\"\\\\\\\\160.67.87.53\\\\mamMediaScanner\\\\Highres\\\\nrk\\\\caches\\\\cache_nrk_wip1\\\\4282633_Leba_0_8328225.mp4\",\"mediaSize\":91988813,\"mediaTime\":1597084487963,\"mediainfo\":{\"name\":\"HIGHRES/NRK/CACHES/CACHE_NRK_WIP1/4282633_LEBA_0_8328225\",\"streams\":[{\"codec\":{\"long_name\":\"H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10\",\"type\":\"video\",\"time_base\":\"1/50\",\"tag_string\":\"avc1\",\"is_avc\":\"true\"},\"width\":1920,\"height\":1080,\"sample_aspect_ratio\":\"1:1\",\"display_aspect_ratio\":\"16:9\",\"pix_fmt\":\"yuv420p\",\"bits_per_raw_sample\":\"8\",\"time_base\":\"1/25000\",\"start_time\":\"0.000000\",\"duration_ts\":1808000,\"duration\":\"72.320000\",\"bit_rate\":\"9918532\",\"nb_frames\":\"1808\"},{\"codec\":{\"long_name\":\"AAC (Advanced Audio Coding)\",\"type\":\"audio\",\"time_base\":\"1/48000\",\"tag_string\":\"mp4a\"},\"sample_fmt\":\"fltp\",\"sample_rate\":\"48000\",\"channels\":2,\"channel_layout\":\"stereo\",\"bits_per_sample\":0,\"time_base\":\"1/48000\",\"start_time\":\"0.000000\",\"duration_ts\":3471360,\"duration\":\"72.320000\",\"bit_rate\":\"253312\",\"max_bit_rate\":\"306375\",\"nb_frames\":\"3391\"}],\"format\":{\"name\":\"mov,mp4,m4a,3gp,3g2,mj2\",\"long_name\":\"QuickTime / MOV\",\"start_time\":\"0.000000\",\"duration\":\"72.341333\",\"bit_rate\":\"10172752\"},\"field_order\":\"bff\",\"scenes\":[6.96],\"freezes\":[],\"blacks\":[]},\"_id\":\"HIGHRES/NRK/CACHES/CACHE_NRK_WIP1/4282633_LEBA_0_8328225\",\"_rev\":\"8-bac75cdb02cf37e8fe85a1aa73daa98f\"}","localTimestamp":"2020-08-18T13:45:30.454Z"} */
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
-			`${doc.mediaId.replace(/:/gi, '_')}.jpg`
+			`${doc._id.replace(/:/gi, '_')}.jpg`
 		)
 		const tmpPath = destPath.slice(0, -4) + '.new.jpg'
 		await fs.mkdirp(path.dirname(tmpPath))
@@ -448,7 +452,7 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.previews && this.config.previews.folder) || 'previews',
-			`${doc.mediaId.replace(/:/gi, '_')}.webm`
+			`${doc._id.replace(/:/gi, '_')}.webm`
 		)
 		const tmpPath = destPath + '.new'
 
