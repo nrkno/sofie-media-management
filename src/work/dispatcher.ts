@@ -85,6 +85,8 @@ export class Dispatcher {
 		this.warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
 	}
 
+	/* {"level":"error","message":"Unhandled Promise rejection: TypeError: Cannot read property 'map' of undefined\n at Dispatcher.<anonymous> (C:\\casparcg\\media-manager\\dist\\work\\dispatcher.js:84:44)\n at Generator.next (<anonymous>)\n at fulfilled (C:\\casparcg\\media-manager\\node_modules\\tslib\\tslib.js:112:62)\n at runMicrotasks (<anonymous>)\n at processTicksAndRejections (internal/process/task_queues.js:97:5) Cannot read property 'map' of undefined TypeError: Cannot read property 'map' of undefined\n at Dispatcher.<anonymous> (C:\\casparcg\\media-manager\\dist\\work\\dispatcher.js:84:44)\n at Generator.next (<anonymous>)\n at fulfilled (C:\\casparcg\\media-manager\\node_modules\\tslib\\tslib.js:112:62)\n at runMicrotasks (<anonymous>)\n at processTicksAndRejections (internal/process/task_queues.js:97:5)","localTimestamp":"2020-08-18T13:08:56.383Z"} */
+
 	private async initDB(): Promise<void> {
 		PouchDB.plugin(PouchDBFind)
 		await fs.ensureDir('./db') // TODO this should be configurable?
@@ -580,7 +582,7 @@ export class Dispatcher {
 	private onNewWorkFlow = atomic(async (finished: () => void, wf: WorkFlow, generator: BaseWorkFlowGenerator) => {
 		// TODO: This should also handle extra workflows using a hash of the basic WorkFlow object to check if there is a WORKING or IDLE workflow that is the same
 		const hash = getFlowHash(wf)
-		const wfDb: WorkFlowDB = Object.assign(wf, { hash, _rev: '', steps: undefined })
+		const wfDb: WorkFlowDB = Object.assign({}, wf, { hash, _rev: '', steps: undefined })
 		wfDb.modified = getCurrentTime()
 
 		// console.log(`Current hash: ${hash}`)
