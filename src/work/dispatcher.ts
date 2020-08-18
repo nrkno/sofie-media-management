@@ -622,13 +622,13 @@ export class Dispatcher {
 			// persist the workflow steps separately to db:
 			await Promise.all(
 				wf.steps.map(step => {
-					this.logger.info(`persisting step: ${JSON.stringify(step)}`)
 					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
 						_id: wfDb._id + '_' + randomId(),
 						workFlowId: wfDb._id
 					})
 					stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
 					stepDb.modified = getCurrentTime()
+					this.logger.info(`persisting step: ${JSON.stringify(workStepToPlain(stepDb))}`)
 					return noTryAsync(
 						() => this.workSteps.put(workStepToPlain(stepDb) as WorkStepDB),
 						err =>
