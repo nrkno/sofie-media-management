@@ -68,6 +68,9 @@ function makeVideoStream(clipData: ClipData, videoFormat: number): object {
 // Note: SD videos have one audio track with 4 or 8 channels - not represented here
 export function makeAudioStreams(clipData: ClipData, audioFormat: number): object[] {
 	const streams: object[] = []
+	if (audioFormat === -1) {
+		return streams
+	}
 	let noOfStreams = audioFormat <= 522 ? 4 : 8
 
 	for (let index = 1; index <= noOfStreams; index++) {
@@ -135,7 +138,7 @@ function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number
 
 	return {
 		filename: `quantel:${clipData.ClipGUID}`,
-		nb_streams: audioFormat <= 522 ? 5 : 9,
+		nb_streams: audioFormat === -1 ? 1 : (audioFormat <= 522 ? 5 : 9),
 		nb_programs: 0,
 		format_name: 'mxf',
 		format_long_name: 'MXF (Material eXchange Format)',
@@ -166,10 +169,11 @@ export default function mapClipMetadata(clipData: ClipData): object {
 		.map(x => +x)
 		.sort()
 		.reverse()[0]
-	if (clipData.AudioFormats === '') {
-		throw new Error('Cannot make audio stream metadata with empty audio formats.')
+	let audioFormat: number
+	if (clipData.AudioFormats === '') { // Streams can be published without audio
+		audioFormat = -1
 	}
-	let audioFormat = clipData.AudioFormats.split(' ')
+	audioFormat = clipData.AudioFormats.split(' ')
 		.map(x => +x)
 		.sort()
 		.reverse()[0]
