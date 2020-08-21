@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0-3](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-2...v1.2.0-3) (2020-08-21)
+
+
+### Bug Fixes
+
+* handle black frame detect durations with an 's' unit specifier ([8ef39e4](https://github.com/nrkno/tv-automation-media-management/commit/8ef39e4941cadc8fa94e995bf48da99d514da12c))
+* reference correct _id property when making file names ([db1db5e](https://github.com/nrkno/tv-automation-media-management/commit/db1db5e7a981c72c4a6af7f5d1ec48d82dac6998))
+* resilient to quantel check being called with undefined - possible bad data on initialization ([2aa4427](https://github.com/nrkno/tv-automation-media-management/commit/2aa4427993e51b84cc3fb5a96c8c53cb228bf3a8))
+* stop circular depedency in logging from causing jobs to NaN% ([e9bb402](https://github.com/nrkno/tv-automation-media-management/commit/e9bb402b4af451cd42b30f889e1dbe662e3520d0))
+* stop wiping workflow steps before persisting them ([134cdd1](https://github.com/nrkno/tv-automation-media-management/commit/134cdd190f8955d6a9a26514b58efd05c5ff57ae))
+* tolerate clips with no audio / audio format is empty string ([458ad38](https://github.com/nrkno/tv-automation-media-management/commit/458ad38bcef4b95dd7d0671a45e9375b95724743))
+
 ## [1.2.0-2](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-1...v1.2.0-2) (2020-08-10)
 
 
