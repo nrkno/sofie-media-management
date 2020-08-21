@@ -138,7 +138,7 @@ function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number
 
 	return {
 		filename: `quantel:${clipData.ClipGUID}`,
-		nb_streams: audioFormat === -1 ? 1 : (audioFormat <= 522 ? 5 : 9),
+		nb_streams: audioFormat === -1 ? 1 : audioFormat <= 522 ? 5 : 9,
 		nb_programs: 0,
 		format_name: 'mxf',
 		format_long_name: 'MXF (Material eXchange Format)',
@@ -170,7 +170,8 @@ export default function mapClipMetadata(clipData: ClipData): object {
 		.sort()
 		.reverse()[0]
 	let audioFormat: number
-	if (clipData.AudioFormats === '') { // Streams can be published without audio
+	if (clipData.AudioFormats === '') {
+		// Streams can be published without audio
 		audioFormat = -1
 	}
 	audioFormat = clipData.AudioFormats.split(' ')
