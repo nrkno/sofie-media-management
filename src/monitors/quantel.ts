@@ -320,7 +320,7 @@ export class MonitorQuantel extends Monitor {
 						continue
 					}
 					if (clipSummaries.length >= 1) {
-						const clipSummaryOnPool = _.find(clipSummaries, (clipData: ClipDataSummary): boolean => {
+						const clipSummaryOnPool = _.filter(clipSummaries, (clipData: ClipDataSummary): boolean => {
 							return (
 								typeof clipData.PoolID === 'number' &&
 								(server.pools || []).indexOf(clipData.PoolID) !== -1 && // If present in any of the pools of the server
@@ -328,13 +328,18 @@ export class MonitorQuantel extends Monitor {
 								clipData.Completed !== null &&
 								clipData.Completed.length > 0 // Note from Richard: Completed might not necessarily mean that it's completed on the right server
 							)
-						})
+						}).sort(
+							(
+								a,
+								b // Sort Created dates into reverse order
+							) => new Date(b.Created).getTime() - new Date(a.Created).getTime()
+						)
 						if (clipSummaryOnPool) {
 							// The clip is present, and on the right server
 							this.logger.debug(`${this.ident} doWatch: Clip "${url}" found`)
 							// TODO: perhaps use clipData.Completed ?
 
-							const clipData = await this.quantel.getClip(clipSummaryOnPool.ClipID)
+							const clipData = await this.quantel.getClip(clipSummaryOnPool[0].ClipID)
 
 							if (clipData) {
 								const { result: foundObject, error: foundError } = await noTryAsync(() =>
