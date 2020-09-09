@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.1-0](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0...v1.2.1-0) (2020-09-09)
+
+
+### Bug Fixes
+
+* sort ClipGUIDs duplicated on a pool to select the latest one ([57f13a9](https://github.com/nrkno/tv-automation-media-management/commit/57f13a93536c4329886fdf8c0b3cef6fa8c37c1d))
+
 ## [1.2.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-3...v1.2.0) (2020-08-21)
 
 ## [1.2.0-3](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0-2...v1.2.0-3) (2020-08-21)
