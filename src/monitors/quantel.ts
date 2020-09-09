@@ -336,7 +336,9 @@ export class MonitorQuantel extends Monitor {
 						)
 						if (clipSummaryOnPool) {
 							// The clip is present, and on the right server
-							this.logger.debug(`${this.ident} doWatch: Clip "${url}" found with ${clipSummaryOnPool.length} mathcing clips`)
+							this.logger.debug(
+								`${this.ident} doWatch: Clip "${url}" found with ${clipSummaryOnPool.length} mathcing clips`
+							)
 
 							const clipData = await this.quantel.getClip(clipSummaryOnPool[0].ClipID)
 
