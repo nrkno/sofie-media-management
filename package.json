@@ -131,7 +131,7 @@
     "koa-router": "^8.0.8",
     "koa-send": "^5.0.0",
     "no-try": "^1.1.3",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
     "pouchdb-find": "^7.0.0",
     "pouchdb-node": "^7.0.0",
     "reflect-metadata": "^0.1.12",
