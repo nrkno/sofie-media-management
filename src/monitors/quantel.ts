@@ -370,7 +370,7 @@ export class MonitorQuantel extends Monitor {
 
 										_attachments: {},
 										_id: url.toUpperCase(),
-										_rev: '1-created' + Date.now()
+										_rev: ''
 									}
 
 									const { error: putError, result: putResult } = await noTryAsync(
@@ -380,7 +380,12 @@ export class MonitorQuantel extends Monitor {
 									)
 									if (putError) {
 										this.logger.debug(
-											`${this.ident} doWatch: Unable to store clip "${url}" in local database`
+											`${
+												this.ident
+											} doWatch: Unable to store clip "${url}" in local database: ${JSON.stringify(
+												mediaObject
+											)}`,
+											putError
 										)
 									} else {
 										this.logger.debug(
