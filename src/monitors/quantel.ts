@@ -163,7 +163,7 @@ export class MonitorQuantel extends Monitor {
 			this.triggerWatch()
 			this.initialized = true
 		} catch (err) {
-			this.logger.error('Monitor Quantel: error initializing quantel monitor', err)
+			this.logger.error(`${this.ident} init: error initializing quantel monitor`, err)
 		}
 	}
 

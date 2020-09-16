@@ -602,12 +602,22 @@ export class Dispatcher {
 		for (let i = 0; i < docs.rows.length; i++) {
 			const item: WorkFlowDB | undefined = docs.rows[i].doc
 			if (item === undefined) continue
-			if (!item.finished && item.hash === hash) {
-				this.logger.warn(
-					`Dispatcher: ignoring new workFlow: "${wf._id}", because a matching workflow has been found: "${item._id}".`
-				)
-				finished()
-				return
+			if (item.hash === hash) {
+				if (!item.finished) {
+					this.logger.warn(
+						`Dispatcher: ignoring new workFlow: "${wf._id}", because a matching workflow has been found: "${item._id}".`
+					)
+					finished()
+					return
+				}
+				// Only for Quantel ... because CasparCG clip workflows might be re-initiated due to file delete 
+				if (item.finished && item.success === true && item.name && item.name.startsWith("quantel:")) { 
+					this.logger.warn(
+						`Dispatcher: ignoring new workFlow: "${wf._id}", because a previous Quantel workflow has completed successfully: "${item._id}".`
+					)
+					finished()
+					return
+				}
 			}
 		}
 		// Did not find an outstanding workflow with the same hash
