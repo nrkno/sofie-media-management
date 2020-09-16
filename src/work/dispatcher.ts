@@ -610,8 +610,8 @@ export class Dispatcher {
 					finished()
 					return
 				}
-				// Only for Quantel ... because CasparCG clip workflows might be re-initiated due to file delete 
-				if (item.finished && item.success === true && item.name && item.name.startsWith("quantel:")) { 
+				// Only for Quantel ... because CasparCG clip workflows might be re-initiated due to file delete
+				if (item.finished && item.success === true && item.name && item.name.startsWith('quantel:')) {
 					this.logger.warn(
 						`Dispatcher: ignoring new workFlow: "${wf._id}", because a previous Quantel workflow has completed successfully: "${item._id}".`
 					)
