@@ -667,11 +667,7 @@ export class Worker {
 		let filterString = ''
 		if (metaconf.blackDetection) {
 			if (metaconf.blackDuration && metaconf.blackDuration?.endsWith('s')) {
-<<<<<<< HEAD
 				metaconf.blackDuration = metaconf.blackDuration.slice(0, -1)
-=======
-				metaconf.blackDuration = metaconf.blackDuration.slice(0, -1) 
->>>>>>> release22.1
 			}
 			filterString +=
 				`blackdetect=d=${metaconf.blackDuration || '2.0'}:` +
