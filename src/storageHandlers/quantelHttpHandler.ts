@@ -294,7 +294,7 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 	async init(): Promise<void> {
 		QuantelGatewaySingleton = this.gateway = new QuantelGateway()
 		await this.gateway.init(this.gatewayUrl, this.ISAUrl, this.ISABackupUrl, this.zoneId, this.serverId)
-		this._monitor = setInterval(() => this.monitor(), 5000)
+		this._monitor = global.setInterval(() => this.monitor(), 5000)
 		this._initialized = true
 	}
 	destroy(): Promise<void> {

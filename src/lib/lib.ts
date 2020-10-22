@@ -138,7 +138,7 @@ export function throttleOnKey<T extends (key: string, ...args: any[]) => void | 
 			} else {
 				keyThrottleHistory[id].args = args
 				keyThrottleHistory[id].lastCalled = Date.now()
-				keyThrottleHistory[id].timeout = setTimeout(() => {
+				keyThrottleHistory[id].timeout = global.setTimeout(() => {
 					keyThrottleHistory[id].timeout = undefined
 					keyThrottleHistory[id].lastCalled = Date.now()
 					// console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)

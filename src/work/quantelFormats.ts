@@ -1,7 +1,7 @@
 import { ClipData } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
 
 function makeVideoStream(clipData: ClipData, videoFormat: number): object {
-	let targetVideo = {
+	let targetVideo: { [property: string]: string | number | undefined | boolean | object } = {
 		index: 0,
 		codec_name: videoFormat > 100 ? 'h264' : 'mpeg2video',
 		codec_long_name: videoFormat > 100 ? 'H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10' : 'MPEG-2 video',
@@ -57,7 +57,7 @@ function makeVideoStream(clipData: ClipData, videoFormat: number): object {
 	}
 
 	if (videoFormat < 100) {
-		// renove non-AVC flags for MPEG-2 video
+		// remove non-AVC flags for MPEG-2 video
 		delete targetVideo.is_avc
 		delete targetVideo.nal_length_size
 	}
