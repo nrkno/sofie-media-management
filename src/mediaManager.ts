@@ -202,7 +202,11 @@ export class MediaManager {
 				this.coreHandler,
 				this._logger,
 				settings.lingerTime,
-				settings.cronJobTime
+				settings.cronJobTime,
+				settings.copyPriority,
+				settings.metadata?.priority,
+				settings.thumbnails?.priority,
+				settings.previews?.priority
 			)
 		)
 

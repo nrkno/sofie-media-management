@@ -73,7 +73,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		coreHandler: CoreHandler,
 		private logger: LoggerInstance,
 		lingerTime?: number,
-		cronJobTime?: number
+		cronJobTime?: number,
+		private copyPriority?: number,
+		private metadataPriority?: number,
+		private thumbnailPriority?: number,
+		private previewPriority?: number
 	) {
 		super(logger)
 		this._allStorages = availableStorage
@@ -732,7 +736,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					action: WorkStepAction.COPY,
 					file: file,
 					target: st,
-					priority: 2,
+					priority: this.copyPriority || 2.0,
 					criticalStep: true,
 					status: WorkStepStatus.IDLE
 				})
@@ -743,7 +747,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					action: WorkStepAction.SCAN,
 					file,
 					target: st,
-					priority: 2,
+					priority: this.copyPriority || 2.0,
 					criticalStep: true,
 					status: WorkStepStatus.IDLE
 				})
@@ -754,21 +758,21 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				action: WorkStepAction.GENERATE_METADATA,
 				file,
 				target: st,
-				priority: 1,
+				priority: this.metadataPriority || 1.0,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
 				file,
 				target: st,
-				priority: 0.5,
+				priority: this.thumbnailPriority || 0.5,
 				status: WorkStepStatus.IDLE
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
 				file,
 				target: st,
-				priority: 0.3,
+				priority: this.previewPriority || 0.3,
 				status: WorkStepStatus.IDLE
 			})
 		)
