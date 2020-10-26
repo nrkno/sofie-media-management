@@ -341,7 +341,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			name: 'Enable preview generation',
 			type: ConfigManifestEntryType.BOOLEAN
 		},
-		{ 
+		{
 			id: 'previews.priority',
 			name: 'Preview generation priority',
 			type: ConfigManifestEntryType.NUMBER,
