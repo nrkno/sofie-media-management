@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.1-0...v1.2.1) (2020-09-28)
+
+
+### Bug Fixes
+
+* create objects in quantel monitor if missing and destination ID in config manifest ([95e243d](https://github.com/nrkno/tv-automation-media-management/commit/95e243dd8c4e88507fcbce7aa99973cac1854959))
+
 ### [1.2.1-0](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.0...v1.2.1-0) (2020-09-09)
 
 
