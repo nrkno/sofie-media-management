@@ -136,6 +136,14 @@ export class MonitorMediaWatcher extends Monitor {
 					await this.sendRemoved(id)
 				}
 
+				this.coreHandler.core.onConnected(() => {
+					this._status = {
+						statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
+						messages: ['Updating status after recent core connect ...']
+					}
+					this.updateAndSendStatus()
+				})
+
 				this.logger.info('Media watcher: done file sync init')
 			} else {
 				this.logger.info('Media watcher disabled')

@@ -151,6 +151,14 @@ export class MonitorQuantel extends Monitor {
 				this._updateAndSendStatus()
 			})
 
+			this.coreHandler.core.onConnected(() => {
+				this._status = {
+					statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
+					messages: ['Updating status after recent core connect ...']
+				} 
+				this._updateAndSendStatus()
+			})
+
 			// Sync initial file list:
 			// TODO: make this work, currently there is a discrepancy in the id..
 			// const objectRevisions = await this.getAllCoreObjRevisions()
