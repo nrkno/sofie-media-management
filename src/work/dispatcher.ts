@@ -618,6 +618,17 @@ export class Dispatcher {
 					finished()
 					return
 				}
+				// TODO consider whether this is relevant for non-Quantel workflows as well
+				if (item.finished && item.success !== true && item.name && item.name.startsWith('quantel:')) {
+					// Allow the new workflow - try again on restarts - but delete the old one
+					this.logger.warn(
+						`Dispatcher: new Quantel workflow "${wf._id}" replaces failed workflow "${item._id}".`
+					)
+					const { error: delError } = await noTryAsync(() => this.workFlows.remove(item))
+					if (delError) {
+						this.logger.error('Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"', delError)
+					}
+				}
 			}
 		}
 		// Did not find an outstanding workflow with the same hash
