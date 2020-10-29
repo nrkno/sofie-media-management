@@ -599,6 +599,7 @@ export class Dispatcher {
 			throw docsError // TODO too extreme?
 		}
 
+		let stepCache: PouchDB.Core.AllDocsResponse<WorkStepDB> | undefined = undefined
 		for (let i = 0; i < docs.rows.length; i++) {
 			const item: WorkFlowDB | undefined = docs.rows[i].doc
 			if (item === undefined) continue
@@ -627,6 +628,26 @@ export class Dispatcher {
 					const { error: delError } = await noTryAsync(() => this.workFlows.remove(item))
 					if (delError) {
 						this.logger.error('Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"', delError)
+					}
+					// Tidy up any related worksteps
+					if (!stepCache) {
+						const { result: stepDetails, error: stepError } = await noTryAsync(() => this.workSteps.allDocs())
+						if (stepError) {
+							this.logger.error(`Dispatcher: workstep replacement - failed to retrieve workstep identifiers`)
+							stepCache = undefined
+						} else {
+							stepCache = stepDetails
+						}
+					}
+					if (stepCache) {
+						for ( let row of stepCache.rows ) {
+							if (row.doc && row.doc._id.startsWith(item._id)) {
+								const { error: delStepError } = await noTryAsync(() => this.workSteps.remove(row.doc?._id ?? '', row.doc?._rev ?? ''))
+								if (delStepError) {
+									this.logger.error(`Dispatcher: workstep replacement - failed to delete workstep "${row.doc?._id}"`)
+								}
+							}
+						}
 					}
 				}
 			}
