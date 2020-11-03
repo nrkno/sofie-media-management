@@ -1,15 +1,4 @@
 {
-  "compilerOptions": {
-    "experimentalDecorators": true
-  },
-  "extends": "./config/tsconfig.base",
-  "exclude": [
-    "node_modules/**",
-    "src/**/__mocks__/*"
-  ],
-  "types": [
-    "node",
-    "reflect-metadata",
-    "jest"
-  ]
+	"extends": "@sofie-automation/code-standard-preset/ts/tsconfig.bin",
+	"exclude": ["node_modules/**", "scratch/**"]
 }
