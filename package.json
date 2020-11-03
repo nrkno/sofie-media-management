@@ -158,7 +158,7 @@
 			"prettier --write"
 		],
 		"*.{ts,tsx}": [
-			"yarn lint --fix"
+			"yarn lint-fix"
 		]
 	}
 }
