@@ -44,10 +44,10 @@ export function retryNumber<T>(
 ): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		test().then(
-			res => {
+			(res) => {
 				resolve(res)
 			},
-			reason => {
+			(reason) => {
 				doneSoFar = doneSoFar === undefined ? 1 : doneSoFar + 1
 				if (doneSoFar >= count) {
 					reject(reason)
@@ -85,13 +85,13 @@ export function getFlowHash(wf: WorkFlow): string {
 		(wf.name || 'UNNAMED') +
 		';' +
 		wf.steps
-			.map(i =>
+			.map((i) =>
 				_.values(
 					_.omit(i, ['_id', '_rev', 'status', 'messages', 'modified', 'priority', 'progress', 'expectedLeft'])
 				)
-					.map(j => {
+					.map((j) => {
 						if (typeof j === 'object') {
-							return _.compact(_.values(j).map(k => (typeof k === 'object' ? null : k))).join(':')
+							return _.compact(_.values(j).map((k) => (typeof k === 'object' ? null : k))).join(':')
 						} else {
 							return j
 						}
@@ -144,7 +144,7 @@ export function throttleOnKey<T extends (key: string, ...args: any[]) => void | 
 					// console.log(`Calling throttled ${id} with ${key}, ${keyThrottleHistory[id].args}`)
 					const p = fcn(key, ...keyThrottleHistory[id].args)
 					if (p) {
-						p.catch(e => {
+						p.catch((e) => {
 							console.error(
 								`There was an error in a throttled function ${fcn.name}: ${JSON.stringify(e)}`
 							)
@@ -185,11 +185,11 @@ const syncFunctionRunningFcns: { [id: string]: number } = {}
 export function atomic<T extends (finished: () => void, ...args: any[]) => void>(
 	fcn: T,
 	id0?: string,
-	timeout: number = 10000
+	timeout = 10000
 ): (...args: any[]) => void {
 	// TODO: typing for the returned function could be improved with TypeScript 3.3
 
-	let id = id0 || randomId()
+	const id = id0 || randomId()
 
 	return function(...args: any[]): void {
 		syncFunctionFcns.push({
@@ -203,13 +203,13 @@ export function atomic<T extends (finished: () => void, ...args: any[]) => void>
 	} as T
 }
 function evaluateFunctions() {
-	_.each(syncFunctionFcns, o => {
+	_.each(syncFunctionFcns, (o) => {
 		if (o.status === syncFunctionFcnStatus.WAITING) {
 			let runIt = false
 			// is the function running?
 			if (syncFunctionRunningFcns[o.id]) {
 				// Yes, an instance of the function is running
-				let timeSinceStart = Date.now() - syncFunctionRunningFcns[o.id]
+				const timeSinceStart = Date.now() - syncFunctionRunningFcns[o.id]
 				if (timeSinceStart > o.timeout) {
 					// The function has run too long
 					runIt = true
@@ -275,19 +275,19 @@ export function atomicPromise<T>(id: string, fcn: (...args: any[]) => Promise<T>
 }
 
 function evaluateAtomicPromiseQueue() {
-	_.each(atomicPromiseQueue, queue => {
+	_.each(atomicPromiseQueue, (queue) => {
 		const first = _.first(queue)
 
 		if (first && !first.running) {
 			first.running = true
 
 			Promise.resolve(first.fcn())
-				.then(result => {
+				.then((result) => {
 					queue.shift()
 					first.resolve(result)
 					evaluateAtomicPromiseQueue()
 				})
-				.catch(error => {
+				.catch((error) => {
 					queue.shift()
 					first.reject(error)
 					evaluateAtomicPromiseQueue()
@@ -300,13 +300,13 @@ export function updateDB<T>(db: PouchDB.Database<T>, objId: string, cb: (obj: T)
 	return atomicPromise('put_' + objId, () => {
 		return db
 			.get(objId)
-			.then(obj => {
+			.then((obj) => {
 				const updatedObj = cb(obj)
 				return db.put(updatedObj).then(() => {
 					return updatedObj
 				})
 			})
-			.catch(e => {
+			.catch((e) => {
 				console.log('Error in updateDB ', objId)
 				throw e
 			})
@@ -330,7 +330,7 @@ export function putToDBUpsert<T>(
 						})
 					} else return Promise.resolve(undefined)
 				},
-				error => {
+				(error) => {
 					if (error.status === 404) {
 						const updatedObj = cb(undefined)
 						if (updatedObj) {
@@ -341,7 +341,7 @@ export function putToDBUpsert<T>(
 					} else throw error
 				}
 			)
-			.catch(e => {
+			.catch((e) => {
 				console.log('Error in putToDBUpsert ', objId)
 				throw e
 			})
@@ -350,7 +350,7 @@ export function putToDBUpsert<T>(
 
 /** Async Javascripts missing wait function. */
 export function wait(time: number): Promise<void> {
-	return new Promise(resolve => {
+	return new Promise((resolve) => {
 		setTimeout(resolve, time)
 	})
 }

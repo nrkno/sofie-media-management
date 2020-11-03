@@ -58,10 +58,10 @@ export class PreviewAndThumbnailVacuum {
 				since: 'now',
 				live: true
 			})
-			.on('change', change => {
+			.on('change', (change) => {
 				this.rowChanged(change.id, change.deleted)
 			})
-			.on('error', err => {
+			.on('error', (err) => {
 				this.logger.error(`PreviewAndThumbnailVacuum: error from change listener`, err)
 			})
 	}

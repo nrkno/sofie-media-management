@@ -43,7 +43,7 @@ export interface DeviceConfig {
 }
 
 export class MediaManager {
-	private coreHandler: CoreHandler
+	private coreHandler: CoreHandler | undefined = undefined
 	private _config: Config
 	private _logger: Winston.LoggerInstance
 
@@ -153,7 +153,7 @@ export class MediaManager {
 		// TODO: Initialize Media Manager (?)
 		// TODO: resources created here should be disposed of from here
 
-		this._availableStorage = _.map(settings.storages || [], item => {
+		this._availableStorage = _.map(settings.storages || [], (item) => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
 				handler: buildStorageHandler(item as GeneralStorageSettings, this._logger)
 			})
@@ -162,14 +162,14 @@ export class MediaManager {
 		this._trackedMedia = this._trackedMedia || new TrackedMediaItems(this._logger)
 
 		await Promise.all(
-			this._availableStorage.map(st => {
+			this._availableStorage.map((st) => {
 				this._logger.info(`About to initialize storage handler for ${st.id}.`)
 				return st.handler
 					.init()
 					.then(() => {
 						this._logger.info(`Storage handler for "${st.id}" initialized.`)
 					})
-					.catch(reason => {
+					.catch((reason) => {
 						this.coreHandler.setProcessState(
 							st.id,
 							[`Could not set up storage handler "${st.id}": ${reason}`],
@@ -228,11 +228,11 @@ export class MediaManager {
 		this.coreHandler.onChanged(() => {
 			this.coreHandler.core
 				.getPeripheralDevice()
-				.then(device => {
+				.then((device) => {
 					if (device) {
 						const settings = device.settings
 						if (!_.isEqual(settings, this._monitorManager.settings)) {
-							this._monitorManager.onNewSettings(settings).catch(e => this._logger.error(e))
+							this._monitorManager.onNewSettings(settings).catch((e) => this._logger.error(e))
 						}
 					}
 				})

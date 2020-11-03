@@ -1,7 +1,7 @@
 import { ClipData } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
 
-function makeVideoStream(clipData: ClipData, videoFormat: number): object {
-	let targetVideo: any = {
+function makeVideoStream(clipData: ClipData, videoFormat: number): Record<string, unknown> {
+	const targetVideo: Record<string, unknown> = {
 		index: 0,
 		codec_name: videoFormat > 100 ? 'h264' : 'mpeg2video',
 		codec_long_name: videoFormat > 100 ? 'H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10' : 'MPEG-2 video',
@@ -66,12 +66,12 @@ function makeVideoStream(clipData: ClipData, videoFormat: number): object {
 }
 
 // Note: SD videos have one audio track with 4 or 8 channels - not represented here
-export function makeAudioStreams(clipData: ClipData, audioFormat: number): object[] {
-	const streams: object[] = []
+export function makeAudioStreams(clipData: ClipData, audioFormat: number): Array<Record<string, unknown>> {
+	const streams: Array<Record<string, unknown>> = []
 	if (audioFormat === -1) {
 		return streams
 	}
-	let noOfStreams = audioFormat <= 522 ? 4 : 8
+	const noOfStreams = audioFormat <= 522 ? 4 : 8
 
 	for (let index = 1; index <= noOfStreams; index++) {
 		streams.push({
@@ -120,7 +120,7 @@ export function makeAudioStreams(clipData: ClipData, audioFormat: number): objec
 	return streams
 }
 
-function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number): object {
+function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number): Record<string, unknown> {
 	// FFprobe guesses bitrate and size based on first 100 frames ... this guesses at the guess
 	let bitrate = 0
 	switch (videoFormat) {
@@ -160,13 +160,13 @@ function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number
 	}
 }
 
-export default function mapClipMetadata(clipData: ClipData): object {
+export default function mapClipMetadata(clipData: ClipData): Record<string, unknown> {
 	if (clipData.VideoFormats === '') {
 		throw new Error('Cannot make video stream metadata with an empty video format.')
 	}
 	// Some videos have multiple formats, e.g. "0 611 633" ... this works with the highest number
-	let videoFormat = clipData.VideoFormats.split(' ')
-		.map(x => +x)
+	const videoFormat = clipData.VideoFormats.split(' ')
+		.map((x) => +x)
 		.sort()
 		.reverse()[0]
 	let audioFormat: number
@@ -175,7 +175,7 @@ export default function mapClipMetadata(clipData: ClipData): object {
 		audioFormat = -1
 	}
 	audioFormat = clipData.AudioFormats.split(' ')
-		.map(x => +x)
+		.map((x) => +x)
 		.sort()
 		.reverse()[0]
 

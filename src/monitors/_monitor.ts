@@ -13,7 +13,7 @@ export abstract class Monitor extends EventEmitter {
 
 	private changes: PouchDB.Core.Changes<MediaObject>
 
-	protected lastSequenceNr: number = 0
+	protected lastSequenceNr = 0
 
 	private monitorConnectionTimeout: NodeJS.Timer | null = null
 
@@ -27,8 +27,8 @@ export abstract class Monitor extends EventEmitter {
 		messages: []
 	}
 
-	protected isDestroyed: boolean = false
-	protected initialized: boolean = false
+	protected isDestroyed = false
+	protected initialized = false
 
 	// Accessor
 	protected _status: PeripheralDeviceAPI.StatusObject = {
@@ -85,7 +85,7 @@ export abstract class Monitor extends EventEmitter {
 
 	/** To be triggered whenever a MediaObject is added or changed */
 	protected async sendChanged(doc: MediaObject): Promise<void> {
-		let sendDoc = _.omit(doc, ['_attachments']) // TODO not required with thumbs external
+		const sendDoc = _.omit(doc, ['_attachments']) // TODO not required with thumbs external
 		this.logger.info('Media scanning: _sendChanged', JSON.stringify(sendDoc, null, 2))
 		try {
 			await this.coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
@@ -124,7 +124,7 @@ export abstract class Monitor extends EventEmitter {
 			[this.settings.storageId]
 		)
 
-		let coreObjRevisions: CoreObjRevisions = {}
+		const coreObjRevisions: CoreObjRevisions = {}
 		_.each(coreObjects, (obj: any) => {
 			coreObjRevisions[obj.id] = obj.rev
 		})
@@ -141,8 +141,8 @@ export abstract class Monitor extends EventEmitter {
 	}
 
 	protected setConnectionStatus(connected: boolean) {
-		let status = connected ? PeripheralDeviceAPI.StatusCode.GOOD : PeripheralDeviceAPI.StatusCode.BAD
-		let messages = connected ? [] : ['MediaScanner not connected']
+		const status = connected ? PeripheralDeviceAPI.StatusCode.GOOD : PeripheralDeviceAPI.StatusCode.BAD
+		const messages = connected ? [] : ['MediaScanner not connected']
 		if (status !== this.statusConnection.statusCode) {
 			this.statusConnection.statusCode = status
 			this.statusConnection.messages = messages
@@ -175,7 +175,7 @@ export abstract class Monitor extends EventEmitter {
 			}
 		}
 
-		_.each([statusSettings, this.statusConnection, this.statusDisk], s => {
+		_.each([statusSettings, this.statusConnection, this.statusDisk], (s) => {
 			if (s.statusCode > statusCode) {
 				messages = s.messages || []
 				statusCode = s.statusCode
@@ -236,8 +236,8 @@ export abstract class Monitor extends EventEmitter {
 		this.logger.info(`Media watcher: restarting changes stream (since ${opts.since})`)
 		this.changes = this.db
 			.changes<MediaObject>(opts)
-			.on('change', changes => this.changeHandler(changes))
-			.on('error', error => this.errorHandler(error))
+			.on('change', (changes) => this.changeHandler(changes))
+			.on('error', (error) => this.errorHandler(error))
 	}
 
 	protected changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
@@ -250,7 +250,7 @@ export abstract class Monitor extends EventEmitter {
 				// Ignore watchdog file changes
 
 				this.logger.debug('Media watcher: deleteMediaObject', changes.id, newSequenceNr)
-				this.sendRemoved(changes.id).catch(e => {
+				this.sendRemoved(changes.id).catch((e) => {
 					this.logger.error('Media watcher: error sending deleted doc', e)
 				})
 			}
@@ -261,7 +261,7 @@ export abstract class Monitor extends EventEmitter {
 
 				this.logger.debug('Media watcher: updateMediaObject', newSequenceNr, md._id, md.mediaId)
 				md.mediaId = md._id
-				this.sendChanged(md).catch(e => {
+				this.sendChanged(md).catch((e) => {
 					this.logger.error('Media watcher: error sending changed doc', e)
 				})
 			}

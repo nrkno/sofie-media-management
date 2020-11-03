@@ -75,11 +75,11 @@ const FixedQuantelStats = literal<fs.Stats>({
  * The workers are kept by the dispatcher and given work from it
  */
 export class Worker {
-	private _busy: boolean = false
-	private _warmingUp: boolean = false
+	private _busy = false
+	private _warmingUp = false
 	private _step: GeneralWorkStepDB | undefined
 	private abortHandler: (() => void) | undefined
-	private finishPromises: Array<Function> = []
+	private finishPromises: Array<(x: unknown[]) => unknown> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
 	private quantelMonitorArrival: ((qm: MonitorQuantel | undefined) => void) | undefined = undefined
@@ -108,7 +108,7 @@ export class Worker {
 		return this._busy ? this._lastBeginStep : undefined
 	}
 
-	setQuantelMonitor(monitor?: MonitorQuantel) {
+	setQuantelMonitor(monitor?: MonitorQuantel): void {
 		if (!this.quantelMonitorArrival) {
 			if (monitor) {
 				this.quantelMonitorPromise = Promise.resolve(monitor)
@@ -144,12 +144,12 @@ export class Worker {
 	 * synchronous pre-step, to be called before doWork.
 	 * run as an intent to start a work (soon)
 	 */
-	warmup() {
+	warmup(): void {
 		if (this._warmingUp) throw new Error(`${this.ident} already warming up`)
 		this._warmingUp = true
 	}
 
-	cooldown() {
+	cooldown(): void {
 		if (this._warmingUp) {
 			this._warmingUp = false
 		}
@@ -165,7 +165,7 @@ export class Worker {
 	 *  Receive work from the Dispatcher
 	 */
 	async doWork(step: GeneralWorkStepDB): Promise<WorkResult> {
-		const progressReportFailed = e => {
+		const progressReportFailed = (e: any) => {
 			this.logger.warn(`${this.ident} could not report progress`, e)
 		}
 
@@ -183,11 +183,11 @@ export class Worker {
 				return this.unBusyAndFailStep(
 					this.doCompositeCopy(
 						step,
-						progress =>
+						(progress) =>
 							this.reportProgress(step, progress)
 								.then()
 								.catch(progressReportFailed),
-						onCancel => (this.abortHandler = onCancel)
+						(onCancel) => (this.abortHandler = onCancel)
 					)
 				)
 			case WorkStepAction.DELETE:
@@ -208,7 +208,7 @@ export class Worker {
 	 * This method does not return any feedback on success or not,
 	 * Instead use this.waitUntilFinished to determine if worker is done or not.
 	 */
-	tryToAbort() {
+	tryToAbort(): void {
 		if (this.busy && this.step && this.abortHandler) {
 			// Implement abort functions
 			this.abortHandler()
@@ -220,7 +220,7 @@ export class Worker {
 	 */
 	waitUntilFinished(): Promise<void> {
 		if (this._busy) {
-			return new Promise(resolve => {
+			return new Promise((resolve) => {
 				this.finishPromises.push(resolve)
 			})
 		} else {
@@ -230,7 +230,7 @@ export class Worker {
 
 	private notBusyAnymore() {
 		this._busy = false
-		this.finishPromises.forEach(fcn => {
+		this.finishPromises.forEach((fcn) => {
 			fcn()
 		})
 		this.finishPromises = []
@@ -264,7 +264,7 @@ export class Worker {
 
 		await noTryAsync(
 			() =>
-				updateDB(this.workStepDB, step._id, obj => {
+				updateDB(this.workStepDB, step._id, (obj) => {
 					const currentProgress = obj.progress || 0
 					if (currentProgress < progress) {
 						// this.logger.debug(`Worker: ${step._id}: Higher progress won: ${currentProgress}`),
@@ -272,7 +272,7 @@ export class Worker {
 					}
 					return obj
 				}),
-			error => this.logger.error(`Worker: error updating progress in database`, error)
+			(error) => this.logger.error(`Worker: error updating progress in database`, error)
 		)
 	}
 
@@ -311,11 +311,11 @@ export class Worker {
 	}
 
 	private async doGenerateThumbnail(step: ScannerWorkStep): Promise<WorkResult> {
-		let fileId = getID(step.file.name)
+		const fileId = getID(step.file.name)
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
-		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		const { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
@@ -344,7 +344,7 @@ export class Worker {
 				() =>
 					new Promise((resolve, reject) => {
 						const thumbStream = fs.createWriteStream(tmpPath)
-						http.get(stillUrl, res => {
+						http.get(stillUrl, (res) => {
 							if (res.statusCode !== 200) {
 								return reject(new Error(`Expected status code of 200, got ${res.statusCode}`))
 							}
@@ -413,7 +413,7 @@ export class Worker {
 		}
 
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		const { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError2) {
 			return this.failStep(
 				`after work, failed to retrieve media object with ID "${fileId}"`,
@@ -437,11 +437,11 @@ export class Worker {
 	}
 
 	private async doGeneratePreview(step: ScannerWorkStep): Promise<WorkResult> {
-		let fileId = getID(step.file.name)
+		const fileId = getID(step.file.name)
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
-		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		const { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
@@ -497,24 +497,24 @@ export class Worker {
 
 		let resolver: (v?: any) => void
 		let rejector: (reason?: any) => void
-		let generating = () =>
+		const generating = () =>
 			new Promise((resolve, reject) => {
 				resolver = resolve
 				rejector = reject
-				let previewProcess = spawn(
+				const previewProcess = spawn(
 					(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32'
 						? 'ffmpeg.exe'
 						: 'ffmpeg',
 					args,
 					{ shell: true }
 				)
-				previewProcess.stdout.on('data', data => {
+				previewProcess.stdout.on('data', (data) => {
 					this.logger.debug(`Worker: preview generate: stdout for "${fileId}"`, data.toString())
 				})
-				previewProcess.stderr.on('data', data => {
+				previewProcess.stderr.on('data', (data) => {
 					this.logger.debug(`Worker: preview generate: stderr for "${fileId}"`, data.toString())
 				})
-				previewProcess.on('close', code => {
+				previewProcess.on('close', (code) => {
 					if (code === 0) {
 						resolver()
 					} else {
@@ -551,7 +551,7 @@ export class Worker {
 		}
 
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		const { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError2) {
 			return this.failStep(
 				`after work, failed to retrieve media object with ID "${fileId}"`,
@@ -653,9 +653,9 @@ export class Worker {
 		const metaconf = this.config.metadata
 		if (!metaconf || (!metaconf.scenes && !metaconf.freezeDetection && !metaconf.blackDetection)) {
 			this.logger.debug(
-				`Worker: get metadata: not generating stream metadata: ${metaconf} ${!metaconf!.scenes &&
-					!metaconf!.freezeDetection &&
-					!metaconf!.blackDetection}`
+				`Worker: get metadata: not generating stream metadata: ${metaconf} ${!metaconf?.scenes &&
+					!metaconf?.freezeDetection &&
+					!metaconf?.blackDetection}`
 			)
 			return {}
 		}
@@ -710,21 +710,21 @@ export class Worker {
 		args.push('-threads 1')
 		args.push('-')
 
-		let infoProcess: ChildProcessWithoutNullStreams = spawn(
+		const infoProcess: ChildProcessWithoutNullStreams = spawn(
 			(this.config.paths && this.config.paths.ffmpeg) || process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
 			args,
 			{ shell: true }
 		)
-		let [scenes, freezes, blacks] = [[] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly>]
+		const [scenes, freezes, blacks] = [[] as Array<number>, [] as Array<Anomaly>, [] as Array<Anomaly>]
 		// TODO current frame is not read?
 		// let currentFrame = 0
 
 		// infoProcess.stdout.on('data', () => { lastProgressReportTimestamp = new Date() })
 		infoProcess.stderr.on('data', (data: any) => {
-			let stringData = data.toString()
+			const stringData = data.toString()
 			// this.logger.debug(`Worker: get metadata: received stderr "${stringData}"`)
 			if (typeof stringData !== 'string') return
-			let frameMatch = stringData.match(/^frame= +\d+/)
+			const frameMatch = stringData.match(/^frame= +\d+/)
 			if (frameMatch) {
 				// currentFrame = Number(frameMatch[0].replace('frame=', ''))
 				return
@@ -774,7 +774,7 @@ export class Worker {
 			rejecter = reject
 		})
 
-		infoProcess.on('close', code => {
+		infoProcess.on('close', (code) => {
 			if (code === 0) {
 				// success
 				// if freeze frame is the end of video, it is not detected fully
@@ -829,7 +829,7 @@ export class Worker {
 	private static updateFreezeStartEnd(tl: Array<SortMeta>): Array<Anomaly> {
 		let freeze: Anomaly | undefined
 		let interruptedFreeze = false
-		let freezes: Array<Anomaly> = []
+		const freezes: Array<Anomaly> = []
 		const startFreeze = (t: number): void => {
 			freeze = { start: t, duration: -1, end: -1 }
 		}
@@ -879,11 +879,11 @@ export class Worker {
 	}
 
 	private async doGenerateAdvancedMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		let fileId = getID(step.file.name)
+		const fileId = getID(step.file.name)
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
-		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		const { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			return this.failStep(`failed to retrieve media object with ID "${fileId}"`, step.action, getError)
 		}
@@ -923,7 +923,7 @@ export class Worker {
 		}
 
 		// Read document again ... might have been updated while we were busy working
-		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		const { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError2) {
 			return this.failStep(
 				`after work, failed to retrieve media object with ID "${fileId}"`,
@@ -958,11 +958,12 @@ export class Worker {
 	}
 
 	private async doGenerateMetadata(step: ScannerWorkStep): Promise<WorkResult> {
-		let fileId = getID(step.file.name)
+		const fileId = getID(step.file.name)
 		// if (step.target.options && step.target.options.mediaPath) {
 		// 	fileId = step.target.options.mediaPath + '/' + fileId
 		// }
 		let docExists = true
+		// eslint-disable-next-line
 		let { result: doc, error: getError } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 		if (getError) {
 			docExists = false
@@ -1068,7 +1069,7 @@ export class Worker {
 		this.logger.info(`Worker: metadata generate: generated metadata for "${fileId}"`)
 		this.logger.debug(`Worker: metadata generate: generated metadata details`, probeData)
 
-		let newInfo = literal<MediaInfo>({
+		const newInfo = literal<MediaInfo>({
 			name: this.isQuantel(doc.mediaId) ? probeData.name : doc._id,
 			//path: doc.mediaPath,
 			//size: doc.mediaSize,
@@ -1134,7 +1135,7 @@ export class Worker {
 
 		// Read document again ... might have been updated while we were busy working
 		if (docExists) {
-			let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+			const { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
 			if (getError2) {
 				return this.failStep(
 					`after work, failed to retrieve media object with ID "${fileId}"`,

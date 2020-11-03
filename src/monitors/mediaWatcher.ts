@@ -98,7 +98,7 @@ export class MonitorMediaWatcher extends Monitor {
 					allDocsResponse.total_rows
 				)
 
-				for (let doc of allDocsResponse.rows) {
+				for (const doc of allDocsResponse.rows) {
 					const docId = this.hashId(doc.id)
 
 					if (doc.value.deleted) {
@@ -112,13 +112,13 @@ export class MonitorMediaWatcher extends Monitor {
 					) {
 						delete coreObjRevisions[docId]
 
-						let doc2 = await this.db.get<MediaObject>(doc.id, {
+						const doc2 = await this.db.get<MediaObject>(doc.id, {
 							attachments: true
 						})
 						doc2.mediaId = doc2._id
 						await this.sendChanged(doc2)
 
-						await new Promise(resolve => {
+						await new Promise((resolve) => {
 							setTimeout(resolve, 100) // slow it down a bit, maybe remove this later
 						})
 					} else {
@@ -132,7 +132,7 @@ export class MonitorMediaWatcher extends Monitor {
 					this.lastSequenceNr = parseInt(dbInfo.update_seq + '', 10)
 				}
 				// The ones left in coreObjRevisions have not been touched, ie they should be deleted
-				for (let id in coreObjRevisions) {
+				for (const id in coreObjRevisions) {
 					await this.sendRemoved(id)
 				}
 
@@ -170,7 +170,7 @@ export class MonitorMediaWatcher extends Monitor {
 
 	private async updateFsStats(): Promise<void> {
 		try {
-			let disks: Array<DiskInfo> = []
+			const disks: Array<DiskInfo> = []
 			let cmd = ''
 			switch (process.platform) {
 				// Note: the Description (Win) and '-l' flag (Linux) limits this to local disks only.
@@ -189,17 +189,17 @@ export class MonitorMediaWatcher extends Monitor {
 						'wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size',
 						{ windowsHide: true }
 					)
-					let lines = stdout
+					const lines = stdout
 						.split('\r\n')
-						.filter(line => line.trim() !== '')
+						.filter((line) => line.trim() !== '')
 						.filter((_line, idx) => idx > 0)
-					for (let line of lines) {
-						let lineMatch = line.match(
+					for (const line of lines) {
+						const lineMatch = line.match(
 							/(?<fs>\w:)\s+(?<desc>(Local Fixed Disk|Network Connection|Removable Disk))\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/
 						)
 						if (lineMatch && lineMatch.groups) {
 							if (lineMatch.groups.desc !== 'Local Fixed Disk') continue // Only report on local disks
-							let [free, size] = [parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size)]
+							const [free, size] = [parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size)]
 							disks.push({
 								fs: lineMatch.groups.fs,
 								type: lineMatch.groups.type,
@@ -218,14 +218,14 @@ export class MonitorMediaWatcher extends Monitor {
 			if (cmd) {
 				// some flavour of Unix
 				const { stdout } = await exec(cmd)
-				let lines = stdout.split('\n')
-				for (let line of lines) {
-					let lineMatch = line.match(
+				const lines = stdout.split('\n')
+				for (const line of lines) {
+					const lineMatch = line.match(
 						/(?<fs>\/\S+)\s+(?<type>\w+)\s+(?<sizeb>\d+)\s+(?<usedb>\d+)\s+(?<avail>\d+)\s+(?<capacity>\d+\%)\s+(?<mount>\S+)/
 					)
 
 					if (lineMatch && lineMatch.groups) {
-						let [size, used] = [
+						const [size, used] = [
 							parseInt(lineMatch.groups.sizeb) * 1024,
 							parseInt(lineMatch.groups.usedb) * 1024
 						]
@@ -241,9 +241,9 @@ export class MonitorMediaWatcher extends Monitor {
 				}
 			}
 
-			let messages: Array<string> = []
+			const messages: Array<string> = []
 			let status = PeripheralDeviceAPI.StatusCode.GOOD
-			for (let disk of disks) {
+			for (const disk of disks) {
 				let diskStatus = PeripheralDeviceAPI.StatusCode.GOOD
 				if (disk.use) {
 					if (disk.use > 75) {

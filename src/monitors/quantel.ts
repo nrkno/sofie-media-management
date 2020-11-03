@@ -9,6 +9,7 @@ import { QuantelGateway } from 'tv-automation-quantel-gateway-client'
 import { MediaObject } from '../api/mediaObject'
 import { noTryAsync } from 'no-try'
 import { ClipData, ClipDataSummary } from 'tv-automation-quantel-gateway-client/dist/quantelTypes'
+import { literal } from '../lib/lib'
 
 /** The minimum time to wait between polling status */
 const BREATHING_ROOM = 300
@@ -57,7 +58,7 @@ export class MonitorQuantel extends Monitor {
 	private quantel: QuantelGateway
 	private watchError: string | null
 	// private cachedMediaObjects: { [objectId: string]: MediaObject | null | { _id: string; _rev: string } } = {}
-	private appPort: number = 8000
+	private appPort = 8000
 	private waitingForInit: Promise<void> | undefined = undefined
 
 	private ident = 'Quantel monitor:'
@@ -72,24 +73,22 @@ export class MonitorQuantel extends Monitor {
 		super(deviceId, db, settings, logger)
 
 		this.quantel = new QuantelGateway()
-		this.quantel.on('error', e => this.logger.error(`${this.ident} Quantel.QuantelGateway`, e))
+		this.quantel.on('error', (e) => this.logger.error(`${this.ident} Quantel.QuantelGateway`, e))
 		if (appPort) {
 			this.appPort = appPort
 		}
 	}
 
 	get deviceInfo(): MonitorDevice {
-		// @ts-ignore: todo: make stronger typed, via core-integration
-		return {
+		return literal<MonitorDevice>({
 			deviceName: `Quantel (${this.settings.gatewayUrl} ${this.settings.zoneId}/${this.settings.serverId})`,
 			deviceId: this.deviceId,
 
 			deviceCategory: PeripheralDeviceAPI.DeviceCategory.MEDIA_MANAGER,
 			deviceType: PeripheralDeviceAPI.DeviceType.MEDIA_MANAGER,
 
-			// @ts-ignore: todo: make stronger typed, via core-integration
 			deviceSubType: 'quantel'
-		}
+		})
 	}
 
 	public async restart(): Promise<void> {
@@ -126,7 +125,7 @@ export class MonitorQuantel extends Monitor {
 				this.expectedMediaItems().find({
 					studioId: this.studioId
 				}),
-				doc => {
+				(doc) => {
 					this.onExpectedAdded(doc._id, doc as ExpectedMediaItem)
 				}
 			)
@@ -192,12 +191,12 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	private parseUrlToQuery(queryUrl: string): QuantelClipSearchQuery {
-		const parsed = url.parse(queryUrl)
+		const parsed = new url.URL(queryUrl)
 		if (parsed.protocol !== QUANTEL_URL_PROTOCOL)
 			throw new Error(`${this.ident} parseUrlToQuery: Unsupported URL format: ${queryUrl}`)
-		let guid = decodeURI(parsed.host || parsed.path || '') // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
+		let guid = parsed.pathname // host for quantel:030B4A82-1B7C-11CF-9D53-00AA003C9CB6
 		// path for quantel:"030B4A82-1B7C-11CF-9D53-00AA003C9CB6"
-		let title = decodeURI(parsed.query || '') // query for quantel:?Clip title or quantel:?"Clip title"
+		let title = parsed.searchParams.keys().next().value || '' // query for quantel:?Clip title or quantel:?"Clip title"
 
 		if (guid.startsWith('?')) {
 			// check if the title wasn't mistakenly matched as GUID
@@ -205,13 +204,13 @@ export class MonitorQuantel extends Monitor {
 			guid = ''
 		}
 
-		if (guid) {
+		if (guid.length > 0) {
 			return {
-				ClipGUID: `"${guid}"`
+				ClipGUID: `"${guid.startsWith('"') ? guid.slice(1, -1) : guid}"`
 			}
-		} else if (title) {
+		} else if (title > 0) {
 			return {
-				Title: `"${title}"`
+				Title: `"${title.startsWith('"') ? title.slice(1, -1) : title}"`
 			}
 		}
 		throw new Error(`${this.ident} parseUrlToQuery: Unexpected search results: ${queryUrl}`)
@@ -243,7 +242,7 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	private onExpectedChanged = (id: string, _oldFields: any, _clearedFields: any, _newFields: any) => {
-		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
+		const item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		if (!item)
 			throw new Error(
 				`${this.ident} onExpectedChanged: Could not find the changed item "${id}" in expectedMediaItems`
@@ -276,7 +275,7 @@ export class MonitorQuantel extends Monitor {
 		// This function should only be called once during init, and then upon end of this.doWatch()
 		setTimeout(() => {
 			if (!this.isDestroyed) {
-				this.doWatch().catch(e => {
+				this.doWatch().catch((e) => {
 					this.logger.error(`${this.ident} triggerWatch: Error in Quantel doWatch`, e)
 				})
 			}
@@ -293,7 +292,7 @@ export class MonitorQuantel extends Monitor {
 
 		// Fetch all url/GUID:s that we are to monitor
 		const urls = _.keys(this.monitoredFiles)
-		for (let url of urls) {
+		for (const url of urls) {
 			if (this.isDestroyed) return // abort checking
 
 			const monitoredFile = this.monitoredFiles[url]
@@ -413,7 +412,7 @@ export class MonitorQuantel extends Monitor {
 								)
 							} else {
 								let copyCreated = false
-								for (let pool of server.pools) {
+								for (const pool of server.pools) {
 									const { result, error } = await noTryAsync(() =>
 										this.quantel.copyClip(undefined, clipSummaries[0].ClipID, pool, 8, true)
 									) // Note: Intra-zone copy only
@@ -440,7 +439,7 @@ export class MonitorQuantel extends Monitor {
 					} else this.logger.debug(`${this.ident} doWatch: Clip "${url}" not found`)
 				} else this.logger.error(`${this.ident} doWatch: Falsy url encountered`)
 
-				let newStatus = mediaObject ? QuantelMonitorFileStatus.READY : QuantelMonitorFileStatus.MISSING
+				const newStatus = mediaObject ? QuantelMonitorFileStatus.READY : QuantelMonitorFileStatus.MISSING
 
 				monitoredFile.status = newStatus
 
@@ -532,7 +531,7 @@ export class MonitorQuantel extends Monitor {
 	}
 
 	private wait(time: number): Promise<void> {
-		return new Promise(resolve => {
+		return new Promise((resolve) => {
 			setTimeout(resolve, time)
 		})
 	}
@@ -546,7 +545,7 @@ export class MonitorQuantel extends Monitor {
 			throw new Error(`${this.ident} ${method}: Could not find clip with ID "${url}"`)
 		}
 
-		const clipSummary = _.find(clipSummaries, clipData => {
+		const clipSummary = _.find(clipSummaries, (clipData) => {
 			return parseInt(clipData.Frames, 10) > 0 && clipData.Completed !== null && clipData.Completed.length > 0
 		})
 		if (clipSummary) {

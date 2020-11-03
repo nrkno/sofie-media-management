@@ -104,7 +104,7 @@ export class TrackedMediaItems {
 	}
 
 	async remove(tmi: TrackedMediaItemDB): Promise<boolean> {
-		let result = await this.db.remove(tmi._id, tmi._rev)
+		const result = await this.db.remove(tmi._id, tmi._rev)
 		return result.ok
 	}
 

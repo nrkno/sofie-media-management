@@ -10,7 +10,7 @@ import { MediaManagerApp } from '../app'
 
 export class MonitorManager {
 	private _monitors: { [id: string]: Monitor } = {}
-	private _initialized: boolean = false
+	private _initialized = false
 	private _coreHandler: CoreHandler
 	private _dispatcher: Dispatcher | undefined = undefined
 	private _app: MediaManagerApp | undefined = undefined
@@ -31,12 +31,12 @@ export class MonitorManager {
 
 		this.settings = settings
 
-		let anythingChanged: boolean = false
+		let anythingChanged = false
 
 		const monitors: { [id: string]: MonitorSettings } = settings.monitors || {}
-		for (let monitorId in monitors) {
+		for (const monitorId in monitors) {
 			const monitorSettings = monitors[monitorId]
-			const storageSettings = this.settings.storages.find(x => x.id === monitorSettings.storageId)
+			const storageSettings = this.settings.storages.find((x) => x.id === monitorSettings.storageId)
 
 			const existingMonitor: Monitor | undefined = this._monitors[monitorId]
 			if (!existingMonitor) {
@@ -51,7 +51,7 @@ export class MonitorManager {
 				}
 			}
 		}
-		for (let monitorId in this._monitors) {
+		for (const monitorId in this._monitors) {
 			if (!monitors[monitorId]) {
 				// the device has been removed
 				await this.removeMonitor(monitorId)
@@ -103,7 +103,7 @@ export class MonitorManager {
 
 		// Setup Core connection and tie it to the Monitor:
 		const coreMonitorHandler = new CoreMonitorHandler(this._coreHandler, monitor)
-		monitor.on('connectionChanged', deviceStatus => {
+		monitor.on('connectionChanged', (deviceStatus) => {
 			coreMonitorHandler.onConnectionChanged(deviceStatus)
 		})
 		await coreMonitorHandler.init()

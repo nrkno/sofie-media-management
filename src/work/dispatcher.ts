@@ -56,7 +56,7 @@ export class Dispatcher {
 
 	private cronJobTime: number
 	private watchdogTime: number = 5 * 60 * 1000
-	private watchdogRunning: boolean = false
+	private watchdogRunning = false
 
 	private warningWFQueueLength: number
 	private warningTaskWorkingTime: number
@@ -74,9 +74,9 @@ export class Dispatcher {
 		private coreHandler: CoreHandler,
 		private logger: LoggerInstance
 	) {
-		this.coreHandler.restartWorkflow = workflowId => this.actionRestartWorkflow(workflowId)
-		this.coreHandler.abortWorkflow = workflowId => this.actionAbortWorkflow(workflowId)
-		this.coreHandler.prioritizeWorkflow = workflowId => this.prioritizeWorkflow(workflowId)
+		this.coreHandler.restartWorkflow = (workflowId) => this.actionRestartWorkflow(workflowId)
+		this.coreHandler.abortWorkflow = (workflowId) => this.actionAbortWorkflow(workflowId)
+		this.coreHandler.prioritizeWorkflow = (workflowId) => this.prioritizeWorkflow(workflowId)
 		this.coreHandler.restartAllWorkflows = () => this.actionRestartAllWorkflows()
 		this.coreHandler.abortAllWorkflows = () => this.actionAbortAllWorkflows()
 
@@ -149,7 +149,7 @@ export class Dispatcher {
 		await this.cleanupOldWorkflows()
 		await noTryAsync(
 			() => this.initialWorkFlowSync(),
-			e => {
+			(e) => {
 				this.logger.error(`Dispatcher: failed to synchronize workFlows with core`, e)
 				process.exit(1)
 				throw e
@@ -157,7 +157,7 @@ export class Dispatcher {
 		)
 		await noTryAsync(
 			() => this.initialWorkStepsSync(),
-			e => {
+			(e) => {
 				this.logger.error(`Dispatcher: failed to synchronize workSteps with core`, e)
 				process.exit(1)
 				throw e
@@ -165,14 +165,14 @@ export class Dispatcher {
 		)
 		// Maintain one-to-many relationship for the WorkFlows and WorkSteps
 		// Update WorkFlows and WorkSteps in Core
-		let workflowChanges = this.workFlows.changes({
+		const workflowChanges = this.workFlows.changes({
 			since: 'now',
 			live: true,
 			include_docs: true
 		})
-		workflowChanges.on('change', async change => {
+		workflowChanges.on('change', async (change) => {
 			if (change.deleted) {
-				let { result } = await noTryAsync(
+				const { result } = await noTryAsync(
 					() =>
 						this.workSteps.find({
 							selector: {
@@ -183,7 +183,7 @@ export class Dispatcher {
 						this.logger.error(`Dispatcher: could not find workflow with id "${change.id}" on change`, error)
 					}
 				)
-				let { error } = await noTryAsync(() => Promise.all(result.docs.map(i => this.workSteps.remove(i))))
+				const { error } = await noTryAsync(() => Promise.all(result.docs.map((i) => this.workSteps.remove(i))))
 				if (error) {
 					this.logger.error(`Dispatcher: could not remove orphaned WorkSteps`, error)
 				} else {
@@ -193,17 +193,17 @@ export class Dispatcher {
 				}
 				noTryAsync(
 					() => this.pushWorkFlowToCore(change.id, null),
-					err =>
+					(err) =>
 						this.logger.debug(
 							`Dispatcher: failed to push WorkFlow delete change with ID "${change.id}" to core`,
 							err
 						)
 				)
 			} else if (change.doc) {
-				let changeDoc = change.doc
+				const changeDoc = change.doc
 				noTryAsync(
 					() => this.pushWorkFlowToCore(change.id, changeDoc),
-					err =>
+					(err) =>
 						this.logger.debug(
 							`Dispatcher: failed to push WorkFlow update change with ID "${change.id}" to core`,
 							err
@@ -211,30 +211,30 @@ export class Dispatcher {
 				)
 			}
 		})
-		workflowChanges.on('error', err => {
+		workflowChanges.on('error', (err) => {
 			this.logger.error(`Dispatcher: an error happened in the WorkFlow changes stream`, err)
 		})
 
-		let workstepChanges = this.workSteps.changes({
+		const workstepChanges = this.workSteps.changes({
 			since: 'now',
 			live: true,
 			include_docs: true
 		})
-		workstepChanges.on('change', change => {
+		workstepChanges.on('change', (change) => {
 			if (change.deleted) {
 				noTryAsync(
 					() => this.pushWorkStepToCore(change.id, null),
-					err =>
+					(err) =>
 						this.logger.debug(
 							`Dispatcher: failed to push WorkStep delete change with ID "${change.id}" to core`,
 							err
 						)
 				)
 			} else if (change.doc) {
-				let changeDoc = change.doc
+				const changeDoc = change.doc
 				noTryAsync(
 					() => this.pushWorkStepToCore(change.id, changeDoc),
-					err =>
+					(err) =>
 						this.logger.debug(
 							`Dispatcher: failed to push WorkStep delete change with ID "${change.id}" to core`,
 							err
@@ -242,7 +242,7 @@ export class Dispatcher {
 				)
 			}
 		})
-		workstepChanges.on('error', err => {
+		workstepChanges.on('error', (err) => {
 			this.logger.error(`Dispatcher: an error happened in the WorkStep changes stream`, err)
 		})
 
@@ -250,7 +250,7 @@ export class Dispatcher {
 		this.cronJobInterval = setInterval(() => {
 			noTryAsync(
 				() => this.cleanupOldWorkflows(),
-				e => this.logger.error(`Dispatcher: unhandled error in cleanupOldWorkflows`, e)
+				(e) => this.logger.error(`Dispatcher: unhandled error in cleanupOldWorkflows`, e)
 			)
 		}, this.cronJobTime)
 		this.watchdogInterval = setInterval(() => {
@@ -258,10 +258,10 @@ export class Dispatcher {
 		}, this.watchdogTime)
 
 		this.coreHandler.setProcessState('MediaScanner', [], P.StatusCode.GOOD),
-			await Promise.all(this.generators.map(gen => gen.init()))
+			await Promise.all(this.generators.map((gen) => gen.init()))
 		this.logger.debug(`Dispatcher: initialized`)
 
-		this.generators.forEach(gen => {
+		this.generators.forEach((gen) => {
 			gen.on(WorkFlowGeneratorEventType.NEW_WORKFLOW, this.onNewWorkFlow)
 		})
 		await this.cancelLeftoverWorkSteps()
@@ -269,7 +269,7 @@ export class Dispatcher {
 
 	// FIXME nothing calls this
 	async destroy(): Promise<void> {
-		const { error: genError } = await noTryAsync(() => Promise.all(this.generators.map(gen => gen.destroy())))
+		const { error: genError } = await noTryAsync(() => Promise.all(this.generators.map((gen) => gen.destroy())))
 		if (genError) {
 			this.logger.warn(`Dispatcher: failed to dispose of one or more generators`, genError)
 		} else {
@@ -285,7 +285,7 @@ export class Dispatcher {
 		this.logger.debug(`Dispatcher: WorkFlow clean up task destroyed`)
 
 		const { error: handlerError } = await noTryAsync(() =>
-			Promise.all(this.availableStorage.map(st => st.handler.destroy()))
+			Promise.all(this.availableStorage.map((st) => st.handler.destroy()))
 		)
 		if (handlerError) {
 			this.logger.warn(`Dispather: failed to dispose of one or more storage handlers`, handlerError)
@@ -298,12 +298,12 @@ export class Dispatcher {
 		if (this.watchdogRunning) return
 		this.watchdogRunning = true
 
-		let { result: workflows } = await noTryAsync(
+		const { result: workflows } = await noTryAsync(
 			() =>
 				this.workFlows.allDocs({
 					include_docs: true
 				}),
-			err => {
+			(err) => {
 				this.logger.error(`Dispatch: watchdog: could not list all WorkFlows, restarting`, err)
 				this.watchdogRunning = false
 				this.coreHandler.killProcess(1)
@@ -313,15 +313,16 @@ export class Dispatcher {
 
 		noTry(
 			() => {
-				const unfinishedWorkFlows = workflows.rows.filter(i => i.doc && i.doc.finished === false)
+				const unfinishedWorkFlows = workflows.rows.filter((i) => i.doc && i.doc.finished === false)
 				const oldWorkFlows = unfinishedWorkFlows.filter(
-					i => i.doc && i.doc.created < getCurrentTime() - 3 * 60 * 60 * 1000
+					(i) => i.doc && i.doc.created < getCurrentTime() - 3 * 60 * 60 * 1000
 				)
 				const recentlyFinished = workflows.rows.filter(
-					i => i.doc && i.doc.finished && i.doc.modified && i.doc.modified > getCurrentTime() - 15 * 60 * 1000
+					(i) =>
+						i.doc && i.doc.finished && i.doc.modified && i.doc.modified > getCurrentTime() - 15 * 60 * 1000
 				)
 				const oldUnfinishedWorkFlows = unfinishedWorkFlows.filter(
-					i => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
+					(i) => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
 				)
 				if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
 					this.coreHandler.setProcessState(
@@ -352,7 +353,7 @@ export class Dispatcher {
 				if (
 					_.compact(
 						this.workers.map(
-							i => i.lastBeginStep && i.lastBeginStep < getCurrentTime() - this.warningTaskWorkingTime
+							(i) => i.lastBeginStep && i.lastBeginStep < getCurrentTime() - this.warningTaskWorkingTime
 						)
 					).length > 0
 				) {
@@ -371,7 +372,7 @@ export class Dispatcher {
 				// no problems found, set status to GOOD
 				this.coreHandler.setProcessState(PROCESS_NAME, [], P.StatusCode.GOOD)
 			},
-			err => {
+			(err) => {
 				this.logger.error(`Dispatcher: watchdog: error`, err)
 			}
 		)
@@ -384,7 +385,7 @@ export class Dispatcher {
 				finished: true
 			}
 		})
-		await Promise.all(wfs.docs.map(i => this.actionRestartWorkflow(i._id)))
+		await Promise.all(wfs.docs.map((i) => this.actionRestartWorkflow(i._id)))
 	}
 
 	private async actionAbortAllWorkflows() {
@@ -393,7 +394,7 @@ export class Dispatcher {
 				finished: false
 			}
 		})
-		await Promise.all(wfs.docs.map(i => this.actionAbortWorkflow(i._id)))
+		await Promise.all(wfs.docs.map((i) => this.actionAbortWorkflow(i._id)))
 	}
 
 	private async actionRestartWorkflow(workflowId: string) {
@@ -413,7 +414,7 @@ export class Dispatcher {
 		// Reset the workflow steps
 		await Promise.all(
 			steps.docs.map((step: WorkStepDB) =>
-				updateDB(this.workSteps, step._id, step => {
+				updateDB(this.workSteps, step._id, (step) => {
 					step.status = WorkStepStatus.IDLE
 					step.messages = [`Restarted at ${new Date().toTimeString()}`]
 					step.progress = 0
@@ -423,7 +424,7 @@ export class Dispatcher {
 				})
 			)
 		)
-		await updateDB(this.workFlows, wf._id, wf => {
+		await updateDB(this.workFlows, wf._id, (wf) => {
 			wf.finished = false
 			wf.success = false
 			wf.modified = getCurrentTime()
@@ -446,8 +447,8 @@ export class Dispatcher {
 			}
 		})
 		await Promise.all(
-			result.docs.map(item =>
-				updateDB(this.workSteps, item._id, item => {
+			result.docs.map((item) =>
+				updateDB(this.workSteps, item._id, (item) => {
 					item.priority = prioritized ? item.priority / 10 : item.priority * 10
 					item.modified = getCurrentTime()
 					item.messages = _.union(item.messages || [], [
@@ -458,7 +459,7 @@ export class Dispatcher {
 			)
 		)
 
-		await updateDB(this.workFlows, wf._id, wf => {
+		await updateDB(this.workFlows, wf._id, (wf) => {
 			wf.modified = getCurrentTime()
 			wf.priority = prioritized ? wf.priority / 2 : wf.priority * 2
 			return wf
@@ -488,7 +489,7 @@ export class Dispatcher {
 		// Wait for all relevant workers to finish:
 		await Promise.all(ps)
 
-		await updateDB(this.workFlows, wf._id, wf => {
+		await updateDB(this.workFlows, wf._id, (wf) => {
 			wf.finished = true
 			wf.success = false
 			wf.modified = getCurrentTime()
@@ -514,7 +515,7 @@ export class Dispatcher {
 						async (i): Promise<void> => {
 							await noTryAsync(
 								() => this.workFlows.remove(i),
-								e => this.logger.error(`Dispatcher: failed to remove stale workflow "${i._id}"`, e)
+								(e) => this.logger.error(`Dispatcher: failed to remove stale workflow "${i._id}"`, e)
 							)
 						}
 					)
@@ -554,12 +555,12 @@ export class Dispatcher {
 		const workSteps = workStepsResponse.rows
 
 		const map: { [id: string]: true } = {}
-		workFlows.forEach(workFlow => {
+		workFlows.forEach((workFlow) => {
 			map[workFlow.id] = true
 		})
 
 		const ps: Array<Promise<any>> = []
-		workSteps.forEach(step => {
+		workSteps.forEach((step) => {
 			if (step.doc) {
 				if (!map[step.doc.workFlowId]) {
 					ps.push(this.workSteps.remove(step.doc))
@@ -570,7 +571,7 @@ export class Dispatcher {
 
 		await noTryAsync(
 			() => Promise.all(ps),
-			error => this.logger.error(`Dispatcher: error when removing WorkSteps`, error)
+			(error) => this.logger.error(`Dispatcher: error when removing WorkSteps`, error)
 		)
 	}
 
@@ -619,7 +620,7 @@ export class Dispatcher {
 
 			// persist the workflow steps separately to db:
 			await Promise.all(
-				wf.steps.map(step => {
+				wf.steps.map((step) => {
 					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
 						_id: wfDb._id + '_' + randomId(),
 						workFlowId: wfDb._id
@@ -629,7 +630,7 @@ export class Dispatcher {
 					this.logger.info(`persisting step: ${JSON.stringify(workStepToPlain(stepDb))}`)
 					return noTryAsync(
 						() => this.workSteps.put(workStepToPlain(stepDb) as WorkStepDB),
-						err =>
+						(err) =>
 							this.logger.error(
 								`Dispatcher: failed to store workStep "${step.action}" of workFlow "${wf._id}"`,
 								err
@@ -670,14 +671,14 @@ export class Dispatcher {
 			this.logger.error(`Dispatcher: error finding running work to filter outstanding work`, runningError)
 			throw runningError
 		}
-		const steps: Array<WorkStepDB> = (idleHands.docs as object[]).map(item =>
+		const steps: Array<WorkStepDB> = (idleHands.docs as Array<Record<string, any>>).map((item) =>
 			plainToWorkStep(item, this.availableStorage)
 		)
-		const running: Array<WorkStepDB> = (runningHands.docs as object[]).map(item =>
+		const running: Array<WorkStepDB> = (runningHands.docs as Array<Record<string, any>>).map((item) =>
 			plainToWorkStep(item, this.availableStorage)
 		)
-		const runningIds = new Set(running.map(step => step.workFlowId))
-		return steps.filter(step => !runningIds.has(step.workFlowId)).sort((a, b) => b.priority - a.priority)
+		const runningIds = new Set(running.map((step) => step.workFlowId))
+		return steps.filter((step) => !runningIds.has(step.workFlowId)).sort((a, b) => b.priority - a.priority)
 	}
 
 	/**
@@ -702,8 +703,8 @@ export class Dispatcher {
 
 		const { error: updateError } = await noTryAsync(() =>
 			Promise.all(
-				brokenItems.docs.map(i =>
-					updateDB(this.workSteps, i._id, i => {
+				brokenItems.docs.map((i) =>
+					updateDB(this.workSteps, i._id, (i) => {
 						i.status = WorkStepStatus.ERROR
 						i.modified = getCurrentTime()
 						i.messages = _.union(i.messages || [], ['Working on shutdown, failed.'])
@@ -720,7 +721,7 @@ export class Dispatcher {
 		}
 
 		const { error: blockError } = await noTryAsync(() =>
-			Promise.all(brokenItems.docs.map(i => this.blockStepsInWorkFlow(i.workFlowId)))
+			Promise.all(brokenItems.docs.map((i) => this.blockStepsInWorkFlow(i.workFlowId)))
 		)
 		if (blockError) {
 			this.logger.error('Dispatcher: error blocking one or more broken workSteps', blockError)
@@ -728,8 +729,8 @@ export class Dispatcher {
 
 		const { error: cancelError } = await noTryAsync(() =>
 			Promise.all(
-				wfs.map(i =>
-					updateDB(this.workFlows, i, wf => {
+				wfs.map((i) =>
+					updateDB(this.workFlows, i, (wf) => {
 						wf.finished = true
 						wf.success = false
 						return wf
@@ -751,7 +752,7 @@ export class Dispatcher {
 	 */
 	private async setStepWorking(stepId: string): Promise<void> {
 		const { error } = await noTryAsync(() =>
-			updateDB(this.workSteps, stepId, step => {
+			updateDB(this.workSteps, stepId, (step) => {
 				step.status = WorkStepStatus.WORKING
 				step.modified = getCurrentTime()
 				return step
@@ -771,7 +772,7 @@ export class Dispatcher {
 		const firstSteps: {
 			[key: string]: WorkStepDB
 		} = {}
-		steps.forEach(i => {
+		steps.forEach((i) => {
 			if (!firstSteps[i.workFlowId]) {
 				firstSteps[i.workFlowId] = i
 			}
@@ -801,9 +802,9 @@ export class Dispatcher {
 		const { error: updateError } = await noTryAsync(() =>
 			Promise.all(
 				result.docs
-					.filter(item => item.status === WorkStepStatus.IDLE)
-					.map(item => {
-						return updateDB(this.workSteps, item._id, item => {
+					.filter((item) => item.status === WorkStepStatus.IDLE)
+					.map((item) => {
+						return updateDB(this.workSteps, item._id, (item) => {
 							item.status = WorkStepStatus.BLOCKED
 							item.modified = getCurrentTime()
 							if (stepMessage) item.messages = [stepMessage]
@@ -832,14 +833,14 @@ export class Dispatcher {
 			case WorkStepStatus.ERROR:
 				await noTryAsync(
 					() => this.blockStepsInWorkFlow(job.workFlowId),
-					err => this.logger.error(`Dispatcher: could not block outstanding work steps`, err)
+					(err) => this.logger.error(`Dispatcher: could not block outstanding work steps`, err)
 				)
 				break
 		}
 
 		await noTryAsync(
 			() =>
-				updateDB(this.workSteps, job._id, workStep => {
+				updateDB(this.workSteps, job._id, (workStep) => {
 					workStep.status = result.status
 					workStep.modified = getCurrentTime()
 					workStep.messages = (workStep.messages || []).concat(result.messages || [])
@@ -850,7 +851,7 @@ export class Dispatcher {
 					)
 					return workStep
 				}),
-			err => this.logger.error(`Dispatcher: failed to update database after job "${job._id}"`, err)
+			(err) => this.logger.error(`Dispatcher: failed to update database after job "${job._id}"`, err)
 		)
 	}
 
@@ -888,18 +889,18 @@ export class Dispatcher {
 				}
 
 				const isFinished = steps.docs.every(
-					workStep => workStep.status !== WorkStepStatus.WORKING && workStep.status !== WorkStepStatus.IDLE
+					(workStep) => workStep.status !== WorkStepStatus.WORKING && workStep.status !== WorkStepStatus.IDLE
 				)
 
 				if (isFinished) {
 					// if they are finished, check if all are DONE (not CANCELLED, ERROR or BLOCKED)
 					const isSuccessful = steps.docs.every(
-						workStep =>
+						(workStep) =>
 							workStep.status === WorkStepStatus.DONE || workStep.status === WorkStepStatus.SKIPPED
 					)
 
 					const { error: updateError } = await noTryAsync(() =>
-						updateDB(this.workFlows, wf._id, wf => {
+						updateDB(this.workFlows, wf._id, (wf) => {
 							wf.finished = isFinished
 							wf.success = isSuccessful
 							wf.modified = getCurrentTime()
@@ -943,7 +944,7 @@ export class Dispatcher {
 				noTryAsync(
 					// Don't await - set workers off in parallel
 					() => this.doWorkWithWorker(this.workers[i], nextJob),
-					error => {
+					(error) => {
 						this.logger.error(
 							`Dispatcher: there was an unhandled error when handling job "${nextJob._id}"`,
 							error
@@ -958,12 +959,12 @@ export class Dispatcher {
 	private async doWorkWithWorker(worker: Worker, job: WorkStepDB) {
 		worker.warmup()
 		await this.setStepWorking(job._id)
-		let workResult = await worker.doWork(job as GeneralWorkStepDB)
+		const workResult = await worker.doWork(job as GeneralWorkStepDB)
 		await this.processResult(job, workResult)
 		await this.updateWorkFlowStatus() // Update unfinished WorkFlow statuses
 		noTryAsync(
 			() => this.watchdog(),
-			error => this.logger.error(`Dispatcher: unhandled exception in watchdog`, error)
+			(error) => this.logger.error(`Dispatcher: unhandled exception in watchdog`, error)
 		)
 		this.dispatchWork() // dispatch more work once this job is done
 	}
@@ -996,15 +997,15 @@ export class Dispatcher {
 
 		let tasks: Array<() => Promise<void>> = []
 
-		let coreObjRevisions: { [id: string]: string } = {}
+		const coreObjRevisions: { [id: string]: string } = {}
 		_.each(coreObjects, (obj: any) => {
 			coreObjRevisions[obj._id] = obj.rev
 		})
 		tasks = tasks.concat(
 			_.compact(
 				_.map(
-					allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views),
-					doc => {
+					allDocsResponse.rows.filter((i) => i.doc && !(i.doc as any).views),
+					(doc) => {
 						const docId = doc.id
 
 						if (doc.value.deleted) {
@@ -1045,7 +1046,7 @@ export class Dispatcher {
 			})
 		})
 		let allTasks = Promise.resolve()
-		for (let task of tasks) {
+		for (const task of tasks) {
 			allTasks = allTasks.then(task)
 		}
 		await allTasks
@@ -1080,15 +1081,15 @@ export class Dispatcher {
 
 		let tasks: Array<() => Promise<void>> = []
 
-		let coreObjRevisions: { [id: string]: string } = {}
+		const coreObjRevisions: { [id: string]: string } = {}
 		_.each(coreObjects, (obj: any) => {
 			coreObjRevisions[obj._id] = obj.rev
 		})
 		tasks = tasks.concat(
 			_.compact(
 				_.map(
-					allDocsResponse.rows.filter(i => i.doc && !(i.doc as any).views),
-					doc => {
+					allDocsResponse.rows.filter((i) => i.doc && !(i.doc as any).views),
+					(doc) => {
 						const docId = doc.id
 
 						if (doc.value.deleted) {
@@ -1132,7 +1133,7 @@ export class Dispatcher {
 		})
 
 		let allTasks = Promise.resolve()
-		for (let task of tasks) {
+		for (const task of tasks) {
 			allTasks = allTasks.then(task)
 		}
 		await allTasks
@@ -1171,9 +1172,9 @@ export class Dispatcher {
 		'pushWorkStepToCore'
 	)
 
-	setQuantelMonitor(monitor: MonitorQuantel) {
+	setQuantelMonitor(monitor: MonitorQuantel): void {
 		this.quantelMonitor = monitor
-		this.workers.forEach(w => {
+		this.workers.forEach((w) => {
 			w.setQuantelMonitor(this.quantelMonitor)
 		})
 	}

@@ -23,10 +23,10 @@ export namespace robocopy {
 			])
 
 			const errors: string[] = []
-			let output: string[] = []
+			const output: string[] = []
 
 			if (rbcpy.stdout) {
-				rbcpy.stdout.on('data', data => {
+				rbcpy.stdout.on('data', (data) => {
 					const m = data
 						.toString()
 						.trim()
@@ -42,17 +42,17 @@ export namespace robocopy {
 			}
 
 			if (rbcpy.stderr) {
-				rbcpy.stderr.on('data', data => {
+				rbcpy.stderr.on('data', (data) => {
 					errors.push(data.toString().trim())
 				})
 			}
 
-			rbcpy.on('close', code => {
+			rbcpy.on('close', (code) => {
 				rbcpy = undefined
 				if ((code & 1) === 1) {
 					// Robocopy's code for succesfully copying files is 1 at LSB: https://ss64.com/nt/robocopy-exit.html
 					if (srcFileName !== dstFileName) {
-						fs.rename(path.join(dstFolder, srcFileName), path.join(dstFolder, dstFileName), err => {
+						fs.rename(path.join(dstFolder, srcFileName), path.join(dstFolder, dstFileName), (err) => {
 							if (err) {
 								reject(err)
 								return

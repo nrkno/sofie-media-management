@@ -14,7 +14,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 
 	private LOCAL_LINGER_TIME = 7 * 24 * 60 * 60 * 1000
 
-	protected ident: string = 'Local storage generator:'
+	protected ident = 'Local storage generator:'
 
 	constructor(
 		availableStorage: StorageObject[],
@@ -31,9 +31,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 	async init(): Promise<void> {
 		this.logger.debug(`${this.ident} initializing WorkFlow generator ${this.constructor.name}`)
 		return Promise.resolve().then(() => {
-			this._flows.forEach(item => {
+			this._flows.forEach((item) => {
 				if (item.mediaFlowType === MediaFlowType.LOCAL_INGEST) {
-					const srcStorage = this._availableStorage.find(i => i.id === item.sourceId)
+					const srcStorage = this._availableStorage.find((i) => i.id === item.sourceId)
 
 					if (srcStorage) {
 						if (srcStorage.options.onlySelectedFiles) {
@@ -54,7 +54,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 		return Promise.resolve()
 	}
 
-	protected registerStorage(st: StorageObject) {
+	protected registerStorage(st: StorageObject): void {
 		this.logger.debug(`${this.ident} registerStorage: Registering storage: "${st.id}" in ${this.constructor.name}`)
 		st.handler.on(StorageEventType.add, (e: StorageEvent) => this.onAdd(st, e))
 		st.handler.on(StorageEventType.change, (e: StorageEvent) => this.onChange(st, e))
@@ -66,7 +66,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					`${this.ident} registerStorage: Initial ${this.constructor.name} scan for "${st.id}" complete.`
 				)
 			})
-			.catch(e => {
+			.catch((e) => {
 				this.logger.error(
 					`${this.ident} registerStorage: Initial ${this.constructor.name} scan for "${st.id}" failed`,
 					e
@@ -119,19 +119,21 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					sourceStorageId: st.id,
 					lastSeen: getCurrentTime(),
 					lingerTime: this.LOCAL_LINGER_TIME,
-					targetStorageIds: targetStorages ? targetStorages.map(i => i.id) : [],
+					targetStorageIds: targetStorages ? targetStorages.map((i) => i.id) : [],
 					name: file.name
 				})
 			)
-			.then(() => {})
+			.then((_s) => {
+				return
+			})
 	}
 
-	protected onAdd(st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
+	protected onAdd(st: StorageObject, e: StorageEvent, _initialScan?: boolean): void {
 		if (e.type !== StorageEventType.add || !e.file)
 			throw new Error(`${this.ident} onAdd: Invalid event type or arguments.`)
 		const localFile = e.file
 		this._tracked.getById(e.path).then(
-			tmi => {
+			(tmi) => {
 				this.logger.debug(
 					`${this.ident} onAdd: ` +
 						`File "${e.path}" is already tracked, "${st.id}" ignoring. ("${tmi.sourceStorageId}")`
@@ -161,20 +163,20 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 						)
 						this.logger.debug(`${this.ident} onAdd: New forkflow started for "${e.path}": "${workflowId}".`)
 					})
-					.catch(e => {
+					.catch((e) => {
 						this.logger.error(`${this.ident} onAdd: Tracked file registration failed`, e)
 					})
 			}
 		)
 	}
 
-	protected onChange(st: StorageObject, e: StorageEvent) {
+	protected onChange(st: StorageObject, e: StorageEvent): void {
 		if (e.type !== StorageEventType.change || !e.file)
 			throw new Error(`${this.ident} onChange: Invalid event type or arguments.`)
 		const localFile = e.file
 		this._tracked
 			.getById(e.path)
-			.then(tmi => {
+			.then((tmi) => {
 				if (tmi.sourceStorageId === st.id) {
 					const workflowId = e.path + '_' + randomId()
 					this.emit(
@@ -194,14 +196,14 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					this.logger.debug(`${this.ident} onChange: New forkflow started for "${e.path}": "${workflowId}".`)
 				}
 			})
-			.catch(e => {
+			.catch((e) => {
 				this.logger.error(`${this.ident} onChange: Unregistered file "${e.path}" changed!`)
 			})
 	}
 
-	protected onDelete(st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
+	protected onDelete(st: StorageObject, e: StorageEvent, _initialScan?: boolean): void {
 		this._tracked.getById(e.path).then(
-			tmi => {
+			(tmi) => {
 				if (tmi.sourceStorageId === st.id) {
 					this._tracked.remove(tmi).then(
 						() => {
@@ -210,7 +212,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 									`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`
 							)
 						},
-						e => {
+						(e) => {
 							this.logger.error(
 								`${this.ident} onDelete: ` +
 									`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`,
@@ -226,7 +228,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				}
 				// TODO: generate a pull from sourceStorage?
 			},
-			e => {
+			(e) => {
 				this.logger.debug(`${this.ident} onDelete: Untracked file "${e.path}" deleted from storage "${st.id}".`)
 			}
 		)
@@ -237,9 +239,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 
 		return st.handler
 			.getAllFiles()
-			.then(allFiles => {
+			.then((allFiles) => {
 				return Promise.all(
-					allFiles.map(async file => {
+					allFiles.map(async (file) => {
 						try {
 							const trackedFile = await this._tracked.getById(file.name)
 							if (trackedFile.sourceStorageId === st.id) {
@@ -268,7 +270,9 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 						$lt: initialScanTime
 					}
 				})
-				return Promise.all(staleFiles.map(sFile => this._tracked.remove(sFile))).then(() => {})
+				return Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile))).then((_x) => {
+					return
+				})
 			})
 	}
 }

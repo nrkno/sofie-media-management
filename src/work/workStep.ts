@@ -103,11 +103,11 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 	}
 }
 
-export function workStepToPlain(obj: WorkStep): object {
+export function workStepToPlain(obj: WorkStep): Record<string, any> {
 	return classToPlain(obj)
 }
 
-export function plainToWorkStep(obj: object, availableStorage: StorageObject[]): WorkStepDB {
+export function plainToWorkStep(obj: Record<string, any>, availableStorage: StorageObject[]): WorkStepDB {
 	const action = obj['action'] as WorkStepAction
 	switch (action) {
 		case WorkStepAction.COPY:
@@ -130,7 +130,7 @@ export function plainToWorkStep(obj: object, availableStorage: StorageObject[]):
 								type: StorageType.QUANTEL_STREAM,
 								options: {}
 						  })
-						: availableStorage.find(i => i.id === storageId)
+						: availableStorage.find((i) => i.id === storageId)
 				if (!storage) throw new Error(`Unknown storage: "${storageId}"`)
 				cls.target = storage
 				return (cls as any) as WorkStepDB

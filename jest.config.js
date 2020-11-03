@@ -4,19 +4,12 @@ module.exports = {
 			tsConfig: 'tsconfig.jest.json'
 		}
 	},
-	moduleFileExtensions: [
-		'ts',
-		'js'
-	],
+	moduleFileExtensions: ['ts', 'js'],
 	transform: {
 		'^.+\\.(ts|tsx)$': 'ts-jest'
 	},
-	testMatch: [
-		'**/__tests__/**/*.spec.(ts|js)'
-	],
-	testPathIgnorePatterns: [
-		'integrationTests'
-	],
+	testMatch: ['**/__tests__/**/*.spec.(ts|js)'],
+	testPathIgnorePatterns: ['integrationTests'],
 	testEnvironment: 'node',
 	coverageThreshold: {
 		global: {
@@ -26,5 +19,5 @@ module.exports = {
 			statements: 100
 		}
 	},
-	coverageDirectory: "./coverage/"
+	coverageDirectory: './coverage/'
 }

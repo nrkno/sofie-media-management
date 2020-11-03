@@ -18,14 +18,14 @@ import { LoggerInstance } from 'winston'
 function getLocalFileProperties(fileUrl: string): Promise<FileProperties> {
 	return new Promise((resolve, reject) => {
 		fs.stat(fileUrl).then(
-			stats => {
+			(stats) => {
 				resolve({
 					created: stats.ctimeMs,
 					modified: stats.mtimeMs,
 					size: stats.size
 				})
 			},
-			err => reject(err)
+			(err) => reject(err)
 		)
 	})
 }
@@ -76,13 +76,13 @@ type NestedFiles = Array<File | NestedFiles | null>
 export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _basePath: string
 	private _watcher: chokidar.FSWatcher
-	private _initialized: boolean = false
-	private _writable: boolean = false
-	private _readable: boolean = false
+	private _initialized = false
+	private _writable = false
+	private _readable = false
 
-	private _usePolling: boolean = false
+	private _usePolling = false
 
-	private _selectiveListen: boolean = false
+	private _selectiveListen = false
 
 	/**
 	 * Creates an instance of LocalFolderHandler.
@@ -127,7 +127,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			.on('change', this.onChange)
 			.on('unlink', this.onUnlink)
 
-		return new Promise<void>(resolve => {
+		return new Promise<void>((resolve) => {
 			if (this._selectiveListen) {
 				// Ready event never fired
 				this._initialized = true
@@ -158,13 +158,13 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return _.compact(_.flatten(await this.traverseFolder(this._basePath)))
 	}
 
-	addMonitoredFile = (name: string) => {
+	addMonitoredFile = (name: string): void => {
 		if (this._selectiveListen) {
 			this._watcher.add(name)
 		}
 	}
 
-	removeMonitoredFile = (name: string) => {
+	removeMonitoredFile = (name: string): void => {
 		if (this._selectiveListen) {
 			this._watcher.unwatch(name)
 		}
@@ -175,14 +175,14 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return new Promise((resolve, reject) => {
 			const localUrl = path.join(this._basePath, name)
 			fs.stat(localUrl).then(
-				stats => {
+				(stats) => {
 					if (stats.isFile()) {
 						resolve(new LocalFolderFile(localUrl, this._readable, this._writable, name))
 					} else {
 						reject('Object is not a file')
 					}
 				},
-				err => reject(err)
+				(err) => reject(err)
 			)
 		})
 	}
@@ -190,12 +190,12 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	putFile(file: File, progressCallback?: (progress: number) => void): CancelablePromise<File> {
 		function monitorProgress(localFile: File, sourceProperties: FileProperties): void {
 			localFile.getProperties().then(
-				targetProperties => {
+				(targetProperties) => {
 					if (typeof progressCallback === 'function') {
 						progressCallback((targetProperties.size || 0) / (sourceProperties.size || 1))
 					}
 				},
-				error => {
+				(error) => {
 					// this is just to report progress on the file
 					console.log(error)
 				}
@@ -208,7 +208,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 			return new CancelablePromise((resolve, reject, onCancel) => {
 				const localFile = this.createFile(file)
 				file.getProperties().then(
-					sourceProperties => {
+					(sourceProperties) => {
 						fs.ensureDir(path.dirname(localFile.url))
 							.then(
 								async () => {
@@ -229,14 +229,14 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 									}
 
 									if (process.platform === 'win32') {
-										const p = robocopy.copyFile(file.url, localFile.url, progress => {
+										const p = robocopy.copyFile(file.url, localFile.url, (progress) => {
 											if (typeof progressCallback === 'function') {
 												progressCallback(progress)
 											}
 										})
 										p.then(() => {
 											resolve()
-										}).catch(e => {
+										}).catch((e) => {
 											reject(e)
 										})
 										onCancel(() => {
@@ -248,7 +248,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 											monitorProgress(localFile, sourceProperties)
 										}, 1000)
 
-										fs.copyFile(file.url, localFile.url, err => {
+										fs.copyFile(file.url, localFile.url, (err) => {
 											clearInterval(progressMonitor)
 
 											if (err) {
@@ -260,25 +260,25 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 										})
 									}
 								},
-								err => reject(err)
+								(err) => reject(err)
 							)
-							.catch(err => reject(err))
+							.catch((err) => reject(err))
 					},
-					err => reject(err)
+					(err) => reject(err)
 				)
 			})
 		} else {
 			// Use streams if fast, system-level file system copy is not possible
 			return new CancelablePromise((resolve, reject, onCancel) => {
 				file.getReadableStream().then(
-					rStream => {
+					(rStream) => {
 						const localFile = this.createFile(file)
 						file.getProperties().then(
-							sourceProperties => {
+							(sourceProperties) => {
 								fs.ensureDir(path.dirname(localFile.url)).then(
 									() => {
 										localFile.getWritableStream().then(
-											wStream => {
+											(wStream) => {
 												const progressMonitor = setInterval(() => {
 													monitorProgress(localFile, sourceProperties)
 												}, 1000)
@@ -303,20 +303,20 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 													reject('File write cancelled')
 												})
 											},
-											reason => {
+											(reason) => {
 												reject(reason)
 											}
 										)
 									},
-									err => reject(err)
+									(err) => reject(err)
 								)
 							},
-							e => {
+							(e) => {
 								throw new Error(`Could not get file properties for file: "${file.name}": ${e}`)
 							}
 						)
 					},
-					reason => reject(reason)
+					(reason) => reject(reason)
 				)
 			})
 		}
@@ -327,7 +327,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		return new Promise((resolve, reject) => {
 			fs.unlink(file.url).then(
 				() => resolve(),
-				err => reject(err)
+				(err) => reject(err)
 			)
 		})
 	}
@@ -409,12 +409,12 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private traverseFolder(folder: string, accumulatedPath?: string): Promise<NestedFiles> {
 		return new Promise((resolve, reject) => {
 			fs.readdir(folder).then(
-				files => {
-					const result: Promise<File | NestedFiles | null>[] = files.map(entry => {
+				(files) => {
+					const result: Promise<File | NestedFiles | null>[] = files.map((entry) => {
 						const entryUrl = path.join(folder, entry)
 						return new Promise((resolve, reject) => {
 							fs.stat(entryUrl).then(
-								stats => {
+								(stats) => {
 									if (stats.isFile()) {
 										resolve(
 											new LocalFolderFile(
@@ -430,17 +430,17 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 										resolve()
 									}
 								},
-								err => reject(err)
+								(err) => reject(err)
 							)
 						})
 					})
 					Promise.all(result)
-						.then(resolved => {
+						.then((resolved) => {
 							resolve(_.flatten(resolved))
 						})
-						.catch(reason => reject(reason))
+						.catch((reason) => reject(reason))
 				},
-				err => reject(err)
+				(err) => reject(err)
 			)
 		})
 	}

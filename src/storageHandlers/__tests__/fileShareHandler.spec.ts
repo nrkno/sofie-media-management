@@ -6,11 +6,11 @@ import * as winston from 'winston'
 
 jest.mock('windows-network-drive')
 jest.mock('chokidar')
-;(chokidar as any).on = (chokidar as any).watch = jest.fn().mockImplementation((event: string, handler: Function) => {
+;(chokidar as any).on = (chokidar as any).watch = jest.fn().mockImplementation((event: string, handler: () => void) => {
 	if (event === 'ready') {
 		setTimeout(() => {
 			handler()
-		})
+		}, 0)
 	}
 	return chokidar
 })
@@ -43,7 +43,7 @@ describe('FileShareHandler', () => {
 			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)
 		try {
-			fsh0.on('error', err => fail(err))
+			fsh0.on('error', (err) => fail(err))
 			await fsh0.init()
 		} catch (e) {
 			fail(e)

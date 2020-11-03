@@ -10,7 +10,7 @@ import { LoggerInstance } from 'winston'
 export class WatchFolderGenerator extends LocalStorageGenerator {
 	private _storageMapping: _.Dictionary<string> = {}
 
-	protected ident: string = 'Watch folder generator:'
+	protected ident = 'Watch folder generator:'
 
 	constructor(
 		availableStorage: StorageObject[],
@@ -23,10 +23,10 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 
 	async init(): Promise<void> {
 		return Promise.resolve().then(() => {
-			this._flows.forEach(item => {
+			this._flows.forEach((item) => {
 				if (item.mediaFlowType === MediaFlowType.WATCH_FOLDER) {
-					const srcStorage = this._availableStorage.find(i => i.id === item.sourceId)
-					const dstStorage = this._availableStorage.find(i => i.id === item.destinationId)
+					const srcStorage = this._availableStorage.find((i) => i.id === item.sourceId)
+					const dstStorage = this._availableStorage.find((i) => i.id === item.destinationId)
 
 					if (srcStorage && dstStorage) {
 						if (srcStorage.options.onlySelectedFiles) {
@@ -42,7 +42,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		})
 	}
 
-	protected registerStoragePair(srcStorage: StorageObject, dstStorage: StorageObject) {
+	protected registerStoragePair(srcStorage: StorageObject, dstStorage: StorageObject): void {
 		this._storageMapping[srcStorage.id] = dstStorage.id
 		super.registerStorage(srcStorage)
 	}
@@ -77,7 +77,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 		if (!e.file) throw new Error(`${this.ident} onFileUpdated: Invalid event type or arguments.`)
 		const localFile = e.file
 		const dstStorageId = this._storageMapping[st.id]
-		const targetStorage = this._availableStorage.find(i => i.id === dstStorageId)
+		const targetStorage = this._availableStorage.find((i) => i.id === dstStorageId)
 		if (!targetStorage)
 			throw new Error(`${this.ident} onFileUpdated: Could not find target storage "${dstStorageId}"`)
 		this._tracked
@@ -98,7 +98,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 									`File "${e.path}" has started to be tracked by ${this.constructor.name} for "${st.id}".`
 							)
 						})
-						.catch(e => {
+						.catch((e) => {
 							this.logger.error(`${this.ident} onFileUpdated: Tracked file registration failed`, e)
 						})
 				}
@@ -126,9 +126,9 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				}
 
 				return targetStorage.handler.getFile(localFile.name).then(
-					file => {
-						return file.getProperties().then(properties => {
-							return localFile.getProperties().then(localProperties => {
+					(file) => {
+						return file.getProperties().then((properties) => {
+							return localFile.getProperties().then((localProperties) => {
 								if (localProperties.size !== properties.size) {
 									emitCopy()
 								}
@@ -140,30 +140,29 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 					}
 				)
 			})
-			.then(() => {})
-			.catch(e =>
+			.catch((e) =>
 				this.logger.error(`${this.ident} onFileUpdated: An error was thrown when handling an updated file`, e)
 			)
 	}
 
-	protected onAdd(st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
+	protected onAdd(st: StorageObject, e: StorageEvent, _initialScan?: boolean): void {
 		return this.onFileUpdated(st, e)
 	}
 
-	protected onChange(st: StorageObject, e: StorageEvent) {
+	protected onChange(st: StorageObject, e: StorageEvent): void {
 		return this.onAdd(st, e)
 	}
 
-	protected onDelete(st: StorageObject, e: StorageEvent, _initialScan?: boolean) {
+	protected onDelete(st: StorageObject, e: StorageEvent, _initialScan?: boolean): void {
 		this._tracked.getById(e.path).then(
-			tmi => {
+			(tmi) => {
 				if (tmi.sourceStorageId === st.id) {
-					tmi.targetStorageIds.forEach(sId => {
-						const storageObject = this._availableStorage.find(as => as.id === sId)
+					tmi.targetStorageIds.forEach((sId) => {
+						const storageObject = this._availableStorage.find((as) => as.id === sId)
 						if (storageObject) {
 							storageObject.handler
 								.getFile(tmi.name)
-								.then(file => {
+								.then((file) => {
 									const workflowId = e.path + '_' + randomId()
 									this.emit(
 										WorkFlowGeneratorEventType.NEW_WORKFLOW,
@@ -187,7 +186,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 											`New workflow to delete file "${tmi.name}" from target storage "${storageObject.id}"`
 									)
 								})
-								.catch(e => {
+								.catch((e) => {
 									this.logger.warn(
 										`${this.ident} onDelete: Could not find file in target storage: "${storageObject.id}"`,
 										e
@@ -202,7 +201,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 									`Tracked file "${e.path}" deleted from storage "${st.id}" became untracked.`
 							)
 						},
-						e => {
+						(e) => {
 							this.logger.error(
 								`${this.ident} onDelete: ` +
 									`Tracked file "${e.path}" deleted from storage "${st.id}" could not become untracked`,
@@ -213,7 +212,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				}
 				// TODO: generate a pull from sourceStorage?
 			},
-			e => {
+			(e) => {
 				this.logger.debug(`${this.ident} onDelete: Untracked file "${e.path}" deleted from storage "${st.id}".`)
 			}
 		)
@@ -222,12 +221,12 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 	protected async initialCheck(st: StorageObject): Promise<void> {
 		const initialScanTime = getCurrentTime()
 		const dstStorageId = this._storageMapping[st.id]
-		const targetStorage = this._availableStorage.find(i => i.id === dstStorageId)
+		const targetStorage = this._availableStorage.find((i) => i.id === dstStorageId)
 		if (!targetStorage) throw new Error(`${this.ident} initialCheck: Target storage "${dstStorageId}" not found!`)
 
 		return st.handler
 			.getAllFiles()
-			.then(allFiles => {
+			.then((allFiles) => {
 				return Promise.all(
 					allFiles.map(
 						async (file): Promise<void> => {
@@ -263,7 +262,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 						$lt: initialScanTime
 					}
 				})
-				staleFiles.map(sFile => {
+				staleFiles.map((sFile) => {
 					this.onDelete(st, {
 						type: StorageEventType.delete,
 						path: sFile.name

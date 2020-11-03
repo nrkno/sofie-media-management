@@ -35,11 +35,11 @@ interface FileToScan {
  */
 export class Watcher extends EventEmitter {
 	private watcher: chokidar.FSWatcher
-	private scanning: boolean = false
-	private scanId: number = 1
+	private scanning = false
+	private scanId = 1
 	private filesToScan: { [mediaId: string]: FileToScan } = {}
 	private filesToScanFail: { [mediaId: string]: number } = {}
-	private retrying: boolean = false
+	private retrying = false
 
 	constructor(
 		private db: PouchDB.Database<MediaObject>,
@@ -50,7 +50,7 @@ export class Watcher extends EventEmitter {
 		super()
 	}
 
-	public init() {
+	public init(): void {
 		if (!this.storageSettings) return
 		this.watcher = chokidar.watch(
 			this.storageSettings.options.basePath,
@@ -67,13 +67,13 @@ export class Watcher extends EventEmitter {
 		)
 		this.watcher.on('add', (localPath: string, stat: Stats): void => {
 			const mediaId = getId(this.storageSettings.options.basePath, localPath)
-			this.scanFile(localPath, mediaId, stat).catch(error => {
+			this.scanFile(localPath, mediaId, stat).catch((error) => {
 				this.logger.error(error)
 			})
 		})
 		this.watcher.on('change', (localPath: string, stat: Stats) => {
 			const mediaId = getId(this.storageSettings.options.basePath, localPath)
-			this.scanFile(localPath, mediaId, stat).catch(error => {
+			this.scanFile(localPath, mediaId, stat).catch((error) => {
 				this.logger.error(error)
 			})
 		})
@@ -81,15 +81,15 @@ export class Watcher extends EventEmitter {
 			const mediaId = getId(this.storageSettings.options.basePath, localPath)
 			this.db
 				.get(mediaId)
-				.then(doc => this.db.remove(doc))
-				.catch(error => {
+				.then((doc) => this.db.remove(doc))
+				.catch((error) => {
 					this.logger.error(error)
 				})
 		})
 		this.watcher.on('ready', () => {
 			this.logger.info('Watcher: ready!')
 		})
-		this.watcher.on('error', err => {
+		this.watcher.on('error', (err) => {
 			if (err) {
 				this.logger.error(`Watcher: error: ${err.message}`, err)
 			}
@@ -185,7 +185,7 @@ export class Watcher extends EventEmitter {
 		}
 	}
 
-	async retryScan() {
+	async retryScan(): Promise<void> {
 		if (this.retrying) {
 			return
 		}
@@ -211,6 +211,7 @@ export class Watcher extends EventEmitter {
 		this.logger.info('Media watching: checking for dead media')
 		const limit = 256
 		let startkey: string | undefined = undefined
+		// eslint-disable-next-line no-constant-condition
 		while (true) {
 			const deleted: Array<PouchDB.Core.PutDocument<MediaObject>> = []
 
@@ -221,22 +222,23 @@ export class Watcher extends EventEmitter {
 			})
 			await Promise.all(
 				result.rows.map(async ({ doc }) => {
+					if (!doc) return Promise.resolve()
 					const { error } = await noTryAsync(async () => {
 						const mediaFolder = path.normalize(this.storageSettings.options.basePath)
-						const mediaPath = path.normalize(doc!.mediaPath)
+						const mediaPath = path.normalize(doc.mediaPath)
 						this.logger.debug(
 							`Delete test: mediaPath = ${mediaPath} mediaFolder = ${mediaFolder} indexOf=${mediaPath.indexOf(
 								mediaFolder
 							)}`
 						)
-						if (mediaPath.indexOf(mediaFolder) === 0 && (await fileExists(doc!.mediaPath))) {
+						if (mediaPath.indexOf(mediaFolder) === 0 && (await fileExists(doc?.mediaPath ?? ''))) {
 							return
 						}
 
 						deleted.push(
 							literal<PouchDB.Core.PutDocument<MediaObject>>({
-								_id: doc!._id,
-								_rev: doc!._rev,
+								_id: doc._id,
+								_rev: doc._rev,
 								_deleted: true
 							} as MediaObject & PouchDB.Core.ChangesMeta)
 						)
@@ -247,17 +249,17 @@ export class Watcher extends EventEmitter {
 				})
 			)
 
-			this.logger.debug(`About to delete media objects ${deleted.map(x => x._id)}`)
+			this.logger.debug(`About to delete media objects ${deleted.map((x) => x._id)}`)
 			await this.db.bulkDocs(deleted)
 
 			if (result.rows.length < limit) {
 				break
 			}
-			startkey = result.rows[result.rows.length - 1].doc!._id
+			startkey = result.rows[result.rows.length - 1].doc?._id
 		}
 
 		this.logger.info(`Media scanning: finished check for dead media`)
 	}
 
-	getCurrentScanId = () => (this.scanning ? this.scanId : false)
+	getCurrentScanId = (): number | false => (this.scanning ? this.scanId : false)
 }

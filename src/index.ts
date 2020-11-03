@@ -7,7 +7,7 @@ console.log('process started') // This is a message all Sofie processes log upon
 
 let manager: MediaManager
 // Setup logging --------------------------------------
-let logger = new Winston.Logger({})
+const logger = new Winston.Logger({})
 if (logPath) {
 	// Log json to file, human-readable to console
 	logger.add(Winston.transports.Console, {
@@ -24,7 +24,7 @@ if (logPath) {
 	logger.info('Logging to', logPath)
 	// Hijack console.log:
 	// @ts-ignore
-	let orgConsoleLog = console.log
+	const orgConsoleLog = console.log
 	console.log = function(...args: any[]) {
 		// orgConsoleLog('a')
 		if (args.length >= 1) {
@@ -39,7 +39,7 @@ if (logPath) {
 		handleExceptions: true,
 		json: true,
 		level: 'silly',
-		stringify: obj => {
+		stringify: (obj) => {
 			obj.localTimestamp = getCurrentTime()
 			return JSON.stringify(obj) // make single line
 		}
@@ -47,7 +47,7 @@ if (logPath) {
 	logger.info('Logging to Console')
 	// Hijack console.log:
 	// @ts-ignore
-	let orgConsoleLog = console.log
+	const orgConsoleLog = console.log
 	console.log = function(...args: any[]) {
 		// orgConsoleLog('a')
 		if (args.length >= 1) {
@@ -57,7 +57,7 @@ if (logPath) {
 	}
 }
 function getCurrentTime() {
-	let v = Date.now()
+	const v = Date.now()
 	return new Date(v).toISOString()
 }
 
@@ -76,7 +76,7 @@ manager = new MediaManager(logger)
 
 logger.info('Core:          ' + config.core.host + ':' + config.core.port)
 logger.info('------------------------------------------------------------------')
-manager.init(config).catch(e => {
+manager.init(config).catch((e) => {
 	logger.error(e)
 })
 

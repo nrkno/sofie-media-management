@@ -5,7 +5,7 @@ describe('lib', () => {
 		const start = Date.now()
 		function slow() {
 			return atomicPromise('testSlow', () => {
-				return new Promise<number>(resolve => {
+				return new Promise<number>((resolve) => {
 					setTimeout(() => {
 						resolve(Date.now())
 					}, 100)

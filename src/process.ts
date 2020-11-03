@@ -11,7 +11,7 @@ export class Process {
 	constructor(logger: LoggerInstance) {
 		this.logger = logger
 	}
-	init(processConfig: ProcessConfig) {
+	init(processConfig: ProcessConfig): void {
 		if (processConfig.unsafeSSL) {
 			this.logger.info('Disabling NODE_TLS_REJECT_UNAUTHORIZED, be sure to ONLY DO THIS ON A LOCAL NETWORK!')
 			process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
@@ -20,7 +20,7 @@ export class Process {
 		}
 		if (processConfig.certificates.length) {
 			this.logger.info(`Loading certificates...`)
-			_.each(processConfig.certificates, certificate => {
+			_.each(processConfig.certificates, (certificate) => {
 				try {
 					this.certificates.push(fs.readFileSync(certificate))
 					this.logger.info(`Using certificate "${certificate}"`)

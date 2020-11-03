@@ -10,7 +10,7 @@ export class QuantelGateway extends EventEmitter {
 	public checkStatusInterval: number = CHECK_STATUS_INTERVAL
 
 	private _gatewayUrl: string
-	private _initialized: boolean = false
+	private _initialized = false
 	private _ISAUrl: string
 	private _zoneId: string
 	private _serverId: number
@@ -65,7 +65,7 @@ export class QuantelGateway extends EventEmitter {
 				if (!this._serverId) return `Server id not set`
 
 				const servers = await this.getServers(this._zoneId)
-				const server = _.find(servers, s => s.ident === this._serverId)
+				const server = _.find(servers, (s) => s.ident === this._serverId)
 
 				if (!server) return `Server ${this._serverId} not present on ISA`
 				if (server.down) return `Server ${this._serverId} is down`
@@ -79,13 +79,13 @@ export class QuantelGateway extends EventEmitter {
 		}
 		const checkServerStatus = () => {
 			getServerStatus()
-				.then(statusMessage => {
+				.then((statusMessage) => {
 					if (statusMessage !== this._statusMessage) {
 						this._statusMessage = statusMessage
 						callbackOnStatusChange(statusMessage === null, statusMessage)
 					}
 				})
-				.catch(e => this.emit('error', e))
+				.catch((e) => this.emit('error', e))
 		}
 		this._monitorInterval = setInterval(() => {
 			checkServerStatus()
@@ -126,7 +126,7 @@ export class QuantelGateway extends EventEmitter {
 
 		const servers = await this.getServers(this._zoneId)
 		const server =
-			_.find(servers, server => {
+			_.find(servers, (server) => {
 				return server.ident === this._serverId
 			}) || null
 		this._cachedServer = server
@@ -320,7 +320,7 @@ export class QuantelGateway extends EventEmitter {
 		bodyData?: object
 	): Promise<any> {
 		return new Promise((resolve, reject) => {
-			let requestMethod = request[method]
+			const requestMethod = request[method]
 			if (requestMethod) {
 				const url = this.urlQuery(this._gatewayUrl + '/' + resource, queryParameters)
 
@@ -349,12 +349,12 @@ export class QuantelGateway extends EventEmitter {
 					}
 				)
 			} else reject(`Unknown request method: "${method}"`)
-		}).then(res => {
+		}).then((res) => {
 			return res
 		})
 	}
 	private urlQuery(url: string, params: QueryParameters = {}): string {
-		let queryString = _.compact(
+		const queryString = _.compact(
 			_.map(params, (value, key: string) => {
 				if (value !== undefined) {
 					return `${key}=${encodeURIComponent(value.toString())}`

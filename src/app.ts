@@ -16,7 +16,7 @@ export class MediaManagerApp {
 	private app = new Koa()
 	private router = new Router()
 	private transformer: string | undefined = undefined
-	private smoothStream: boolean = false
+	private smoothStream = false
 
 	constructor(
 		private config: DeviceSettings,
@@ -40,13 +40,13 @@ export class MediaManagerApp {
 
 		this.router.get('/media/thumbnail/:id', async (ctx, next) => {
 			this.logger.debug(`HTTP/S server: received thumbnail request ${ctx.params.id}`)
-			let id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
-			let thumbPath = path.join(
+			const id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
+			const thumbPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
 				(this.config.previews && this.config.previews.folder) || 'thumbs',
 				`${id.replace(/:/gi, '_')}.jpg`
 			)
-			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
+			const { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
 			if (statError) {
 				this.logger.warning(`HTTP/S server: thumbnail requested that did not exist ${ctx.params.id}`, statError)
 				return await next()
@@ -58,14 +58,14 @@ export class MediaManagerApp {
 
 		this.router.get('/media/preview/:id+', async (ctx, next) => {
 			this.logger.debug(`HTTP/S server: received preview request ${ctx.params.id}`)
-			let id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
+			const id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
 			ctx.type = 'video/webm'
-			let previewPath = path.join(
+			const previewPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
 				(this.config.previews && this.config.previews.folder) || 'previews',
 				`${id.replace(/:/gi, '_')}.webm`
 			)
-			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
+			const { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
 			if (statError) {
 				this.logger.warn(`HTTP/S server: preview requested that did not exist ${ctx.params.id}`, statError)
 				return await next()
@@ -81,7 +81,7 @@ export class MediaManagerApp {
 			await next()
 		})
 
-		this.router.get('/(quantel|gv)/*', async ctx => {
+		this.router.get('/(quantel|gv)/*', async (ctx) => {
 			this.logger.debug(`Pass-through requests to transformer: ${ctx.path}`)
 			if (this.transformer === undefined) {
 				ctx.status = 502
@@ -113,7 +113,7 @@ export class MediaManagerApp {
 
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
 
-		return new Promise(resolve => {
+		return new Promise((resolve) => {
 			if (this.config.httpPort) {
 				this.app.listen(this.config.httpPort, () => {
 					this.logger.info(`MediaMangerApp: Koa started on HTTP port ${this.config.httpPort}`)
@@ -150,12 +150,12 @@ async function manifestTransform(ssxml: string): Promise<string> {
 		`<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:scte35="http://www.scte.org/schemas/35/2014SCTE35.xsd" xsi:schemaLocation="urn:mpeg:dash:schema:mpd:2011 DASH-MPD.xsd" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" minBufferTime="PT5.000S" maxSegmentDuration="PT3.000S" availabilityStartTime="2016-01-20T21:10:02Z" mediaPresentationDuration="PT${duration}S">\n` +
 		`  <Period id="period0" duration="PT${duration}S">\n`
 	let vAdapt = `    <AdaptationSet mimeType="video/mp4" segmentAlignment="true" startWithSAP="1" maxWidth="${video.$.DisplayWidth}" maxHeight="${video.$.DisplayHeight}" maxFrameRate="${video.$.Fps}" par="1:1">\n`
-	for (let ql of video.QualityLevel) {
+	for (const ql of video.QualityLevel) {
 		vAdapt += `      <Representation id="${ql.$.Bitrate}" bandwidth="${ql.$.Bitrate}" codecs="avc1.4D401E" width="${ql.$.MaxWidth}" height="${ql.$.MaxHeight}" frameRate="${video.$.Fps}" sar="1:1" scanType="progressive">\n`
 		vAdapt += `        <BaseURL>stream-mp4/video/</BaseURL>\n`
 		vAdapt += `        <SegmentTemplate timescale="${ssm.$.TimeScale}" initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/$Time$.mp4" duration="${ssm.$.Duration}" presentationTimeOffset="0">\n`
 		vAdapt += `          <SegmentTimeline>\n`
-		for (let seg of video.c) {
+		for (const seg of video.c) {
 			vAdapt += `            <S t="${seg.$.t}" d="${seg.$.d}" />\n`
 		}
 		vAdapt += `          </SegmentTimeline>\n`
@@ -173,7 +173,7 @@ async function manifestTransform(ssxml: string): Promise<string> {
 		aAdapt += `        <AudioChannelConfiguration schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011" value="${ql.Channels}"/>\n`
 		aAdapt += `        <SegmentTemplate timescale="${ssm.$.TimeScale}" initialization="init.mp4" media="$Time$.mp4" duration="${ssm.$.Duration}" presentationTimeOffset="0">\n`
 		aAdapt += `          <SegmentTimeline>\n`
-		for (let seg of audio.c) {
+		for (const seg of audio.c) {
 			aAdapt += `            <S t="${seg.$.t}" d="${seg.$.d}" />\n`
 		}
 		aAdapt += `          </SegmentTimeline>\n`

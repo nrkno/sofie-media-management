@@ -14,7 +14,7 @@ export class LocalStorageGenerator extends EventEmitter {
 			return Promise.resolve()
 		}
 	)
-	emitNewEvent = () => {
+	emitNewEvent = (): void => {
 		this.emit(
 			WorkFlowGeneratorEventType.NEW_WORKFLOW,
 			literal<WorkFlow>({

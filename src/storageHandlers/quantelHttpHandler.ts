@@ -12,7 +12,7 @@ import { CancelablePromise } from '../lib/cancelablePromise'
 function getHTTPProperties(gateway: QuantelGateway, url: string): Promise<FileProperties> {
 	if (!gateway.initialized) throw Error(`Quantel Gateway not initialized`)
 	const query = parseQuantelUrl(url)
-	return gateway.searchClip(query).then(result => {
+	return gateway.searchClip(query).then((result) => {
 		if (result.length > 0) {
 			const clip = result[0]
 			return literal<FileProperties>({
@@ -111,7 +111,7 @@ export class QuantelHTTPFile implements File {
 			console.log(`Looking for clip ${JSON.stringify(this.query)}`)
 			this.gateway
 				.searchClip(this.query)
-				.then(result => {
+				.then((result) => {
 					if (result.length > 0) {
 						const clip = result[0]
 						if (parseInt(clip.Frames, 10) > 0) {
@@ -135,7 +135,7 @@ export class QuantelHTTPFile implements File {
 													rejectAtomic()
 												}
 											})
-											.on('error', err => {
+											.on('error', (err) => {
 												reject(err)
 												rejectAtomic()
 											})
@@ -147,7 +147,7 @@ export class QuantelHTTPFile implements File {
 											})
 									})
 								}
-							).catch(e => console.error(`HTTP request failed`, e))
+							).catch((e) => console.error(`HTTP request failed`, e))
 						} else {
 							throw Error(`Clip found, but 0-length`)
 						}
@@ -155,12 +155,12 @@ export class QuantelHTTPFile implements File {
 						throw Error(`Clip not found in Quantel ISA`)
 					}
 				})
-				.catch(e => reject(e))
+				.catch((e) => reject(e))
 		})
 	}
 
 	async getProperties(): Promise<FileProperties> {
-		return getHTTPProperties(this.gateway, this._url).then(props => {
+		return getHTTPProperties(this.gateway, this._url).then((props) => {
 			if (props.size === 0) throw Error(`Reserved clip: ${this._url}`)
 			props.size = undefined
 			return props
@@ -178,8 +178,8 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 
 	private _monitoredUrls: { [key: string]: boolean } = {}
 
-	private _initialized: boolean = false
-	private _readable: boolean = false
+	private _initialized = false
+	private _readable = false
 
 	private gateway: QuantelGateway
 
@@ -254,19 +254,19 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 		throw new Error('Method not implemented.')
 	}
 	getFileProperties(file: File): Promise<FileProperties> {
-		return getHTTPProperties(this.gateway, file.url).then(props => {
+		return getHTTPProperties(this.gateway, file.url).then((props) => {
 			props.size = undefined
 			return props
 		})
 	}
 	monitor(): void {
-		let names = _.keys(this._monitoredUrls)
+		const names = _.keys(this._monitoredUrls)
 		let chain = Promise.resolve()
-		for (let name in names) {
+		for (const name in names) {
 			const url = decodeURIComponent(name)
 			chain = chain
 				.then(() => getHTTPProperties(this.gateway, url))
-				.then(props => {
+				.then((props) => {
 					// clip was not found before
 					if (this._monitoredUrls[name] === false && props.size && props.size > 0) {
 						this.emit(StorageEventType.add, {
