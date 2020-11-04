@@ -32,7 +32,7 @@ export class MediaManagerApp {
 		)
 	}
 
-	async init() {
+	async init(): Promise<void> {
 		this.router.get('/', async (ctx, next) => {
 			ctx.body = { msg: 'Hello World', params: ctx.params }
 			await next()
@@ -128,7 +128,7 @@ export class MediaManagerApp {
 		return this.config.httpPort || 8000
 	}
 
-	setQuantelMonitor(monitor: MonitorQuantel) {
+	setQuantelMonitor(monitor: MonitorQuantel): void {
 		this.transformer = monitor.settings.transformerUrl
 		this.smoothStream = monitor.settings.streamType === QuantelStreamType.SMOOTH_STREAM
 		if (this.transformer !== undefined) {

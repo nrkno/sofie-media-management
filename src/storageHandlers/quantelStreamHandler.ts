@@ -24,7 +24,7 @@ export class QuantelStream implements File {
 
 export class QuantelStreamHandlerSingleton extends StorageHandler {
 	private static instance = new QuantelStreamHandlerSingleton()
-	static get Instance() {
+	static get Instance(): QuantelStreamHandlerSingleton {
 		return this.instance
 	}
 	constructor() {

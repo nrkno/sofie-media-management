@@ -1,3 +1,4 @@
+// eslint-disable-next-line node/no-unpublished-require
 const find = require('find')
 const os = require('os')
 const path = require('path')

@@ -6,7 +6,7 @@ import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as _ from 'underscore'
 import * as chokidar from 'chokidar'
-import { robocopy } from '../lib/robocopy'
+import * as robocopy from '../lib/robocopy'
 import { CancelablePromise } from '../lib/cancelablePromise'
 import { LoggerInstance } from 'winston'
 

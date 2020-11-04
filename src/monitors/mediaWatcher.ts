@@ -1,4 +1,3 @@
-import * as _ from 'underscore'
 import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
@@ -185,29 +184,33 @@ export class MonitorMediaWatcher extends Monitor {
 					cmd = 'df -lkPT'
 					break
 				case 'win32':
-					const { stdout } = await exec(
-						'wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size',
-						{ windowsHide: true }
-					)
-					const lines = stdout
-						.split('\r\n')
-						.filter((line) => line.trim() !== '')
-						.filter((_line, idx) => idx > 0)
-					for (const line of lines) {
-						const lineMatch = line.match(
-							/(?<fs>\w:)\s+(?<desc>(Local Fixed Disk|Network Connection|Removable Disk))\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/
+					{
+						const { stdout } = await exec(
+							'wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size',
+							{
+								windowsHide: true
+							}
 						)
-						if (lineMatch && lineMatch.groups) {
-							if (lineMatch.groups.desc !== 'Local Fixed Disk') continue // Only report on local disks
-							const [free, size] = [parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size)]
-							disks.push({
-								fs: lineMatch.groups.fs,
-								type: lineMatch.groups.type,
-								size,
-								used: size - free,
-								use: parseFloat(((100.0 * (size - free)) / size).toFixed(2)),
-								mount: lineMatch.groups!.fs
-							} as DiskInfo)
+						const lines = stdout
+							.split('\r\n')
+							.filter((line) => line.trim() !== '')
+							.filter((_line, idx) => idx > 0)
+						for (const line of lines) {
+							const lineMatch = line.match(
+								/(?<fs>\w:)\s+(?<desc>(Local Fixed Disk|Network Connection|Removable Disk))\s+(?<type>\w+)\s+(?<free>\d+)\s+(?<size>\d+)/
+							)
+							if (lineMatch && lineMatch.groups) {
+								if (lineMatch.groups.desc !== 'Local Fixed Disk') continue // Only report on local disks
+								const [free, size] = [parseInt(lineMatch.groups.free), parseInt(lineMatch.groups.size)]
+								disks.push({
+									fs: lineMatch.groups.fs,
+									type: lineMatch.groups.type,
+									size,
+									used: size - free,
+									use: parseFloat(((100.0 * (size - free)) / size).toFixed(2)),
+									mount: lineMatch.groups.fs
+								} as DiskInfo)
+							}
 						}
 					}
 					break

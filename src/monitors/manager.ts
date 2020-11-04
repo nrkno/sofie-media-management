@@ -8,6 +8,8 @@ import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { Dispatcher } from '../work/dispatcher'
 import { MediaManagerApp } from '../app'
 
+// eslint-disable-rule no-mixed-spaces-and-tabs
+
 export class MonitorManager {
 	private _monitors: { [id: string]: Monitor } = {}
 	private _initialized = false
@@ -19,7 +21,7 @@ export class MonitorManager {
 
 	constructor(private mediaDB: PouchDB.Database<MediaObject>) {}
 
-	init(coreHandler: CoreHandler, dispatcher?: Dispatcher, app?: MediaManagerApp) {
+	init(coreHandler: CoreHandler, dispatcher?: Dispatcher, app?: MediaManagerApp): void {
 		this._coreHandler = coreHandler
 		this._dispatcher = dispatcher
 		this._app = app

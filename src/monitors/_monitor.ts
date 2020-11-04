@@ -6,6 +6,7 @@ import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
 import { MonitorSettings, MediaObject, StorageSettings, MonitorSettingsType } from '../api'
 import { MonitorDevice, CoreMonitorHandler } from '../coreHandler'
 import { FetchError } from 'node-fetch'
+import { literal } from '../lib/lib'
 
 export abstract class Monitor extends EventEmitter {
 	public readonly deviceType: string
@@ -47,7 +48,7 @@ export abstract class Monitor extends EventEmitter {
 		this.deviceType = this.settings.type
 	}
 
-	setCoreHandler(coreHandler: CoreMonitorHandler) {
+	setCoreHandler(coreHandler: CoreMonitorHandler): void {
 		this.coreHandler = coreHandler
 	}
 
@@ -131,16 +132,16 @@ export abstract class Monitor extends EventEmitter {
 		return coreObjRevisions
 	}
 
-	protected getChangesOptions() {
-		return {
+	protected getChangesOptions(): PouchDB.Core.ChangesOptions {
+		return literal<PouchDB.Core.ChangesOptions>({
 			since: this.lastSequenceNr || 'now',
 			include_docs: true,
 			live: true,
 			attachments: true
-		}
+		})
 	}
 
-	protected setConnectionStatus(connected: boolean) {
+	protected setConnectionStatus(connected: boolean): void {
 		const status = connected ? PeripheralDeviceAPI.StatusCode.GOOD : PeripheralDeviceAPI.StatusCode.BAD
 		const messages = connected ? [] : ['MediaScanner not connected']
 		if (status !== this.statusConnection.statusCode) {
@@ -191,7 +192,7 @@ export abstract class Monitor extends EventEmitter {
 		}
 	}
 
-	protected updateAndSendStatus() {
+	protected updateAndSendStatus(): void {
 		const status = this.updateStatus()
 
 		if (this.status.statusCode !== status.statusCode || !_.isEqual(this.status.messages, status.messages)) {
@@ -203,7 +204,7 @@ export abstract class Monitor extends EventEmitter {
 		}
 	}
 
-	protected triggerMonitorConnection() {
+	protected triggerMonitorConnection(): void {
 		if (!this.monitorConnectionTimeout) {
 			this.monitorConnectionTimeout = setTimeout(() => {
 				this.monitorConnectionTimeout = null
@@ -212,7 +213,7 @@ export abstract class Monitor extends EventEmitter {
 		}
 	}
 
-	protected monitorConnection() {
+	protected monitorConnection(): void {
 		if (this.isDestroyed) return
 
 		if (this.statusConnection.statusCode === PeripheralDeviceAPI.StatusCode.BAD) {
@@ -222,7 +223,7 @@ export abstract class Monitor extends EventEmitter {
 		}
 	}
 
-	protected restartChangesStream(rewindSequence?: boolean) {
+	protected restartChangesStream(rewindSequence?: boolean): void {
 		if (rewindSequence) {
 			if (this.lastSequenceNr > 0) {
 				this.lastSequenceNr--
@@ -237,10 +238,10 @@ export abstract class Monitor extends EventEmitter {
 		this.changes = this.db
 			.changes<MediaObject>(opts)
 			.on('change', (changes) => this.changeHandler(changes))
-			.on('error', (error) => this.errorHandler(error))
+			.on('error', (error: any) => this.errorHandler(error))
 	}
 
-	protected changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>) {
+	protected changeHandler(changes: PouchDB.Core.ChangesResponseChange<MediaObject>): void {
 		const newSequenceNr: string | number = changes.seq
 		if (_.isNumber(newSequenceNr)) this.lastSequenceNr = newSequenceNr
 		else this.logger.warn(`Expected changes.seq to be number, got "${newSequenceNr}"`)
@@ -272,7 +273,7 @@ export abstract class Monitor extends EventEmitter {
 		this.triggerupdateFsStats()
 	}
 
-	protected errorHandler(err) {
+	protected errorHandler(err: unknown): void {
 		if (err instanceof SyntaxError || err instanceof FetchError || err.type === 'invalid-json') {
 			this.logger.warn('Media watcher: terminated (' + err.message + ')') // not a connection issue
 			this.restartChangesStream(true)

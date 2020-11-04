@@ -130,17 +130,17 @@ export class MediaManager {
 		}
 	}
 
-	initProcess() {
+	initProcess(): void {
 		this._process = new Process(this._logger)
 		this._process.init(this._config.process)
 	}
 
-	async initCore() {
+	async initCore(): Promise<void> {
 		this.coreHandler = new CoreHandler(this._logger, this._config.device)
 		return this.coreHandler.init(this._config.core, this._process)
 	}
 
-	async initServer(settings: DeviceSettings) {
+	async initServer(settings: DeviceSettings): Promise<void> {
 		this._app = new MediaManagerApp(settings, this.mediaDB, this._logger)
 		return this._app.init()
 	}

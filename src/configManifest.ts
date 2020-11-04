@@ -11,7 +11,7 @@ import {
 } from 'tv-automation-server-core-integration'
 import { MediaFlowType } from './api'
 
-export function literal<T>(o: T) {
+export function literal<T>(o: T): T {
 	return o
 }
 

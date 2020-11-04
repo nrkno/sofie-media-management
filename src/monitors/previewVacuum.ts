@@ -52,7 +52,7 @@ export class PreviewAndThumbnailVacuum {
 		})
 	}
 
-	start() {
+	start(): void {
 		this.changes = this.mediaDB
 			.changes({
 				since: 'now',
@@ -66,7 +66,7 @@ export class PreviewAndThumbnailVacuum {
 			})
 	}
 
-	stop() {
+	stop(): void {
 		this.changes.removeAllListeners()
 		this.logger.info(`PreviewAndThumbnailVacuum: no longer reacting to media database changes`)
 	}

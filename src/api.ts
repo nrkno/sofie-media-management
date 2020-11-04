@@ -198,7 +198,7 @@ export interface QuantelHTTPStorage extends StorageSettings {
 
 export interface QuantelStream extends StorageSettings {
 	type: StorageType.QUANTEL_STREAM
-	options: {}
+	options: Record<string, unknown>
 }
 
 export interface LocalFolderStorage extends StorageSettings {

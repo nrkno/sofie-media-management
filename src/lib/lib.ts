@@ -28,7 +28,7 @@ export function getHash(str: string): string {
 	return hash
 		.update(str)
 		.digest('base64')
-		.replace(/[\+\/\=]/g, '_') // remove +/= from strings, because they cause troubles
+		.replace(/[+/\=]/g, '_') // remove +/= from strings, because they cause troubles
 }
 
 export function getWorkFlowName(name: string): string {
@@ -167,8 +167,8 @@ enum syncFunctionFcnStatus {
 
 interface SyncFunctionFcn {
 	id: string
-	fcn: Function
-	args: Array<any>
+	fcn: (finished: () => void, ...args: unknown[]) => void
+	args: Array<unknown>
 	timeout: number
 	status: syncFunctionFcnStatus
 }
@@ -182,16 +182,14 @@ const syncFunctionRunningFcns: { [id: string]: number } = {}
  * @param id0 (Optional) Id to determine which functions are to wait for each other. Can use "$0" to refer first argument. Example: "myFcn_$0,$1" will let myFcn(0, 0, 13) and myFcn(0, 1, 32) run in parallell, byt not myFcn(0, 0, 13) and myFcn(0, 0, 14)
  * @param timeout (Optional)
  */
-export function atomic<T extends (finished: () => void, ...args: any[]) => void>(
+export function atomic<T extends (finished: () => void, ...args: unknown[]) => void>(
 	fcn: T,
 	id0?: string,
 	timeout = 10000
-): (...args: any[]) => void {
-	// TODO: typing for the returned function could be improved with TypeScript 3.3
-
+): (...args: unknown[]) => void {
 	const id = id0 || randomId()
 
-	return function(...args: any[]): void {
+	return function(...args: unknown[]): void {
 		syncFunctionFcns.push({
 			id: id,
 			fcn: fcn,
@@ -200,7 +198,7 @@ export function atomic<T extends (finished: () => void, ...args: any[]) => void>
 			status: syncFunctionFcnStatus.WAITING
 		})
 		evaluateFunctions()
-	} as T
+	}
 }
 function evaluateFunctions() {
 	_.each(syncFunctionFcns, (o) => {
@@ -246,24 +244,26 @@ function evaluateFunctions() {
 }
 export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>
 
-const atomicPromiseQueue: {
-	[id: string]: Array<{
-		resolve: Function
-		reject: Function
-		fcn: Function
-		running: boolean
-	}>
-} = {}
+interface AtomicPromiseQueueEntry<T> {
+	resolve: (value: T | PromiseLike<T> | undefined) => void
+	reject: (reason?: any) => void
+	fcn: (...args: unknown[]) => Promise<T>
+	running: boolean
+}
+
+const atomicPromiseQueue: Record<string, Array<AtomicPromiseQueueEntry<any>>> = {}
+
 /**
  * Returns a promise that resolves when the provided function is run.
  * Will make sure that there will never be more than one function running at a time (with provided id)
  * @param id
  * @param fcn
  */
-export function atomicPromise<T>(id: string, fcn: (...args: any[]) => Promise<T>): Promise<T> {
-	if (!atomicPromiseQueue[id]) atomicPromiseQueue[id] = []
+export function atomicPromise<T>(id: string, fcn: (...args: unknown[]) => Promise<T>): Promise<T> {
+	if (!atomicPromiseQueue[id]) atomicPromiseQueue[id] = [] as Array<AtomicPromiseQueueEntry<T>>
+	const specificQueue: Array<AtomicPromiseQueueEntry<T>> = atomicPromiseQueue[id]
 	return new Promise((resolve, reject) => {
-		atomicPromiseQueue[id].push({
+		specificQueue.push({
 			resolve,
 			reject,
 			fcn,

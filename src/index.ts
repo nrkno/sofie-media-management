@@ -5,7 +5,24 @@ import * as Winston from 'winston'
 
 console.log('process started') // This is a message all Sofie processes log upon startup
 
-let manager: MediaManager
+// From https://mariusschulz.com/blog/the-unknown-type-in-typescript#narrowing-the-unknown-type
+function stringifyForLogging(value: unknown): string {
+	if (typeof value === 'function') {
+		// Within this branch, `value` has type `Function`,
+		// so we can access the function's `name` property
+		const functionName = value.name || '(anonymous)'
+		return `[function ${functionName}]`
+	}
+
+	if (value instanceof Date) {
+		// Within this branch, `value` has type `Date`,
+		// so we can call the `toISOString` method
+		return value.toISOString()
+	}
+
+	return String(value)
+}
+
 // Setup logging --------------------------------------
 const logger = new Winston.Logger({})
 if (logPath) {
@@ -23,13 +40,11 @@ if (logPath) {
 	})
 	logger.info('Logging to', logPath)
 	// Hijack console.log:
-	// @ts-ignore
 	const orgConsoleLog = console.log
-	console.log = function(...args: any[]) {
+	console.log = function(...args: unknown[]) {
 		// orgConsoleLog('a')
 		if (args.length >= 1) {
-			// @ts-ignore one or more arguments
-			logger.debug(...args)
+			logger.debug(stringifyForLogging(args[0]), args.slice(1))
 			orgConsoleLog(...args)
 		}
 	}
@@ -46,13 +61,11 @@ if (logPath) {
 	})
 	logger.info('Logging to Console')
 	// Hijack console.log:
-	// @ts-ignore
-	const orgConsoleLog = console.log
-	console.log = function(...args: any[]) {
+	// const orgConsoleLog = console.log
+	console.log = function(...args: unknown[]) {
 		// orgConsoleLog('a')
 		if (args.length >= 1) {
-			// @ts-ignore one or more arguments
-			logger.debug(...args)
+			logger.debug(stringifyForLogging(args[0]), args.slice(1))
 		}
 	}
 }
@@ -72,7 +85,7 @@ process.on('warning', (e: any) => {
 logger.info('------------------------------------------------------------------')
 logger.info('Starting Media Manager')
 if (disableWatchdog) logger.info('Watchdog is disabled!')
-manager = new MediaManager(logger)
+const manager = new MediaManager(logger)
 
 logger.info('Core:          ' + config.core.host + ':' + config.core.port)
 logger.info('------------------------------------------------------------------')

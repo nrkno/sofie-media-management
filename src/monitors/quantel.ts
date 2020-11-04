@@ -173,8 +173,8 @@ export class MonitorQuantel extends Monitor {
 		this.observer.stop()
 	}
 
-	private wrapError(fcn) {
-		return (...args) => {
+	private wrapError(fcn: (...args: unknown[]) => unknown) {
+		return (...args: unknown[]) => {
 			try {
 				return fcn(...args)
 			} catch (e) {
