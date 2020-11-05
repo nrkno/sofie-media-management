@@ -1,7 +1,7 @@
 {
 	"extends": "@sofie-automation/code-standard-preset/ts/tsconfig.bin",
 	"exclude": ["node_modules/**", "scratch/**"],
-	"paths": {
-		"types": [ "jest" ]
+	"compilerOptions": {
+		"types": ["node", "jest"]
 	}
 }
