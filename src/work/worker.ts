@@ -10,7 +10,7 @@ import {
 	Anomaly,
 	Metadata,
 	MediaInfo,
-	StorageSettings
+	StorageSettings,
 } from '../api'
 import { GeneralWorkStepDB, FileWorkStep, WorkStepDB, ScannerWorkStep } from './workStep'
 import { TrackedMediaItems, TrackedMediaItemDB } from '../mediaItemTracker'
@@ -67,7 +67,7 @@ const FixedQuantelStats = literal<fs.Stats>({
 	atime: new Date(),
 	mtime: new Date(),
 	ctime: new Date(),
-	birthtime: new Date()
+	birthtime: new Date(),
 })
 
 /**
@@ -79,7 +79,7 @@ export class Worker {
 	private _warmingUp = false
 	private _step: GeneralWorkStepDB | undefined
 	private abortHandler: (() => void) | undefined
-	private finishPromises: Array<(x: unknown[]) => unknown> = []
+	private finishPromises: Array<(<T extends unknown, R = unknown> (x: T) => R)> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
 	private quantelMonitorArrival: ((qm: MonitorQuantel | undefined) => void) | undefined = undefined
@@ -183,10 +183,7 @@ export class Worker {
 				return this.unBusyAndFailStep(
 					this.doCompositeCopy(
 						step,
-						(progress) =>
-							this.reportProgress(step, progress)
-								.then()
-								.catch(progressReportFailed),
+						(progress) => this.reportProgress(step, progress).then().catch(progressReportFailed),
 						(onCancel) => (this.abortHandler = onCancel)
 					)
 				)
@@ -247,7 +244,7 @@ export class Worker {
 		)
 		return literal<WorkResult>({
 			status: WorkStepStatus.ERROR,
-			messages: [reason.toString()]
+			messages: [reason.toString()],
 		})
 	}
 
@@ -281,7 +278,7 @@ export class Worker {
 			return literal<MediaFileDetails>({
 				mediaPath: mediaGeneralId,
 				mediaId: mediaGeneralId,
-				mediaStat: FixedQuantelStats
+				mediaStat: FixedQuantelStats,
 			})
 		}
 		const storagePath = (config.options && config.options.mediaPath) || ''
@@ -302,7 +299,7 @@ export class Worker {
 		return literal<MediaFileDetails>({
 			mediaPath,
 			mediaStat,
-			mediaId
+			mediaId,
 		})
 	}
 
@@ -373,7 +370,7 @@ export class Worker {
 				`-vf thumbnail,scale=${(this.config.thumbnails && this.config.thumbnails.width) || 256}:` +
 					`${(this.config.thumbnails && this.config.thumbnails.height) || -1}`,
 				'-threads 1',
-				`"${tmpPath}"`
+				`"${tmpPath}"`,
 			]
 
 			const { error: execError } = await noTryAsync(
@@ -432,7 +429,7 @@ export class Worker {
 		}
 
 		return literal<WorkResult>({
-			status: WorkStepStatus.DONE
+			status: WorkStepStatus.DONE,
 		})
 	}
 
@@ -457,7 +454,7 @@ export class Worker {
 				`Worker: generate preview: not regenerating preview at "${destPath}" as, by timestamp, it already exists`
 			)
 			return literal<WorkResult>({
-				status: WorkStepStatus.DONE
+				status: WorkStepStatus.DONE,
 			})
 		}
 
@@ -570,7 +567,7 @@ export class Worker {
 		}
 
 		return literal<WorkResult>({
-			status: WorkStepStatus.DONE
+			status: WorkStepStatus.DONE,
 		})
 	}
 
@@ -593,7 +590,7 @@ export class Worker {
 			'-f',
 			'rawvideo',
 			'-y',
-			process.platform === 'win32' ? 'NUL' : '/dev/null'
+			process.platform === 'win32' ? 'NUL' : '/dev/null',
 		]
 		if (this.isQuantel(doc.mediaId)) {
 			const { result: qm, error: qmError } = await noTryAsync(() => this.getQuantelMonitor())
@@ -653,9 +650,9 @@ export class Worker {
 		const metaconf = this.config.metadata
 		if (!metaconf || (!metaconf.scenes && !metaconf.freezeDetection && !metaconf.blackDetection)) {
 			this.logger.debug(
-				`Worker: get metadata: not generating stream metadata: ${metaconf} ${!metaconf?.scenes &&
-					!metaconf?.freezeDetection &&
-					!metaconf?.blackDetection}`
+				`Worker: get metadata: not generating stream metadata: ${metaconf} ${
+					!metaconf?.scenes && !metaconf?.freezeDetection && !metaconf?.blackDetection
+				}`
 			)
 			return {}
 		}
@@ -740,7 +737,7 @@ export class Worker {
 					literal<Anomaly>({
 						start: parseFloat(res[2]),
 						duration: parseFloat(res[8]),
-						end: parseFloat(res[5])
+						end: parseFloat(res[5]),
 					})
 				)
 			}
@@ -750,7 +747,7 @@ export class Worker {
 					literal<Anomaly>({
 						start: parseFloat(res[2]),
 						duration: 0.0,
-						end: 0.0
+						end: 0.0,
 					})
 				)
 			}
@@ -943,7 +940,7 @@ export class Worker {
 				field_order: fieldOrder,
 				scenes: metadata.scenes,
 				freezes: metadata.freezes,
-				blacks: metadata.blacks
+				blacks: metadata.blacks,
 			})
 		)
 
@@ -953,7 +950,7 @@ export class Worker {
 		}
 
 		return literal<WorkResult>({
-			status: WorkStepStatus.DONE
+			status: WorkStepStatus.DONE,
 		})
 	}
 
@@ -978,14 +975,15 @@ export class Worker {
 					thumbSize: 0,
 					thumbTime: 0,
 					cinf: '',
-					tinf: ''
+					tinf: '',
 				})
 			} else {
 				const mediaFileDetails = await this.lookForFile(step.file.name, step.target)
 				if (mediaFileDetails === false)
 					return this.failStep(
-						`failed to locate media object file with ID "${fileId}" at path "${step.target.options &&
-							step.target.options.mediaPath}"`,
+						`failed to locate media object file with ID "${fileId}" at path "${
+							step.target.options && step.target.options.mediaPath
+						}"`,
 						step.action
 					)
 
@@ -999,7 +997,7 @@ export class Worker {
 					thumbSize: 0,
 					thumbTime: 0,
 					cinf: '',
-					tinf: ''
+					tinf: '',
 				})
 			}
 		}
@@ -1038,7 +1036,7 @@ export class Worker {
 				'-show_streams',
 				'-show_format',
 				'-print_format',
-				'json'
+				'json',
 			]
 
 			const { result: probeOutput, error: execError } = await noTryAsync(
@@ -1086,7 +1084,7 @@ export class Worker {
 					type: s.codec_type,
 					time_base: s.codec_time_base,
 					tag_string: s.codec_tag_string,
-					is_avc: s.is_avc
+					is_avc: s.is_avc,
 				},
 
 				// Video
@@ -1112,7 +1110,7 @@ export class Worker {
 
 				bit_rate: s.bit_rate,
 				max_bit_rate: s.max_bit_rate,
-				nb_frames: s.nb_frames
+				nb_frames: s.nb_frames,
 			})),
 			format: {
 				name: probeData.format.format_name,
@@ -1122,8 +1120,8 @@ export class Worker {
 				start_time: probeData.format.start_time,
 				duration: probeData.format.duration,
 				bit_rate: probeData.format.bit_rate,
-				max_bit_rate: probeData.format.max_bit_rate
-			}
+				max_bit_rate: probeData.format.max_bit_rate,
+			},
 		})
 
 		if (this.isQuantel(doc.mediaId)) {
@@ -1155,7 +1153,7 @@ export class Worker {
 		this.logger.debug(`Worker: metadata generate: put result is`, putResult)
 
 		return literal<WorkResult>({
-			status: WorkStepStatus.DONE
+			status: WorkStepStatus.DONE,
 		})
 	}
 
@@ -1175,12 +1173,12 @@ export class Worker {
 					file: step.file,
 					target: step.target,
 					status: WorkStepStatus.IDLE,
-					priority: 1
+					priority: 1,
 				})
 			)
 			return literal<WorkResult>({
 				status: metadataResult.status,
-				messages: (copyResult.messages || []).concat(metadataResult.messages || [])
+				messages: (copyResult.messages || []).concat(metadataResult.messages || []),
 			})
 		} else {
 			return copyResult
@@ -1225,7 +1223,7 @@ export class Worker {
 		this.logger.debug(`${this.ident} finish updating TMI on "${step.file.name}"`)
 
 		return literal<WorkResult>({
-			status: WorkStepStatus.DONE
+			status: WorkStepStatus.DONE,
 		})
 	}
 
@@ -1263,7 +1261,7 @@ export class Worker {
 		this.logger.debug(`${this.ident} finish updating TMI after delete of "${step.file.name}"`)
 
 		return literal<WorkResult>({
-			status: WorkStepStatus.DONE
+			status: WorkStepStatus.DONE,
 		})
 	}
 }

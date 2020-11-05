@@ -20,12 +20,12 @@ export abstract class Monitor extends EventEmitter {
 
 	private statusConnection: PeripheralDeviceAPI.StatusObject = {
 		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
-		messages: []
+		messages: [],
 	}
 
 	protected statusDisk: PeripheralDeviceAPI.StatusObject = {
 		statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
-		messages: []
+		messages: [],
 	}
 
 	protected isDestroyed = false
@@ -34,7 +34,7 @@ export abstract class Monitor extends EventEmitter {
 	// Accessor
 	protected _status: PeripheralDeviceAPI.StatusObject = {
 		statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-		messages: ['Initializing...']
+		messages: ['Initializing...'],
 	}
 
 	constructor(
@@ -92,7 +92,7 @@ export abstract class Monitor extends EventEmitter {
 			await this.coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
 				this.settings.storageId,
 				this.hashId(doc._id),
-				sendDoc
+				sendDoc,
 			])
 		} catch (e) {
 			this.logger.error('Media scanning: error while updating changed Media object', e)
@@ -105,7 +105,7 @@ export abstract class Monitor extends EventEmitter {
 			await this.coreHandler.core.callMethod(PeripheralDeviceAPI.methods.updateMediaObject, [
 				this.settings.storageId,
 				this.hashId(docId),
-				null
+				null,
 			])
 		} catch (e) {
 			this.logger.error('Media scanning: error while updating deleted Media object', e)
@@ -113,10 +113,7 @@ export abstract class Monitor extends EventEmitter {
 	}
 
 	protected hashId(id: string): string {
-		return crypto
-			.createHash('md5')
-			.update(id)
-			.digest('hex')
+		return crypto.createHash('md5').update(id).digest('hex')
 	}
 
 	protected async getAllCoreObjRevisions(): Promise<CoreObjRevisions> {
@@ -137,7 +134,7 @@ export abstract class Monitor extends EventEmitter {
 			since: this.lastSequenceNr || 'now',
 			include_docs: true,
 			live: true,
-			attachments: true
+			attachments: true,
 		})
 	}
 
@@ -161,18 +158,18 @@ export abstract class Monitor extends EventEmitter {
 			if (!this.settings.storageId || !this.storageSettings) {
 				statusSettings = {
 					statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-					messages: ['Settings parameter "storageId" not set or no corresponding storage']
+					messages: ['Settings parameter "storageId" not set or no corresponding storage'],
 				}
 			} else if (!this.initialized) {
 				statusSettings = {
 					statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-					messages: ['Not initialized']
+					messages: ['Not initialized'],
 				}
 			}
 		} else if (!this.initialized) {
 			statusSettings = {
 				statusCode: PeripheralDeviceAPI.StatusCode.BAD,
-				messages: ['Not initialized']
+				messages: ['Not initialized'],
 			}
 		}
 
@@ -188,7 +185,7 @@ export abstract class Monitor extends EventEmitter {
 		})
 		return {
 			statusCode,
-			messages
+			messages,
 		}
 	}
 
@@ -198,7 +195,7 @@ export abstract class Monitor extends EventEmitter {
 		if (this.status.statusCode !== status.statusCode || !_.isEqual(this.status.messages, status.messages)) {
 			this._status = {
 				statusCode: status.statusCode,
-				messages: status.messages
+				messages: status.messages,
 			}
 			this.emit('connectionChanged', this.status)
 		}

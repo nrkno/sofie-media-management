@@ -70,7 +70,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 				resolve({
 					created: Date.now(),
 					modified: Date.now(),
-					size: 1000
+					size: 1000,
 				})
 			})
 		}

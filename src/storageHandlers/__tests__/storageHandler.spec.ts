@@ -13,11 +13,11 @@ describe('buildStorageHandler', () => {
 				type: StorageType.LOCAL_FOLDER,
 				support: {
 					read: false,
-					write: false
+					write: false,
 				},
 				options: {
-					basePath: './'
-				}
+					basePath: './',
+				},
 			}),
 			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)
@@ -30,12 +30,12 @@ describe('buildStorageHandler', () => {
 				type: StorageType.FILE_SHARE,
 				support: {
 					read: false,
-					write: false
+					write: false,
 				},
 				options: {
 					basePath: '\\\\SERVER\\share',
-					mappedNetworkedDriveTarget: 'X'
-				}
+					mappedNetworkedDriveTarget: 'X',
+				},
 			}),
 			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)

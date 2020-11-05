@@ -7,7 +7,7 @@ import {
 	SubDeviceConfigManifestEntry,
 	ConfigManifestEntryType,
 	DeviceConfigManifest,
-	TableConfigManifestEntry
+	TableConfigManifestEntry,
 } from 'tv-automation-server-core-integration'
 import { MediaFlowType } from './api'
 
@@ -19,7 +19,7 @@ export enum StorageType {
 	LOCAL_FOLDER = 'local_folder',
 	FILE_SHARE = 'file_share',
 	QUANTEL_HTTP = 'quantel_http',
-	UNKNOWN = 'unknown'
+	UNKNOWN = 'unknown',
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
 }
@@ -29,18 +29,18 @@ const MEDIA_MANAGER_STORAGE_COMMON: SubDeviceConfigManifestEntry[] = [
 		id: 'id',
 		name: 'Storage ID',
 		columnName: 'Storage ID',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'support.read',
 		name: 'Allow Read',
-		type: ConfigManifestEntryType.BOOLEAN
+		type: ConfigManifestEntryType.BOOLEAN,
 	},
 	{
 		id: 'support.write',
 		name: 'Allow Write',
-		type: ConfigManifestEntryType.BOOLEAN
-	}
+		type: ConfigManifestEntryType.BOOLEAN,
+	},
 ]
 const MEDIA_MANAGER_STORAGE_CONFIG: SubDeviceConfigManifest['config'] = {}
 MEDIA_MANAGER_STORAGE_CONFIG[StorageType.UNKNOWN] = [...MEDIA_MANAGER_STORAGE_COMMON]
@@ -49,46 +49,46 @@ MEDIA_MANAGER_STORAGE_CONFIG[StorageType.FILE_SHARE] = [
 	{
 		id: 'options.basePath',
 		name: 'Base Path',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'options.mediaPath',
 		name: 'Media Path',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'options.mappedNetworkedDriveTarget',
 		name: 'Mapped Network Drive',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'options.username',
 		name: 'Username',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'options.password',
 		name: 'Password',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'options.onlySelectedFiles',
 		name: "Don't Scan Entire Storage",
-		type: ConfigManifestEntryType.BOOLEAN
-	}
+		type: ConfigManifestEntryType.BOOLEAN,
+	},
 ]
 MEDIA_MANAGER_STORAGE_CONFIG[StorageType.LOCAL_FOLDER] = [
 	...MEDIA_MANAGER_STORAGE_COMMON,
 	{
 		id: 'options.basePath',
 		name: 'Base Path',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'options.mediaPath',
 		name: 'Media Path',
-		type: ConfigManifestEntryType.STRING
-	}
+		type: ConfigManifestEntryType.STRING,
+	},
 ]
 
 const MEDIA_MANAGER_MEDIAFLOW_COMMON: SubDeviceConfigManifestEntry[] = [
@@ -96,13 +96,13 @@ const MEDIA_MANAGER_MEDIAFLOW_COMMON: SubDeviceConfigManifestEntry[] = [
 		id: 'id',
 		name: 'Flow ID',
 		columnName: 'Flow ID',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'sourceId',
 		name: 'Source Storage',
-		type: ConfigManifestEntryType.STRING // is actually a dropdown of storages
-	}
+		type: ConfigManifestEntryType.STRING, // is actually a dropdown of storages
+	},
 ]
 const MEDIA_MANAGER_MEDIAFLOW_CONFIG: SubDeviceConfigManifest['config'] = {}
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.UNKNOWN] = [...MEDIA_MANAGER_MEDIAFLOW_COMMON]
@@ -111,8 +111,8 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.WATCH_FOLDER] = [
 	{
 		id: 'destinationId',
 		name: 'Target Storage',
-		type: ConfigManifestEntryType.STRING // dropdown
-	}
+		type: ConfigManifestEntryType.STRING, // dropdown
+	},
 ]
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.LOCAL_INGEST] = [...MEDIA_MANAGER_MEDIAFLOW_COMMON]
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
@@ -120,21 +120,21 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.EXPECTED_ITEMS] = [
 	{
 		id: 'destinationId',
 		name: 'Target Storage',
-		type: ConfigManifestEntryType.STRING // dropdown
-	}
+		type: ConfigManifestEntryType.STRING, // dropdown
+	},
 ]
 
 export enum MediaMonitorType {
 	NULL = 'null',
 	WATCHER = 'watcher',
-	QUANTEL = 'quantel'
+	QUANTEL = 'quantel',
 }
 const MEDIA_MANAGER_MEDIAMONITOR_COMMON: SubDeviceConfigManifestEntry[] = [
 	{
 		id: 'storageId',
 		name: 'Storage ID',
-		type: ConfigManifestEntryType.STRING // is actually a dropdown of storages
-	}
+		type: ConfigManifestEntryType.STRING, // is actually a dropdown of storages
+	},
 ]
 const MEDIA_MANAGER_MEDIAMONITOR_CONFIG: SubDeviceConfigManifest['config'] = {}
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.NULL] = []
@@ -144,52 +144,52 @@ MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.WATCHER] = [
 		id: 'retryLimit',
 		name: 'Maximum file scan retries',
 		type: ConfigManifestEntryType.INT,
-		placeholder: '3'
-	}
+		placeholder: '3',
+	},
 ]
 export enum QuantelStreamType {
 	HLS = 'hls',
 	MPEG_DASH = 'mpeg-dash',
-	SMOOTH_STREAM = 'smooth-stream'
+	SMOOTH_STREAM = 'smooth-stream',
 }
 MEDIA_MANAGER_MEDIAMONITOR_CONFIG[MediaMonitorType.QUANTEL] = [
 	...MEDIA_MANAGER_MEDIAMONITOR_COMMON,
 	{
 		id: 'gatewayUrl',
 		name: 'Gateway URL',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'ISAUrl',
 		name: 'ISA URL',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'ISABackupUrl',
 		name: 'ISA Backup URL',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'zoneId',
 		name: 'Zone ID (leave blank for default)',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'serverId',
 		name: 'Quantel Server ID',
-		type: ConfigManifestEntryType.NUMBER
+		type: ConfigManifestEntryType.NUMBER,
 	},
 	{
 		id: 'transformerUrl',
 		name: 'TransformerURL',
-		type: ConfigManifestEntryType.STRING
+		type: ConfigManifestEntryType.STRING,
 	},
 	{
 		id: 'streamType',
 		name: 'Stream Type',
 		type: ConfigManifestEntryType.ENUM,
-		values: QuantelStreamType
-	}
+		values: QuantelStreamType,
+	},
 ]
 
 export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
@@ -198,166 +198,166 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			id: 'workers',
 			name: 'No. of Available Workers',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '3'
+			placeholder: '3',
 		},
 		{
 			id: 'lingerTime',
 			name: 'File Linger Time (ms)',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '259200000'
+			placeholder: '259200000',
 		},
 		{
 			id: 'workFlowLingerTime',
 			name: 'Workflow Linger Time (ms)',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '86400000'
+			placeholder: '86400000',
 		},
 		{
 			id: 'cronJobTime',
 			name: 'Cron-Job Interval Time (ms)',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '3600000'
+			placeholder: '3600000',
 		},
 		{
 			id: 'httpPort',
 			name: 'HTTP port serving resources',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
 		},
 		{
 			id: 'httpsPort',
 			name: 'HTTPS port serving resources',
-			type: ConfigManifestEntryType.INT
+			type: ConfigManifestEntryType.INT,
 		},
 		{
 			id: 'paths.resources',
 			name: 'Parent folder for serving resources',
-			type: ConfigManifestEntryType.STRING
+			type: ConfigManifestEntryType.STRING,
 		},
 		{
 			id: 'thumbnails.width',
 			name: 'Thumbnail width',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '256'
+			placeholder: '256',
 		},
 		{
 			id: 'thumbnails.height',
 			name: 'Thumbnail height, -1 preserves aspect',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '-1'
+			placeholder: '-1',
 		},
 		{
 			id: 'thumbnails.folder',
 			name: 'Thumbnail sub-folder',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: 'thumbs'
+			placeholder: 'thumbs',
 		},
 		{
 			id: 'metadata.fieldOrder',
 			name: 'Enable field order check',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		{
 			id: 'metadata.fieldOrderScanDuration',
 			name: 'Number of frames to use to test field order',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '200'
+			placeholder: '200',
 		},
 		{
 			id: 'metadata.scenes',
 			name: 'Enable scene change detection',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		{
 			id: 'metadata.sceneThreshold',
 			name: 'Likelihood frame introduces new scene (0.0 to 1.0)',
 			type: ConfigManifestEntryType.NUMBER,
-			placeholder: '0.4'
+			placeholder: '0.4',
 		},
 		{
 			id: 'metadata.freezeDetection',
 			name: 'Enable freeze frame detection',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		{
 			id: 'metadata.freezeNoise',
 			name: 'Noise tolerance - difference ratio 0.0 upto 1.0',
 			type: ConfigManifestEntryType.NUMBER,
-			placeholder: '0.001'
+			placeholder: '0.001',
 		},
 		{
 			id: 'metadata.freezeDuration',
 			name: 'Duration of freeze until notified, e.g. "2s"',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: '2s'
+			placeholder: '2s',
 		},
 		{
 			id: 'metadata.blackDetection',
 			name: 'Enable black frame detection',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		{
 			id: 'metadata.blackDuration',
 			name: 'Duration of black until notified, e.g. "2s"',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: '2s'
+			placeholder: '2s',
 		},
 		{
 			id: 'metadata.blackRatio',
 			name: 'Ratio of black pixels',
 			type: ConfigManifestEntryType.NUMBER,
-			placeholder: '0.98'
+			placeholder: '0.98',
 		},
 		{
 			id: 'metadata.blackThreshold',
 			name: 'Luminance threshold - pixel is black',
 			type: ConfigManifestEntryType.NUMBER,
-			placeholder: '0.1'
+			placeholder: '0.1',
 		},
 		{
 			id: 'metadata.mergeBlacksAndFreezes',
 			name: 'Merge black with freeze frame',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		{
 			id: 'previews.enable',
 			name: 'Enable preview generation',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		{
 			id: 'previews.width',
 			name: 'Preview width',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '160'
+			placeholder: '160',
 		},
 		{
 			id: 'previews.height',
 			name: 'Preview height, -1 preserves aspect',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '-1'
+			placeholder: '-1',
 		},
 		{
 			id: 'previews.bitrate',
 			name: 'Preview bitrate, e.g. 40k',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: '40k'
+			placeholder: '40k',
 		},
 		{
 			id: 'previews.folder',
 			name: 'Preview sub-folder',
 			type: ConfigManifestEntryType.STRING,
-			placeholder: 'previews'
+			placeholder: 'previews',
 		},
 		{
 			id: 'debugLogging',
 			name: 'Activate Debug Logging',
-			type: ConfigManifestEntryType.BOOLEAN
+			type: ConfigManifestEntryType.BOOLEAN,
 		},
 		literal<TableConfigManifestEntry>({
 			id: 'storages',
 			name: 'Attached Storages',
 			type: ConfigManifestEntryType.TABLE,
 			defaultType: StorageType.UNKNOWN,
-			config: MEDIA_MANAGER_STORAGE_CONFIG
+			config: MEDIA_MANAGER_STORAGE_CONFIG,
 		}),
 		literal<TableConfigManifestEntry>({
 			id: 'mediaFlows',
@@ -365,7 +365,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			type: ConfigManifestEntryType.TABLE,
 			defaultType: MediaFlowType.UNKNOWN,
 			typeField: 'mediaFlowType',
-			config: MEDIA_MANAGER_MEDIAFLOW_CONFIG
+			config: MEDIA_MANAGER_MEDIAFLOW_CONFIG,
 		}),
 		literal<TableConfigManifestEntry>({
 			id: 'monitors',
@@ -373,7 +373,7 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			type: ConfigManifestEntryType.TABLE,
 			defaultType: MediaMonitorType.NULL,
 			isSubDevices: true,
-			config: MEDIA_MANAGER_MEDIAMONITOR_CONFIG
-		})
-	]
+			config: MEDIA_MANAGER_MEDIAMONITOR_CONFIG,
+		}),
+	],
 }

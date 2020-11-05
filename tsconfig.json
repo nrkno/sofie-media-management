@@ -2,6 +2,7 @@
 	"extends": "@sofie-automation/code-standard-preset/ts/tsconfig.bin",
 	"exclude": ["node_modules/**", "scratch/**"],
 	"compilerOptions": {
-		"types": ["node", "jest"]
+		"types": ["node", "jest"],
+		"experimentalDecorators": true
 	}
 }

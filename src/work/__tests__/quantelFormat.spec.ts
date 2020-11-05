@@ -39,7 +39,7 @@ const clipData633_524: ClipData = {
 	ClipGUID: 'cb0715ee-a286-4f8d-a0e0-628da8108b7f',
 	Protection: '',
 	VDCPID: '',
-	PublishCompleted: '2020-05-28T09:24:18.000Z'
+	PublishCompleted: '2020-05-28T09:24:18.000Z',
 }
 
 describe('Test AVC-I 8-channel audio', () => {
@@ -95,7 +95,7 @@ const clipData91_521: ClipData = {
 	ClipGUID: '1cec8465e9734b469844a6c3c9c9516e',
 	Protection: '',
 	VDCPID: '',
-	PublishCompleted: null
+	PublishCompleted: null,
 }
 
 describe('Test IMX-50 4-channel 16-bit audio', () => {

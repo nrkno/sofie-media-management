@@ -13,11 +13,11 @@ import { MediaManagerApp } from '../app'
 export class MonitorManager {
 	private _monitors: { [id: string]: Monitor } = {}
 	private _initialized = false
-	private _coreHandler: CoreHandler
+	private _coreHandler!: CoreHandler
 	private _dispatcher: Dispatcher | undefined = undefined
 	private _app: MediaManagerApp | undefined = undefined
 
-	public settings: DeviceSettings
+	public settings!: DeviceSettings
 
 	constructor(private mediaDB: PouchDB.Database<MediaObject>) {}
 
@@ -116,7 +116,7 @@ export class MonitorManager {
 		} catch (e) {
 			await coreMonitorHandler.core.setStatus({
 				statusCode: PeripheralDeviceAPI.StatusCode.FATAL,
-				messages: ['Error during init: ' + ((e && e.message) || e.stack || e.toString())]
+				messages: ['Error during init: ' + ((e && e.message) || e.stack || e.toString())],
 			})
 			this._coreHandler.logger.warn(e)
 			await coreMonitorHandler.dispose(true)

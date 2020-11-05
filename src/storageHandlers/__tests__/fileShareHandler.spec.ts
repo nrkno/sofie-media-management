@@ -15,10 +15,10 @@ jest.mock('chokidar')
 	return chokidar
 })
 ;(networkDrive as any).mount = jest.fn().mockResolvedValue(true)
-;(networkDrive as any).find = function() {
+;(networkDrive as any).find = function () {
 	return Promise.resolve([])
 }
-;(networkDrive as any).list = function() {
+;(networkDrive as any).list = function () {
 	return Promise.resolve({})
 }
 
@@ -32,13 +32,13 @@ describe('FileShareHandler', () => {
 				type: StorageType.FILE_SHARE,
 				support: {
 					read: true,
-					write: false
+					write: false,
 				},
 				options: {
 					basePath: '\\\\STORAGE\\public',
 					mappedNetworkedDriveTarget: 'U',
-					onlySelectedFiles: false // to make test use '.' and cause watcher to enter ready state
-				}
+					onlySelectedFiles: false, // to make test use '.' and cause watcher to enter ready state
+				},
 			},
 			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)

@@ -1,13 +1,14 @@
 {
 	"extends": "@sofie-automation/code-standard-preset/ts/tsconfig.bin",
 	"exclude": ["node_modules/**", "src/**/*spec.ts", "src/**/__tests__/*", "src/**/__mocks__/*", "scratch/**"],
-	"compilerOptions": {
+	"compilerOptions": {	
 		"outDir": "./dist",
 		"baseUrl": "./",
 		"paths": {
 			"*": ["./node_modules/*"],
 			"tv-automation-media-management": ["./src/index.ts"],
 			"types": ["node", "jest", "reflect-metadata"]
-		}
+		},
+		"experimentalDecorators": true
 	}
 }

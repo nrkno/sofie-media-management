@@ -18,6 +18,7 @@ import { MediaManagerApp } from './app'
 import { PreviewAndThumbnailVacuum } from './monitors/previewVacuum'
 import { buildStorageHandler } from './storageHandlers/storageHandlerFactory'
 import * as fs from 'fs-extra'
+import { threadId } from 'worker_threads'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -44,18 +45,18 @@ export interface DeviceConfig {
 
 export class MediaManager {
 	private coreHandler: CoreHandler | undefined = undefined
-	private _config: Config
+	private _config!: Config
 	private _logger: Winston.LoggerInstance
 
-	private _availableStorage: StorageObject[]
-	private _trackedMedia: TrackedMediaItems
-	private _dispatcher: Dispatcher
-	private _workFlowGenerators: BaseWorkFlowGenerator[]
-	private _process: Process
+	private _availableStorage: StorageObject[] = []
+	private _trackedMedia: TrackedMediaItems | undefined = undefined
+	private _dispatcher!: Dispatcher
+	private _workFlowGenerators: BaseWorkFlowGenerator[] = []
+	private _process!: Process
 
-	private mediaDB: PouchDB.Database<MediaObject>
-	private _monitorManager: MonitorManager
-	private _app: MediaManagerApp
+	private mediaDB!: PouchDB.Database<MediaObject>
+	private _monitorManager!: MonitorManager
+	private _app!: MediaManagerApp
 	private vac: PreviewAndThumbnailVacuum | null = null
 
 	constructor(logger: Winston.LoggerInstance) {
@@ -69,7 +70,7 @@ export class MediaManager {
 			this._logger.info(`Initialising media database`)
 			await fs.ensureDir('./db') // TODO this should be configurable?
 			const PrefixedPouchDB = PouchDB.defaults({
-				prefix: './db/'
+				prefix: './db/',
 			} as PouchDB.Configuration.DatabaseConfiguration)
 			this.mediaDB = new PrefixedPouchDB<MediaObject>('media')
 			this._monitorManager = new MonitorManager(this.mediaDB)
@@ -83,6 +84,7 @@ export class MediaManager {
 			await this.initCore()
 			this._logger.info('Core initialized')
 
+			if (!this.coreHandler) { throw new Error('MediaManger: init: Core handler should have been initialized here') }
 			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
 
 			// Stop here if studioId not set
@@ -147,6 +149,8 @@ export class MediaManager {
 
 	async initMediaManager(settings: DeviceSettings): Promise<void> {
 		// console.log(this.coreHandler.deviceSettings)
+		if (!this.coreHandler) { throw new Error('MediaManager: initMediaManager: Core handler should have been initialized here') }
+
 		this._logger.debug('Initializing Media Manager with the following settings:')
 		this._logger.debug(JSON.stringify(settings))
 
@@ -155,7 +159,7 @@ export class MediaManager {
 
 		this._availableStorage = _.map(settings.storages || [], (item) => {
 			return extendMandadory<StorageSettings, StorageObject>(item, {
-				handler: buildStorageHandler(item as GeneralStorageSettings, this._logger)
+				handler: buildStorageHandler(item as GeneralStorageSettings, this._logger),
 			})
 		})
 
@@ -170,11 +174,13 @@ export class MediaManager {
 						this._logger.info(`Storage handler for "${st.id}" initialized.`)
 					})
 					.catch((reason) => {
-						this.coreHandler.setProcessState(
-							st.id,
-							[`Could not set up storage handler "${st.id}": ${reason}`],
-							P.StatusCode.BAD
-						)
+						if (this.coreHandler) {
+							this.coreHandler.setProcessState(
+								st.id,
+								[`Could not set up storage handler "${st.id}": ${reason}`],
+								P.StatusCode.BAD
+							)
+						}
 						this._logger.error(`Storage handler for "${st.id}" not initialized`, reason)
 						throw reason
 					})
@@ -226,6 +232,11 @@ export class MediaManager {
 
 		// Monitor for changes in settings:
 		this.coreHandler.onChanged(() => {
+			if (!this.coreHandler) {
+				this.initCore()
+			}
+			if (!this.coreHandler) { throw new Error('MediaManager: coreHandler.onChanged: Core handler should have been initialized here') }
+
 			this.coreHandler.core
 				.getPeripheralDevice()
 				.then((device) => {

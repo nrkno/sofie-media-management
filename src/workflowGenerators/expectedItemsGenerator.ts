@@ -13,7 +13,7 @@ import {
 	WorkStep,
 	WorkFlow,
 	WorkStepStatus,
-	StorageType
+	StorageType,
 } from '../api'
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
@@ -44,12 +44,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	/** Our flows */
 	private _handledFlows: { [flowId: string]: MediaFlow } = {}
 
-	private expectedMediaItems: () => Collection
-	private observer: Observer
+	private expectedMediaItems!: () => Collection
+	private observer!: Observer
 
-	private _cronJob: NodeJS.Timer
+	private _cronJob!: NodeJS.Timer
 
-	private _expectedMediaItemsSubscription: string
+	private _expectedMediaItemsSubscription!: string
 
 	/** The interval of which to check whether files are still expected. */
 	private CRON_JOB_INTERVAL = 10 * 60 * 1000 // 10 minutes (ms)
@@ -126,16 +126,19 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		this._expectedMediaItemsSubscription = await this._coreHandler.core.subscribe('expectedMediaItems', {
 			mediaFlowId: {
-				$in: _.keys(this._handledFlows)
+				$in: _.keys(this._handledFlows),
 			},
-			studioId: this._getStudioId()
+			studioId: this._getStudioId(),
 		})
 		this.logger.debug(`${this.ident} setupSubscribtionsAndObservers: Subscribed to expectedMediaItems.`)
 
 		this.expectedMediaItems = () => this._coreHandler.core.getCollection('expectedMediaItems')
 
 		const observer = this._coreHandler.core.observe('expectedMediaItems')
-		observer.added = this.wrapError(this.onExpectedAdded)
+		observer.added = this.wrapError(this.onExpectedAdded) as (
+			id: string,
+			fields?: Record<string, unknown> | undefined
+		) => void
 		observer.changed = this.wrapError(this.onExpectedChanged)
 		observer.removed = this.wrapError(this.onExpectedRemoved)
 
@@ -146,12 +149,13 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		return this.initialExpectedCheck()
 	}
 
-	private wrapError = (fcn: (...x: unknown[]) => unknown) => {
-		return (...args: unknown[]) => {
+	private wrapError = <T extends unknown[], R = unknown>(fcn: (...x: T) => R) => {
+		return (...args: T) => {
 			try {
 				return fcn(...args)
 			} catch (e) {
 				this.logger.error(`${this.ident} ${fcn.name}: ${e.message}`, e)
+				return
 			}
 		}
 	}
@@ -196,14 +200,11 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	private isQuantel(url: string): boolean {
-		return url
-			.slice(0, 8)
-			.toLowerCase()
-			.startsWith('quantel:')
+		return url.slice(0, 8).toLowerCase().startsWith('quantel:')
 	}
 
 	/** Called when an item is added (from Core) */
-	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem) => {
+	private onExpectedAdded = (id: string, obj?: ExpectedMediaItem): void => {
 		let item: ExpectedMediaItem
 		if (obj) {
 			item = obj
@@ -221,8 +222,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		if (item.disabled) {
 			this.logger.warn(
-				`${this.ident} onExpectedAdded: An expected item was added called "${item.label ||
-					item.path}", but it was disabled.`
+				`${this.ident} onExpectedAdded: An expected item was added called "${
+					item.label || item.path
+				}", but it was disabled.`
 			)
 			return
 		}
@@ -268,7 +270,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
-			targetStorageIds: [flow.destinationId]
+			targetStorageIds: [flow.destinationId],
 		}
 		this._trackedItems
 			.upsert(baseObj._id, (tmi?: TrackedMediaItemDB) => {
@@ -294,7 +296,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	/** Called when an item is changed in Core */
-	private onExpectedChanged = (id: string, _oldFields: any, clearedFields: any, newFields: any) => {
+	private onExpectedChanged = (id: string, _oldFields: any, clearedFields: any, newFields: any): void => {
 		let item: ExpectedMediaItem = this.expectedMediaItems().findOne(id) as ExpectedMediaItem
 		if (!item)
 			throw new Error(
@@ -314,8 +316,9 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 		}
 		if (item.disabled) {
 			this.logger.warn(
-				`${this.ident} onExpectedChanged: An expected item was added called "${item.label ||
-					item.path}", but it was disabled.`
+				`${this.ident} onExpectedChanged: An expected item was added called "${
+					item.label || item.path
+				}", but it was disabled.`
 			)
 			return
 		}
@@ -357,7 +360,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 			lastSeen: item.lastSeen,
 			lingerTime: item.lingerTime || this.LINGER_TIME,
 			sourceStorageId: flow.sourceId,
-			targetStorageIds: [flow.destinationId]
+			targetStorageIds: [flow.destinationId],
 		}
 
 		this._trackedItems.getById(fileName).then(
@@ -406,7 +409,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	}
 
 	/** Called when an item is removed (from Core) */
-	private onExpectedRemoved = (id: string, oldValue: any) => {
+	private onExpectedRemoved = (id: string, oldValue: any): void => {
 		this.logger.debug(`${this.ident} onExpectedRemoved: ${id} was removed from Core expectedMediaItems collection`)
 
 		const item: ExpectedMediaItem = oldValue || (this.expectedMediaItems().findOne(id) as ExpectedMediaItem)
@@ -614,7 +617,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				lingerTime: i.lingerTime || this.LINGER_TIME,
 				expectedMediaItemId: [i._id],
 				sourceStorageId: flow.sourceId,
-				targetStorageIds: [flow.destinationId]
+				targetStorageIds: [flow.destinationId],
 			})
 
 			// check if an item doesn't already exist in the list with the same id
@@ -677,12 +680,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							`${this.ident} purgeOldExpectedItems:` +
 								`Marking file "${i.name}" coming from "${
 									i.sourceStorageId
-								}" to be deleted because it was last seen ${new Date(
-									i.lastSeen
-								)} & linger time is ${i.lingerTime / (60 * 60 * 1000)} hours`
+								}" to be deleted because it was last seen ${new Date(i.lastSeen)} & linger time is ${
+									i.lingerTime / (60 * 60 * 1000)
+								} hours`
 						)
 						return _.extend(i, {
-							_deleted: true
+							_deleted: true,
 						})
 					})
 				return Promise.all(
@@ -747,7 +750,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					target: st,
 					priority: 2,
 					criticalStep: true,
-					status: WorkStepStatus.IDLE
+					status: WorkStepStatus.IDLE,
 				})
 			)
 		} else {
@@ -758,7 +761,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					target: st,
 					priority: 2,
 					criticalStep: true,
-					status: WorkStepStatus.IDLE
+					status: WorkStepStatus.IDLE,
 				})
 			)
 		}
@@ -768,21 +771,21 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				file,
 				target: st,
 				priority: 1,
-				status: WorkStepStatus.IDLE
+				status: WorkStepStatus.IDLE,
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
 				file,
 				target: st,
 				priority: 0.5,
-				status: WorkStepStatus.IDLE
+				status: WorkStepStatus.IDLE,
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
 				file,
 				target: st,
 				priority: 0.3,
-				status: WorkStepStatus.IDLE
+				status: WorkStepStatus.IDLE,
 			})
 		)
 		// this.logger.info(`Steps are: ${JSON.stringify(steps)}`)
@@ -808,7 +811,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				source: WorkFlowSource.EXPECTED_MEDIA_ITEM,
 				steps: this.generateNewFileWorkSteps(file, targetStorage, doCopy),
 				created: getCurrentTime(),
-				success: false
+				success: false,
 			}),
 			this
 		)
@@ -857,7 +860,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 					support: { read: false, write: false },
 					handler: QuantelStreamHandlerSingleton.Instance,
 					type: StorageType.QUANTEL_STREAM,
-					options: {}
+					options: {},
 				})
 				this.emitCopyWorkflow(file, st, tmi.comment, false, reason, `Quantel item added or updated`)
 			}

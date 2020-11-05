@@ -11,9 +11,7 @@ export function literal<T>(arg: T): T {
 }
 
 export function randomId(): string {
-	return Math.random()
-		.toString(36)
-		.substring(2, 8)
+	return Math.random().toString(36).substring(2, 8)
 }
 
 export function getID(fileName: string): string {
@@ -116,13 +114,13 @@ export function throttleOnKey<T extends (key: string, ...args: any[]) => void | 
 	wait: number,
 	functionName?: string
 ): T {
-	return function(key: string, ...args: any[]): void | Promise<any> {
+	return function (key: string, ...args: any[]): void | Promise<any> {
 		const id = (fcn.name || functionName || randomId()) + '_' + key
 		if (!keyThrottleHistory[id] || keyThrottleHistory[id].lastCalled + wait < Date.now()) {
 			keyThrottleHistory[id] = {
 				args,
 				lastCalled: Date.now(),
-				timeout: undefined
+				timeout: undefined,
 			}
 			const p = fcn(key, ...args)
 			if (p) keyThrottleHistory[id].isPromise = true
@@ -162,12 +160,12 @@ export function throttleOnKey<T extends (key: string, ...args: any[]) => void | 
 enum syncFunctionFcnStatus {
 	WAITING = 0,
 	RUNNING = 1,
-	DONE = 2
+	DONE = 2,
 }
 
 interface SyncFunctionFcn {
 	id: string
-	fcn: (finished: () => void, ...args: unknown[]) => void
+	fcn: <T extends unknown[]> (finished: () => void, ...args: T) => void
 	args: Array<unknown>
 	timeout: number
 	status: syncFunctionFcnStatus
@@ -182,20 +180,20 @@ const syncFunctionRunningFcns: { [id: string]: number } = {}
  * @param id0 (Optional) Id to determine which functions are to wait for each other. Can use "$0" to refer first argument. Example: "myFcn_$0,$1" will let myFcn(0, 0, 13) and myFcn(0, 1, 32) run in parallell, byt not myFcn(0, 0, 13) and myFcn(0, 0, 14)
  * @param timeout (Optional)
  */
-export function atomic<T extends (finished: () => void, ...args: unknown[]) => void>(
+export function atomic<R extends unknown[], T extends (finished: () => void, ...args: R) => void>(
 	fcn: T,
 	id0?: string,
 	timeout = 10000
 ): (...args: unknown[]) => void {
 	const id = id0 || randomId()
 
-	return function(...args: unknown[]): void {
+	return function (...args: unknown[]): void {
 		syncFunctionFcns.push({
 			id: id,
 			fcn: fcn,
 			args: args,
 			timeout: timeout,
-			status: syncFunctionFcnStatus.WAITING
+			status: syncFunctionFcnStatus.WAITING,
 		})
 		evaluateFunctions()
 	}
@@ -267,7 +265,7 @@ export function atomicPromise<T>(id: string, fcn: (...args: unknown[]) => Promis
 			resolve,
 			reject,
 			fcn,
-			running: false
+			running: false,
 		})
 
 		evaluateAtomicPromiseQueue()

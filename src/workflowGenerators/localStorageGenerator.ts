@@ -85,29 +85,29 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 				file,
 				target: st,
 				priority: 1,
-				status: WorkStepStatus.IDLE
+				status: WorkStepStatus.IDLE,
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_METADATA,
 				file,
 				target: st,
 				priority: 0.75,
-				status: WorkStepStatus.IDLE
+				status: WorkStepStatus.IDLE,
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_THUMBNAIL,
 				file,
 				target: st,
 				priority: 0.5,
-				status: WorkStepStatus.IDLE
+				status: WorkStepStatus.IDLE,
 			}),
 			new ScannerWorkStep({
 				action: WorkStepAction.GENERATE_PREVIEW,
 				file,
 				target: st,
 				priority: 0.3,
-				status: WorkStepStatus.IDLE
-			})
+				status: WorkStepStatus.IDLE,
+			}),
 		]
 	}
 
@@ -120,7 +120,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 					lastSeen: getCurrentTime(),
 					lingerTime: this.LOCAL_LINGER_TIME,
 					targetStorageIds: targetStorages ? targetStorages.map((i) => i.id) : [],
-					name: file.name
+					name: file.name,
 				})
 			)
 			.then((_s) => {
@@ -157,7 +157,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 								source: WorkFlowSource.LOCAL_MEDIA_ITEM,
 								steps: this.generateNewFileWorkSteps(localFile, st),
 								created: getCurrentTime(),
-								success: false
+								success: false,
 							}),
 							this
 						)
@@ -189,7 +189,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 							source: WorkFlowSource.LOCAL_MEDIA_ITEM,
 							steps: this.generateNewFileWorkSteps(localFile, st),
 							created: getCurrentTime(),
-							success: false
+							success: false,
 						}),
 						this
 					)
@@ -258,7 +258,7 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 							this.onAdd(st, {
 								type: StorageEventType.add,
 								path: file.name,
-								file: file
+								file: file,
 							})
 						}
 					})
@@ -267,8 +267,8 @@ export class LocalStorageGenerator extends BaseWorkFlowGenerator {
 			.then(async () => {
 				const staleFiles = await this._tracked.getAllFromStorage(st.id, {
 					lastSeen: {
-						$lt: initialScanTime
-					}
+						$lt: initialScanTime,
+					},
 				})
 				return Promise.all(staleFiles.map((sFile) => this._tracked.remove(sFile))).then((_x) => {
 					return

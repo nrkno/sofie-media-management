@@ -12,18 +12,18 @@ export type GeneralWorkStepDB = (FileWorkStep | ScannerWorkStep) & WorkStepDB
  * The object that's stored in the DB
  */
 export class WorkStepDB extends WorkStep {
-	_id: string
-	_rev: string
-	workFlowId: string
+	_id!: string
+	_rev!: string
+	workFlowId!: string
 }
 
 export interface FileWorkStepInitial extends WorkStepInitial {
 	action:
 		| WorkStepAction.COPY
 		| WorkStepAction.DELETE
-		| WorkStepAction.GENERATE_METADATA
-		| WorkStepAction.GENERATE_PREVIEW
-		| WorkStepAction.GENERATE_THUMBNAIL
+		// | WorkStepAction.GENERATE_METADATA
+		// | WorkStepAction.GENERATE_PREVIEW
+		// | WorkStepAction.GENERATE_THUMBNAIL
 	file: File
 	target: StorageObject
 }
@@ -35,7 +35,7 @@ export interface FileWorkStepInitialConstr extends FileWorkStepInitial {
  */
 export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 	action: WorkStepAction.COPY | WorkStepAction.DELETE
-	priority = this.priority === undefined ? 1 : this.priority
+	priority: number
 
 	// code annotations for class-transformer to automate serialization and deserialization
 	@Type(() => File, {
@@ -44,9 +44,9 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 			subTypes: [
 				{ value: LocalFolderFile, name: 'localFolderFile' },
 				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' },
-				{ value: QuantelStream, name: 'quantelStream' }
-			]
-		}
+				{ value: QuantelStream, name: 'quantelStream' },
+			],
+		},
 	})
 	file: File
 
@@ -54,8 +54,12 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 	@Transform((value: string) => value, { toClassOnly: true })
 	target: StorageObject
 
-	constructor(init?: FileWorkStepInitialConstr) {
+	constructor(init: FileWorkStepInitialConstr) {
 		super(init)
+		this.action = init.action
+		this.priority = init.priority
+		this.file = init.file
+		this.target = init.target
 	}
 }
 export interface ScannerWorkStepInitial extends WorkStepInitial {
@@ -79,7 +83,7 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 		| WorkStepAction.GENERATE_PREVIEW
 		| WorkStepAction.GENERATE_THUMBNAIL
 		| WorkStepAction.SCAN
-	priority = this.priority === undefined ? 1 : this.priority
+	priority: number 
 
 	// code annotations for class-transformer to automate serialization and deserialization
 	@Type(() => File, {
@@ -88,9 +92,9 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 			subTypes: [
 				{ value: LocalFolderFile, name: 'localFolderFile' },
 				{ value: QuantelHTTPFile, name: 'quantelHTTPFile' },
-				{ value: QuantelStream, name: 'quantelStream' }
-			]
-		}
+				{ value: QuantelStream, name: 'quantelStream' },
+			],
+		},
 	})
 	file: File
 
@@ -98,8 +102,12 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 	@Transform((value: string) => value, { toClassOnly: true })
 	target: StorageObject
 
-	constructor(init?: ScannerWorkStepInitialConstr) {
+	constructor(init: ScannerWorkStepInitialConstr) {
 		super(init)
+		this.action = init.action
+		this.priority = init.priority
+		this.file = init.file
+		this.target = init.target
 	}
 }
 
@@ -128,7 +136,7 @@ export function plainToWorkStep(obj: Record<string, any>, availableStorage: Stor
 								support: { read: false, write: false },
 								handler: QuantelStreamHandlerSingleton.Instance,
 								type: StorageType.QUANTEL_STREAM,
-								options: {}
+								options: {},
 						  })
 						: availableStorage.find((i) => i.id === storageId)
 				if (!storage) throw new Error(`Unknown storage: "${storageId}"`)

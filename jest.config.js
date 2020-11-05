@@ -1,12 +1,12 @@
 module.exports = {
 	globals: {
 		'ts-jest': {
-			tsconfig: 'tsconfig.json'
-		}
+			tsconfig: 'tsconfig.json',
+		},
 	},
 	moduleFileExtensions: ['ts', 'js'],
 	transform: {
-		'^.+\\.(ts|tsx)$': 'ts-jest'
+		'^.+\\.(ts|tsx)$': 'ts-jest',
 	},
 	testMatch: ['**/__tests__/**/*.spec.(ts|js)'],
 	testPathIgnorePatterns: ['integrationTests'],
@@ -16,8 +16,8 @@ module.exports = {
 			branches: 100,
 			functions: 100,
 			lines: 100,
-			statements: 100
-		}
+			statements: 100,
+		},
 	},
-	coverageDirectory: './coverage/'
+	coverageDirectory: './coverage/',
 }

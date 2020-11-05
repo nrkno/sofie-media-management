@@ -45,18 +45,18 @@ process.argv.forEach((val) => {
 const config: Config = {
 	process: {
 		unsafeSSL: unsafeSSL,
-		certificates: certs
+		certificates: certs,
 	},
 	device: {
 		deviceId: deviceId,
-		deviceToken: deviceToken
+		deviceToken: deviceToken,
 	},
 	core: {
 		host: host,
 		port: port,
 		watchdog: !disableWatchdog,
-		ssl: ssl
-	}
+		ssl: ssl,
+	},
 }
 
 export { config, logPath, disableWatchdog }

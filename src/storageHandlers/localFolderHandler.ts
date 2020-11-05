@@ -22,7 +22,7 @@ function getLocalFileProperties(fileUrl: string): Promise<FileProperties> {
 				resolve({
 					created: stats.ctimeMs,
 					modified: stats.mtimeMs,
-					size: stats.size
+					size: stats.size,
 				})
 			},
 			(err) => reject(err)
@@ -32,10 +32,10 @@ function getLocalFileProperties(fileUrl: string): Promise<FileProperties> {
 
 export class LocalFolderFile implements File {
 	source = StorageType.LOCAL_FOLDER
-	private _name: string
-	private _url: string
-	private _read: boolean
-	private _write: boolean
+	private _name!: string
+	private _url!: string
+	private _read!: boolean
+	private _write!: boolean
 
 	constructor()
 	constructor(url: string, read: boolean, write: boolean, name?: string)
@@ -75,7 +75,7 @@ type NestedFiles = Array<File | NestedFiles | null>
 
 export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private _basePath: string
-	private _watcher: chokidar.FSWatcher
+	private _watcher!: chokidar.FSWatcher
 	private _initialized = false
 	private _writable = false
 	private _readable = false
@@ -110,7 +110,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 				ignoreInitial: true,
 				awaitWriteFinish: {
 					stabilityThreshold: 3000,
-					pollInterval: 100
+					pollInterval: 100,
 				},
 				atomic: true,
 				disableGlobbing: true,
@@ -118,7 +118,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 				usePolling: this._usePolling,
 				// following will only be effective if usePolling: true
 				interval: 3000,
-				binaryInterval: 3000
+				binaryInterval: 3000,
 			})
 			.on('error', (err: Error) => {
 				this.logger.error(`Local folder storage: watcher error`, err)
@@ -150,7 +150,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 					return
 				}
 				reject()
-			})
+			}, 0)
 		})
 	}
 
@@ -283,7 +283,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 													monitorProgress(localFile, sourceProperties)
 												}, 1000)
 
-												function handleError(e) {
+												function handleError(e: Error) {
 													clearInterval(progressMonitor)
 													reject(e)
 												}
@@ -351,7 +351,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 	private onUnlink = (filePath: string) => {
 		this.emit(StorageEventType.delete, {
 			type: StorageEventType.delete,
-			path: filePath
+			path: filePath,
 		})
 	}
 
@@ -364,7 +364,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		this.emit(StorageEventType.change, {
 			type: StorageEventType.change,
 			path: filePath,
-			file: new LocalFolderFile(path.join(this._basePath, filePath), this._readable, this._writable, filePath)
+			file: new LocalFolderFile(path.join(this._basePath, filePath), this._readable, this._writable, filePath),
 		})
 	}
 
@@ -377,7 +377,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 		this.emit(StorageEventType.add, {
 			type: StorageEventType.add,
 			path: filePath,
-			file: new LocalFolderFile(path.join(this._basePath, filePath), this._readable, this._writable, filePath)
+			file: new LocalFolderFile(path.join(this._basePath, filePath), this._readable, this._writable, filePath),
 		})
 	}
 

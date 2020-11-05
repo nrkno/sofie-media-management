@@ -5,7 +5,7 @@ import * as fs from 'fs-extra'
 import { DeviceSettings } from '../api'
 
 export class PreviewAndThumbnailVacuum {
-	private changes: PouchDB.Core.Changes<MediaObject>
+	private changes!: PouchDB.Core.Changes<MediaObject>
 	constructor(
 		private mediaDB: PouchDB.Database<MediaObject>,
 		private config: DeviceSettings,
@@ -56,7 +56,7 @@ export class PreviewAndThumbnailVacuum {
 		this.changes = this.mediaDB
 			.changes({
 				since: 'now',
-				live: true
+				live: true,
 			})
 			.on('change', (change) => {
 				this.rowChanged(change.id, change.deleted)

@@ -3,7 +3,7 @@ import {
 	CoreOptions,
 	PeripheralDeviceAPI as P,
 	DDPConnectorOptions,
-	PeripheralDeviceAPI
+	PeripheralDeviceAPI,
 } from 'tv-automation-server-core-integration'
 import * as _ from 'underscore'
 import * as Winston from 'winston'
@@ -36,7 +36,7 @@ export interface PeripheralDeviceCommand {
  * Represents a connection between the Core and the media-manager
  */
 export class CoreHandler {
-	core: CoreConnection
+	core!: CoreConnection
 	logger: Winston.LoggerInstance
 
 	public _observers: Array<any> = []
@@ -103,11 +103,11 @@ export class CoreHandler {
 		const ddpConfig: DDPConnectorOptions = {
 			host: config.host,
 			port: config.port,
-			ssl: config.ssl
+			ssl: config.ssl,
 		}
 		if (this._process && this._process.certificates.length) {
 			ddpConfig.tlsOpts = {
-				ca: this._process.certificates
+				ca: this._process.certificates,
 			}
 		}
 		await this.core.init(ddpConfig)
@@ -122,10 +122,10 @@ export class CoreHandler {
 		this.logger.info('DeviceId: ' + this.core.deviceId)
 		await Promise.all([
 			this.core.autoSubscribe('peripheralDevices', {
-				_id: this.core.deviceId
+				_id: this.core.deviceId,
 			}),
 			this.core.autoSubscribe('studioOfDevice', this.core.deviceId),
-			this.core.autoSubscribe('peripheralDeviceCommands', this.core.deviceId)
+			this.core.autoSubscribe('peripheralDeviceCommands', this.core.deviceId),
 		])
 		this.logger.info('Core: Subscriptions are set up!')
 		if (this._observers.length) {
@@ -160,13 +160,13 @@ export class CoreHandler {
 		if (this._deviceOptions.deviceId && this._deviceOptions.deviceToken) {
 			credentials = {
 				deviceId: this._deviceOptions.deviceId + subDeviceId,
-				deviceToken: this._deviceOptions.deviceToken
+				deviceToken: this._deviceOptions.deviceToken,
 			}
 		} else if (this._deviceOptions.deviceId) {
 			this.logger.warn('Token not set, only id! This might be unsecure!')
 			credentials = {
 				deviceId: this._deviceOptions.deviceId + subDeviceId,
-				deviceToken: 'unsecureToken'
+				deviceToken: 'unsecureToken',
 			}
 		} else {
 			credentials = CoreConnection.getCredentials(subDeviceId)
@@ -181,7 +181,7 @@ export class CoreHandler {
 			deviceName: name,
 			watchDog: this._coreConfig ? this._coreConfig.watchdog : true,
 
-			configManifest: MEDIA_MANAGER_CONFIG_MANIFEST
+			configManifest: MEDIA_MANAGER_CONFIG_MANIFEST,
 		}
 		options.versions = this._getVersions()
 		return options
@@ -351,13 +351,13 @@ export class CoreHandler {
 
 		return this.core.setStatus({
 			statusCode: statusCode,
-			messages: messages
+			messages: messages,
 		})
 	}
 	setProcessState = (processName: string, comments: string[], status: P.StatusCode): void => {
 		this._processState[processName] = {
 			comments,
-			status
+			status,
 		}
 
 		const deviceState = _.reduce(
@@ -374,12 +374,12 @@ export class CoreHandler {
 
 				return {
 					status,
-					comments
+					comments,
 				}
 			},
 			{
 				status: P.StatusCode.GOOD,
-				comments: [] as string[]
+				comments: [] as string[],
 			}
 		)
 
@@ -398,7 +398,7 @@ export class CoreHandler {
  * Represents a connection between the Core and a Monitor
  */
 export class CoreMonitorHandler {
-	core: CoreConnection
+	core!: CoreConnection
 	public _observers: Array<any> = []
 	// public _device: MonitorDevice
 	private _coreParentHandler: CoreHandler
@@ -497,7 +497,7 @@ export class CoreMonitorHandler {
 		if (!dontUpdateStatus) {
 			await this.core.setStatus({
 				statusCode: P.StatusCode.BAD,
-				messages: ['Uninitialized']
+				messages: ['Uninitialized'],
 			})
 		}
 	}

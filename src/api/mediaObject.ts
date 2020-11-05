@@ -1,6 +1,6 @@
 export enum MediaStreamType {
 	Audio = 'audio',
-	Video = 'video'
+	Video = 'video',
 }
 
 export interface MediaStreamCodec {
@@ -53,7 +53,7 @@ export enum FieldOrder {
 	Unknown = 'unknown',
 	Progressive = 'progressive',
 	TFF = 'tff',
-	BFF = 'bff'
+	BFF = 'bff',
 }
 
 export interface Metadata {

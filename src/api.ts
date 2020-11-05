@@ -146,7 +146,7 @@ export enum MediaFlowType {
 	WATCH_FOLDER = 'watch_folder',
 	LOCAL_INGEST = 'local_ingest',
 	EXPECTED_ITEMS = 'expected_items',
-	UNKNOWN = 'unknown'
+	UNKNOWN = 'unknown',
 }
 
 export interface MediaFlow {
@@ -165,7 +165,7 @@ export enum StorageType {
 	FILE_SHARE = 'file_share',
 	QUANTEL_HTTP = 'quantel_http',
 	QUANTEL_STREAM = 'quantel_stream',
-	UNKNOWN = 'unknown'
+	UNKNOWN = 'unknown',
 	// FTP = 'ftp',
 	// AWS_S3 = 'aws_s3'
 }
@@ -257,7 +257,7 @@ export enum WorkFlowSource {
 	EXPECTED_MEDIA_ITEM = 'expected_media_item',
 	SOURCE_STORAGE_REMOVE = 'source_storage_remove',
 	LOCAL_MEDIA_ITEM = 'local_media_item',
-	TARGET_STORAGE_REMOVE = 'local_storage_remove'
+	TARGET_STORAGE_REMOVE = 'local_storage_remove',
 }
 
 export interface WorkStepInitial {
@@ -292,7 +292,10 @@ export abstract class WorkStep implements WorkStepInitial {
 	/** Calculated time left of this step */
 	expectedLeft?: Duration
 
-	constructor(init?: WorkStepInitial) {
+	constructor(init: WorkStepInitial) {
+		this.action = init.action
+		this.status = init.status
+		this.priority = init.priority
 		Object.assign(this, init)
 	}
 }
@@ -304,7 +307,7 @@ export enum WorkStepStatus {
 	ERROR = 'error',
 	CANCELED = 'canceled',
 	SKIPPED = 'skipped',
-	BLOCKED = 'blocked'
+	BLOCKED = 'blocked',
 }
 
 export enum WorkStepAction {
@@ -313,7 +316,7 @@ export enum WorkStepAction {
 	SCAN = 'scan',
 	GENERATE_PREVIEW = 'generate_preview',
 	GENERATE_THUMBNAIL = 'generate_thumbnail',
-	GENERATE_METADATA = 'generate_metadata'
+	GENERATE_METADATA = 'generate_metadata',
 }
 
 export type MonitorSettings = MonitorSettingsNull | MonitorSettingsWatcher | MonitorSettingsQuantel
@@ -329,7 +332,7 @@ export interface MonitorSettingsBase {
 export enum MonitorSettingsType {
 	NULL = '',
 	WATCHER = 'watcher',
-	QUANTEL = 'quantel'
+	QUANTEL = 'quantel',
 }
 export interface MonitorSettingsNull extends MonitorSettingsBase {
 	type: MonitorSettingsType.NULL
@@ -352,7 +355,7 @@ export enum QuantelStreamType {
 	/** Dynamic Adaptvie Streaming over HTTP (MPEG-DASH) */
 	MPEG_DASH = 'mpeg-dash',
 	/** Microsoft Smooth Streaming, deprecated by Azure Media Services */
-	SMOOTH_STREAM = 'smooth-stream'
+	SMOOTH_STREAM = 'smooth-stream',
 }
 
 /**

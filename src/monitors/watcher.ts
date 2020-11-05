@@ -34,7 +34,7 @@ interface FileToScan {
  *  for file changes.
  */
 export class Watcher extends EventEmitter {
-	private watcher: chokidar.FSWatcher
+	private watcher!: chokidar.FSWatcher
 	private scanning = false
 	private scanId = 1
 	private filesToScan: { [mediaId: string]: FileToScan } = {}
@@ -59,8 +59,8 @@ export class Watcher extends EventEmitter {
 					alwaysStat: true,
 					awaitWriteFinish: {
 						stabilityThreshold: 4000,
-						pollInterval: 1000
-					}
+						pollInterval: 1000,
+					},
 				},
 				this.monitorSettings.scanner
 			)
@@ -117,7 +117,7 @@ export class Watcher extends EventEmitter {
 			this.filesToScan[mediaId] = literal<FileToScan>({
 				mediaPath,
 				mediaId,
-				mediaStat
+				mediaStat,
 			})
 			if (this.scanning) {
 				return
@@ -133,7 +133,7 @@ export class Watcher extends EventEmitter {
 					id: mediaId,
 					path: mediaPath,
 					size: mediaStat.size,
-					mtime: mediaStat.mtime.toISOString()
+					mtime: mediaStat.mtime.toISOString(),
 				})
 			}
 
@@ -218,7 +218,7 @@ export class Watcher extends EventEmitter {
 			const result: PouchDB.Core.AllDocsResponse<MediaObject> = await this.db.allDocs({
 				include_docs: true,
 				startkey,
-				limit
+				limit,
 			})
 			await Promise.all(
 				result.rows.map(async ({ doc }) => {
@@ -239,7 +239,7 @@ export class Watcher extends EventEmitter {
 							literal<PouchDB.Core.PutDocument<MediaObject>>({
 								_id: doc._id,
 								_rev: doc._rev,
-								_deleted: true
+								_deleted: true,
 							} as MediaObject & PouchDB.Core.ChangesMeta)
 						)
 					})

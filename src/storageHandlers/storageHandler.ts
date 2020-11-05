@@ -5,7 +5,7 @@ import {
 	LocalFolderStorage,
 	FileShareStorage,
 	QuantelHTTPStorage,
-	QuantelStream
+	QuantelStream,
 } from '../api'
 import * as stream from 'stream'
 import { EventEmitter } from 'events'
@@ -23,19 +23,19 @@ export abstract class File {
 	 * @type string
 	 * @memberof File
 	 */
-	name: string
+	abstract name: string
 	/**
 	 * Storage-specific resource locator. Can be a fully-qualified URL or a file path.
 	 * @type string
 	 * @memberof File
 	 */
-	url: string
+	abstract url: string
 	/**
 	 * Storage type of the file
 	 * @type StorageType
 	 * @memberof File
 	 */
-	source: StorageType
+	abstract source: StorageType
 
 	/**
 	 * Return a writable stream that can be written to, to fill the file with contents.
@@ -69,7 +69,7 @@ export interface FileProperties {
 export enum StorageEventType {
 	add = 'add',
 	change = 'change',
-	delete = 'delete'
+	delete = 'delete',
 }
 
 export interface StorageEvent {

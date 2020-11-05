@@ -27,7 +27,7 @@ export class MediaManagerApp {
 
 		this.app.use(
 			cors({
-				origin: '*'
+				origin: '*',
 			})
 		)
 	}

@@ -18,12 +18,12 @@ describe('LocalFolderHandler', () => {
 				id: 'local0',
 				support: {
 					read: true,
-					write: true
+					write: true,
 				},
 				type: StorageType.LOCAL_FOLDER,
 				options: {
-					basePath: './test'
-				}
+					basePath: './test',
+				},
 			},
 			new winston.Logger({ transports: [new winston.transports.Console()] })
 		)
@@ -112,12 +112,12 @@ describe('LocalFolderHandler', () => {
 					id: 'local1',
 					support: {
 						read: true,
-						write: true
+						write: true,
 					},
 					type: StorageType.LOCAL_FOLDER,
 					options: {
-						basePath: './test2'
-					}
+						basePath: './test2',
+					},
 				},
 				new winston.Logger({ transports: [new winston.transports.Console()] })
 			)

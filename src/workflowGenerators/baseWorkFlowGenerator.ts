@@ -3,7 +3,7 @@ import { WorkFlow } from '../api'
 import { LoggerInstance } from 'winston'
 
 export enum WorkFlowGeneratorEventType {
-	NEW_WORKFLOW = 'newworkflow'
+	NEW_WORKFLOW = 'newworkflow',
 }
 
 export abstract class BaseWorkFlowGenerator extends EventEmitter {

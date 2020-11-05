@@ -30,6 +30,6 @@ const windowsNetworkDrive = {
 	),
 	isWinOs: jest.fn((): boolean => {
 		return true
-	})
+	}),
 }
 export = windowsNetworkDrive

@@ -30,18 +30,18 @@ if (logPath) {
 	logger.add(Winston.transports.Console, {
 		level: 'verbose',
 		handleExceptions: true,
-		json: false
+		json: false,
 	})
 	logger.add(Winston.transports.File, {
 		level: 'debug',
 		handleExceptions: true,
 		json: true,
-		filename: logPath
+		filename: logPath,
 	})
 	logger.info('Logging to', logPath)
 	// Hijack console.log:
 	const orgConsoleLog = console.log
-	console.log = function(...args: unknown[]) {
+	console.log = function (...args: unknown[]) {
 		// orgConsoleLog('a')
 		if (args.length >= 1) {
 			logger.debug(stringifyForLogging(args[0]), args.slice(1))
@@ -57,12 +57,12 @@ if (logPath) {
 		stringify: (obj) => {
 			obj.localTimestamp = getCurrentTime()
 			return JSON.stringify(obj) // make single line
-		}
+		},
 	})
 	logger.info('Logging to Console')
 	// Hijack console.log:
 	// const orgConsoleLog = console.log
-	console.log = function(...args: unknown[]) {
+	console.log = function (...args: unknown[]) {
 		// orgConsoleLog('a')
 		if (args.length >= 1) {
 			logger.debug(stringifyForLogging(args[0]), args.slice(1))

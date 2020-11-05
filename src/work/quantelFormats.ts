@@ -48,12 +48,12 @@ function makeVideoStream(clipData: ClipData, videoFormat: number): Record<string
 			visual_impaired: 0,
 			clean_effects: 0,
 			attached_pic: 0,
-			timed_thumbnails: 0
+			timed_thumbnails: 0,
 		},
 		tags: {
 			source_video_formats: clipData.VideoFormats,
-			sofie_selects_video_format: videoFormat
-		}
+			sofie_selects_video_format: videoFormat,
+		},
 	}
 
 	if (videoFormat < 100) {
@@ -108,12 +108,12 @@ export function makeAudioStreams(clipData: ClipData, audioFormat: number): Array
 				visual_impaired: 0,
 				clean_effects: 0,
 				attached_pic: 0,
-				timed_thumbnails: 0
+				timed_thumbnails: 0,
 			},
 			tags: {
 				source_audio_formats: clipData.AudioFormats,
-				sofie_selects_autio_format: audioFormat
-			}
+				sofie_selects_autio_format: audioFormat,
+			},
 		})
 	}
 
@@ -155,8 +155,8 @@ function makeFormat(clipData: ClipData, videoFormat: number, audioFormat: number
 			application_platform: 'Sony MXF Development Kit (Win32)',
 			product_uid: 'b4d908cf-53d5-4b41-91a4-82e018e69daa',
 			modification_date: clipData.Modified,
-			timecode: '00:00:00:00'
-		}
+			timecode: '00:00:00:00',
+		},
 	}
 }
 
@@ -182,7 +182,7 @@ export default function mapClipMetadata(clipData: ClipData): Record<string, unkn
 	return {
 		name: clipData.Title,
 		streams: [makeVideoStream(clipData, videoFormat)].concat(makeAudioStreams(clipData, audioFormat)),
-		format: makeFormat(clipData, videoFormat, audioFormat)
+		format: makeFormat(clipData, videoFormat, audioFormat),
 	}
 }
 

@@ -55,8 +55,8 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				target: st,
 				priority: 2,
 				criticalStep: true,
-				status: WorkStepStatus.IDLE
-			}) as WorkStep
+				status: WorkStepStatus.IDLE,
+			}) as WorkStep,
 		].concat(super.generateNewFileWorkSteps(file, st))
 	}
 
@@ -68,8 +68,8 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 				target: st,
 				priority: 2,
 				criticalStep: true,
-				status: WorkStepStatus.IDLE
-			})
+				status: WorkStepStatus.IDLE,
+			}),
 		]
 	}
 
@@ -116,7 +116,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 							source: WorkFlowSource.LOCAL_MEDIA_ITEM,
 							steps: this.generateNewFileWorkSteps(localFile, targetStorage),
 							created: getCurrentTime(),
-							success: false
+							success: false,
 						}),
 						this
 					)
@@ -174,7 +174,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 											source: WorkFlowSource.SOURCE_STORAGE_REMOVE,
 											steps: this.generateDeleteFileWorkSteps(file, storageObject),
 											created: getCurrentTime(),
-											success: false
+											success: false,
 										}),
 										this
 									)
@@ -248,7 +248,7 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 								this.onAdd(st, {
 									type: StorageEventType.add,
 									path: file.name,
-									file: file
+									file: file,
 								})
 							}
 							this.logger.debug(`${this.ident} initialCheck: Finished handling file: ${file.name}`)
@@ -259,13 +259,13 @@ export class WatchFolderGenerator extends LocalStorageGenerator {
 			.then(async () => {
 				const staleFiles = await this._tracked.getAllFromStorage(st.id, {
 					lastSeen: {
-						$lt: initialScanTime
-					}
+						$lt: initialScanTime,
+					},
 				})
 				staleFiles.map((sFile) => {
 					this.onDelete(st, {
 						type: StorageEventType.delete,
-						path: sFile.name
+						path: sFile.name,
 					})
 				})
 			})

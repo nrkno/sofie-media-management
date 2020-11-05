@@ -25,7 +25,7 @@ export class LocalStorageGenerator extends EventEmitter {
 				source: WorkFlowSource.LOCAL_MEDIA_ITEM,
 				steps: [],
 				created: Date.now(),
-				success: false
+				success: false,
 			}),
 			this
 		)

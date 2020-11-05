@@ -36,8 +36,8 @@ export class FileShareHandler extends LocalFolderHandler {
 				onlySelectedFiles:
 					typeof fsSettings.options.onlySelectedFiles === 'boolean'
 						? fsSettings.options.onlySelectedFiles
-						: true
-			}
+						: true,
+			},
 		}
 		return settingsObj
 	}
@@ -68,7 +68,7 @@ export class FileShareHandler extends LocalFolderHandler {
 			await networkDrive.unmount(this._driveLetter)
 			// throw new Error(`Drive letter ${this._driveLetter} is already used for another share: "${usedLetters[this._driveLetter]}"`)
 		}
-		let mounts
+		let mounts: string[]
 		try {
 			mounts = await networkDrive.find(this._uncPath)
 		} catch (e) {

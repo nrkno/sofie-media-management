@@ -18,7 +18,7 @@ export function copyFile(src: string, dst: string, progress?: (progress: number)
 			'/njs',
 			srcFolder,
 			dstFolder,
-			srcFileName
+			srcFileName,
 		])
 
 		const errors: string[] = []

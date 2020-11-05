@@ -8,7 +8,7 @@ import {
 	StorageSettings,
 	StorageType,
 	LocalFolderStorage,
-	FileShareStorage
+	FileShareStorage,
 } from '../api'
 import { LoggerInstance } from 'winston'
 import { promisify } from 'util'
@@ -28,7 +28,7 @@ export class MonitorMediaWatcher extends Monitor {
 	private triggerupdateFsStatsTimeout?: NodeJS.Timer
 	private checkFsStatsInterval?: NodeJS.Timer
 
-	private watcher: Watcher
+	private watcher: Watcher | undefined = undefined
 
 	constructor(
 		deviceId: string,
@@ -57,7 +57,7 @@ export class MonitorMediaWatcher extends Monitor {
 
 			deviceCategory: PeripheralDeviceAPI.DeviceCategory.MEDIA_MANAGER,
 			deviceType: PeripheralDeviceAPI.DeviceType.MEDIA_MANAGER,
-			deviceSubType: 'mediascanner'
+			deviceSubType: 'mediascanner',
 		}
 	}
 
@@ -86,9 +86,9 @@ export class MonitorMediaWatcher extends Monitor {
 					this.getAllCoreObjRevisions(),
 					this.db.allDocs({
 						include_docs: true,
-						attachments: true
+						attachments: true,
 					}),
-					this.db.info()
+					this.db.info(),
 				])
 
 				this.logger.info(
@@ -112,7 +112,7 @@ export class MonitorMediaWatcher extends Monitor {
 						delete coreObjRevisions[docId]
 
 						const doc2 = await this.db.get<MediaObject>(doc.id, {
-							attachments: true
+							attachments: true,
 						})
 						doc2.mediaId = doc2._id
 						await this.sendChanged(doc2)
@@ -188,7 +188,7 @@ export class MonitorMediaWatcher extends Monitor {
 						const { stdout } = await exec(
 							'wmic logicaldisk get Caption,Description,FileSystem,FreeSpace,Size',
 							{
-								windowsHide: true
+								windowsHide: true,
 							}
 						)
 						const lines = stdout
@@ -208,7 +208,7 @@ export class MonitorMediaWatcher extends Monitor {
 									size,
 									used: size - free,
 									use: parseFloat(((100.0 * (size - free)) / size).toFixed(2)),
-									mount: lineMatch.groups.fs
+									mount: lineMatch.groups.fs,
 								} as DiskInfo)
 							}
 						}
@@ -230,7 +230,7 @@ export class MonitorMediaWatcher extends Monitor {
 					if (lineMatch && lineMatch.groups) {
 						const [size, used] = [
 							parseInt(lineMatch.groups.sizeb) * 1024,
-							parseInt(lineMatch.groups.usedb) * 1024
+							parseInt(lineMatch.groups.usedb) * 1024,
 						]
 						disks.push({
 							fs: lineMatch.groups.fs,
@@ -238,7 +238,7 @@ export class MonitorMediaWatcher extends Monitor {
 							size,
 							used,
 							use: parseFloat(((100.0 * used) / size).toFixed(2)),
-							mount: lineMatch.groups.mount
+							mount: lineMatch.groups.mount,
 						} as DiskInfo)
 					}
 				}

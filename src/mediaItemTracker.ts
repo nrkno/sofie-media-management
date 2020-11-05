@@ -26,7 +26,7 @@ export interface TrackedMediaItemDB extends TrackedMediaItem, PouchDB.Core.GetMe
 }
 
 export class TrackedMediaItems {
-	private db: PouchDB.Database<TrackedMediaItem>
+	private db!: PouchDB.Database<TrackedMediaItem>
 
 	constructor(private logger: LoggerInstance, dbAdapter?: string, dbPrefix?: string) {
 		this.initDB(dbAdapter, dbPrefix)
@@ -37,22 +37,22 @@ export class TrackedMediaItems {
 			PouchDB.plugin(PouchDBFind)
 			await fs.ensureDir(dbPrefix || './db')
 			const PrefixedPouchDB = PouchDB.defaults({
-				prefix: dbPrefix || './db/'
+				prefix: dbPrefix || './db/',
 			} as PouchDB.Configuration.DatabaseConfiguration)
 
 			this.db = new PrefixedPouchDB('trackedMediaItems', {
-				adapter: dbAdapter
+				adapter: dbAdapter,
 			})
 			await this.db.compact()
 			await this.db.createIndex({
 				index: {
-					fields: ['sourceStorageId']
-				}
+					fields: ['sourceStorageId'],
+				},
 			})
 			await this.db.createIndex({
 				index: {
-					fields: ['mediaFlowId']
-				}
+					fields: ['mediaFlowId'],
+				},
 			})
 		})
 		if (error) {
@@ -95,10 +95,10 @@ export class TrackedMediaItems {
 		const result = await this.db.find({
 			selector: _.extend(
 				{
-					sourceStorageId: storageId
+					sourceStorageId: storageId,
 				},
 				query || {}
-			)
+			),
 		})
 		return result.docs
 	}

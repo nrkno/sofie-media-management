@@ -16,7 +16,7 @@ import {
 	atomic,
 	Omit,
 	updateDB,
-	wait
+	wait,
 } from '../lib/lib'
 import { WorkFlow, WorkFlowDB, WorkStep, WorkStepStatus, DeviceSettings, MediaObject } from '../api'
 import { WorkStepDB, workStepToPlain, plainToWorkStep, GeneralWorkStepDB } from './workStep'
@@ -36,7 +36,7 @@ enum MMPDMethods {
 	'getMediaWorkFlowRevisions' = 'peripheralDevice.mediaManager.getMediaWorkFlowRevisions',
 	'updateMediaWorkFlow' = 'peripheralDevice.mediaManager.updateMediaWorkFlow',
 	'getMediaWorkFlowStepRevisions' = 'peripheralDevice.mediaManager.getMediaWorkFlowStepRevisions',
-	'updateMediaWorkFlowStep' = 'peripheralDevice.mediaManager.updateMediaWorkFlowStep'
+	'updateMediaWorkFlowStep' = 'peripheralDevice.mediaManager.updateMediaWorkFlowStep',
 }
 
 const PROCESS_NAME = 'Dispatcher'
@@ -48,8 +48,8 @@ const PROCESS_NAME = 'Dispatcher'
 export class Dispatcher {
 	private workers: Worker[] = []
 
-	private workFlows: PouchDB.Database<WorkFlowDB>
-	private workSteps: PouchDB.Database<WorkStepDB>
+	private workFlows!: PouchDB.Database<WorkFlowDB>
+	private workSteps!: PouchDB.Database<WorkStepDB>
 
 	private cronJobInterval: NodeJS.Timer | undefined = undefined
 	private watchdogInterval: NodeJS.Timer | undefined = undefined
@@ -89,7 +89,7 @@ export class Dispatcher {
 		PouchDB.plugin(PouchDBFind)
 		await fs.ensureDir('./db') // TODO this should be configurable?
 		const PrefixedPouchDB = PouchDB.defaults({
-			prefix: './db/'
+			prefix: './db/',
 		} as PouchDB.Configuration.DatabaseConfiguration)
 
 		this.workFlows = new PrefixedPouchDB('workFlows')
@@ -102,18 +102,18 @@ export class Dispatcher {
 		const { error } = await noTryAsync(async () => {
 			await this.workFlows.createIndex({
 				index: {
-					fields: ['priority']
-				}
+					fields: ['priority'],
+				},
 			})
 			await this.workFlows.createIndex({
 				index: {
-					fields: ['finished']
-				}
+					fields: ['finished'],
+				},
 			})
 			await this.workFlows.createIndex({
 				index: {
-					fields: ['finished', 'created']
-				}
+					fields: ['finished', 'created'],
+				},
 			})
 			this.logger.debug(`Dispatcher: DB "workFlows" index "priority" succesfully created.`)
 		})
@@ -126,13 +126,13 @@ export class Dispatcher {
 		const { error } = await noTryAsync(async () => {
 			await this.workSteps.createIndex({
 				index: {
-					fields: ['workFlowId']
-				}
+					fields: ['workFlowId'],
+				},
 			})
 			await this.workSteps.createIndex({
 				index: {
-					fields: ['status']
-				}
+					fields: ['status'],
+				},
 			})
 			this.logger.debug(`Dispatcher: DB "workSteps" index "status" & "workFlowId" succesfully created.`)
 		})
@@ -168,7 +168,7 @@ export class Dispatcher {
 		const workflowChanges = this.workFlows.changes({
 			since: 'now',
 			live: true,
-			include_docs: true
+			include_docs: true,
 		})
 		workflowChanges.on('change', async (change) => {
 			if (change.deleted) {
@@ -176,8 +176,8 @@ export class Dispatcher {
 					() =>
 						this.workSteps.find({
 							selector: {
-								workFlowId: change.id
-							}
+								workFlowId: change.id,
+							},
 						}),
 					(error: Error) => {
 						this.logger.error(`Dispatcher: could not find workflow with id "${change.id}" on change`, error)
@@ -218,7 +218,7 @@ export class Dispatcher {
 		const workstepChanges = this.workSteps.changes({
 			since: 'now',
 			live: true,
-			include_docs: true
+			include_docs: true,
 		})
 		workstepChanges.on('change', (change) => {
 			if (change.deleted) {
@@ -301,7 +301,7 @@ export class Dispatcher {
 		const { result: workflows } = await noTryAsync(
 			() =>
 				this.workFlows.allDocs({
-					include_docs: true
+					include_docs: true,
 				}),
 			(err) => {
 				this.logger.error(`Dispatch: watchdog: could not list all WorkFlows, restarting`, err)
@@ -362,7 +362,7 @@ export class Dispatcher {
 						[
 							`Some workers have been working for more than ${Math.floor(
 								this.warningTaskWorkingTime / (60 * 1000)
-							)} minutes`
+							)} minutes`,
 						],
 						P.StatusCode.BAD
 					)
@@ -382,8 +382,8 @@ export class Dispatcher {
 	private async actionRestartAllWorkflows() {
 		const wfs = await this.workFlows.find({
 			selector: {
-				finished: true
-			}
+				finished: true,
+			},
 		})
 		await Promise.all(wfs.docs.map((i) => this.actionRestartWorkflow(i._id)))
 	}
@@ -391,8 +391,8 @@ export class Dispatcher {
 	private async actionAbortAllWorkflows() {
 		const wfs = await this.workFlows.find({
 			selector: {
-				finished: false
-			}
+				finished: false,
+			},
 		})
 		await Promise.all(wfs.docs.map((i) => this.actionAbortWorkflow(i._id)))
 	}
@@ -408,8 +408,8 @@ export class Dispatcher {
 		// Step 2: Reset the workflow
 		const steps = await this.workSteps.find({
 			selector: {
-				workFlowId: workflowId
-			}
+				workFlowId: workflowId,
+			},
 		})
 		// Reset the workflow steps
 		await Promise.all(
@@ -443,8 +443,8 @@ export class Dispatcher {
 		const prioritized = wf.priority > 1 ? true : false
 		const result = await this.workSteps.find({
 			selector: {
-				workFlowId: workflowId
-			}
+				workFlowId: workflowId,
+			},
 		})
 		await Promise.all(
 			result.docs.map((item) =>
@@ -452,7 +452,7 @@ export class Dispatcher {
 					item.priority = prioritized ? item.priority / 10 : item.priority * 10
 					item.modified = getCurrentTime()
 					item.messages = _.union(item.messages || [], [
-						`Dispatcher: priority changed to ${item.priority} at ${new Date(getCurrentTime())}`
+						`Dispatcher: priority changed to ${item.priority} at ${new Date(getCurrentTime())}`,
 					])
 					return item
 				})
@@ -502,8 +502,8 @@ export class Dispatcher {
 			this.workFlows.find({
 				selector: {
 					created: { $lt: getCurrentTime() - this.workFlowLingerTime },
-					finished: true
-				}
+					finished: true,
+				},
 			})
 		)
 		if (findError) {
@@ -532,17 +532,17 @@ export class Dispatcher {
 
 		const {
 			result: [workFlowResponse, workStepsResponse],
-			error: orphanError
+			error: orphanError,
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.workFlows.allDocs({
 					include_docs: true,
-					attachments: false
+					attachments: false,
 				}),
 				this.workSteps.allDocs({
 					include_docs: true,
-					attachments: false
-				})
+					attachments: false,
+				}),
 			])
 		)
 
@@ -592,7 +592,7 @@ export class Dispatcher {
 		// persist workflow to db:
 		const { result: docs, error: docsError } = await noTryAsync(() =>
 			this.workFlows.allDocs({
-				include_docs: true
+				include_docs: true,
 			})
 		)
 		if (docsError) {
@@ -623,7 +623,7 @@ export class Dispatcher {
 				wf.steps.map((step) => {
 					const stepDb = extendMandadory<WorkStep, Omit<WorkStepDB, '_rev'>>(step, {
 						_id: wfDb._id + '_' + randomId(),
-						workFlowId: wfDb._id
+						workFlowId: wfDb._id,
 					})
 					stepDb.priority = wfDb.priority * stepDb.priority // make sure that a high priority workflow steps will have their priority increased
 					stepDb.modified = getCurrentTime()
@@ -652,8 +652,8 @@ export class Dispatcher {
 		const { result: idleHands, error: idleError } = await noTryAsync(() =>
 			this.workSteps.find({
 				selector: {
-					status: WorkStepStatus.IDLE
-				}
+					status: WorkStepStatus.IDLE,
+				},
 			})
 		)
 		if (idleError) {
@@ -663,8 +663,8 @@ export class Dispatcher {
 		const { result: runningHands, error: runningError } = await noTryAsync(() =>
 			this.workSteps.find({
 				selector: {
-					status: WorkStepStatus.WORKING
-				}
+					status: WorkStepStatus.WORKING,
+				},
 			})
 		)
 		if (runningError) {
@@ -692,8 +692,8 @@ export class Dispatcher {
 		const { result: brokenItems, error: findError } = await noTryAsync(() =>
 			this.workSteps.find({
 				selector: {
-					status: WorkStepStatus.WORKING
-				}
+					status: WorkStepStatus.WORKING,
+				},
 			})
 		)
 		if (findError) {
@@ -788,8 +788,8 @@ export class Dispatcher {
 		const { result, error: findError } = await noTryAsync(() =>
 			this.workSteps.find({
 				selector: {
-					workFlowId: workFlowId
-				}
+					workFlowId: workFlowId,
+				},
 			})
 		)
 		if (findError) {
@@ -863,8 +863,8 @@ export class Dispatcher {
 		const { result: ongoingWork, error: findWFError } = await noTryAsync(() =>
 			this.workFlows.find({
 				selector: {
-					finished: false
-				}
+					finished: false,
+				},
 			})
 		)
 		if (findWFError) {
@@ -877,8 +877,8 @@ export class Dispatcher {
 				const { result: steps, error: findWSError } = await noTryAsync(() =>
 					this.workSteps.find({
 						selector: {
-							workFlowId: wf._id
-						}
+							workFlowId: wf._id,
+						},
 					})
 				)
 				if (findWSError) {
@@ -975,14 +975,14 @@ export class Dispatcher {
 	private async initialWorkFlowSync(): Promise<void> {
 		const {
 			result: [coreObjects, allDocsResponse],
-			error: queryError
+			error: queryError,
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowRevisions),
 				this.workFlows.allDocs<WorkFlowDB>({
 					include_docs: true,
-					attachments: false
-				})
+					attachments: false,
+				}),
 			])
 		)
 		if (queryError) {
@@ -1059,14 +1059,14 @@ export class Dispatcher {
 	private async initialWorkStepsSync(): Promise<void> {
 		const {
 			result: [coreObjects, allDocsResponse],
-			error: queryError
+			error: queryError,
 		} = await noTryAsync(() =>
 			Promise.all([
 				this.coreHandler.core.callMethodLowPrio(MMPDMethods.getMediaWorkFlowStepRevisions),
 				this.workSteps.allDocs<WorkStepDB>({
 					include_docs: true,
-					attachments: false
-				})
+					attachments: false,
+				}),
 			])
 		)
 		if (queryError) {

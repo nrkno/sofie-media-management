@@ -18,7 +18,7 @@ function getHTTPProperties(gateway: QuantelGateway, url: string): Promise<FilePr
 			return literal<FileProperties>({
 				created: new Date(clip.Created).getTime(),
 				modified: new Date(clip.Created).getTime(),
-				size: parseInt(clip.Frames, 10)
+				size: parseInt(clip.Frames, 10),
 			})
 		} else {
 			throw Error(`Clip not found in Quantel ISA`)
@@ -38,11 +38,11 @@ function parseQuantelUrl(url: string): QuantelHTTPQuery {
 	const query = url.substr(8)
 	if (query.startsWith('?')) {
 		return {
-			Title: query.substr(1)
+			Title: query.substr(1),
 		}
 	} else {
 		return {
-			ClipGUID: query
+			ClipGUID: query,
 		}
 	}
 }
@@ -58,9 +58,9 @@ let QuantelGatewaySingleton: QuantelGateway
 
 export class QuantelHTTPFile implements File {
 	source = StorageType.QUANTEL_HTTP
-	private _name: string
-	private _url: string
-	private _read: boolean
+	private _name!: string
+	private _url!: string
+	private _read!: boolean
 
 	@Transform(
 		(value: QuantelGateway): QuantelGatewayTombstone => {
@@ -68,18 +68,18 @@ export class QuantelHTTPFile implements File {
 				gatewayUrl: value.gatewayUrl,
 				ISAUrl: value.ISAUrl,
 				zoneId: value.zoneId,
-				serverId: value.serverId
+				serverId: value.serverId,
 			}
 		},
 		{
-			toPlainOnly: true
+			toPlainOnly: true,
 		}
 	)
 	@Transform((_value: QuantelGatewayTombstone) => QuantelGatewaySingleton, { toClassOnly: true })
 	private gateway: QuantelGateway
 
 	private transformerUrl: string
-	private query: QuantelHTTPQuery
+	private query!: QuantelHTTPQuery
 
 	constructor(gateway: QuantelGateway, transformerUrl: string, url: string, read: boolean, _name?: string)
 	constructor(gateway: QuantelGateway, transformerUrl: string, url?: string, read?: boolean, _name?: string) {
@@ -141,7 +141,7 @@ export class QuantelHTTPFile implements File {
 											})
 											.on('close', () => {
 												console.log(`Connection closed on ${clip.ClipID}. Begin cooldown.`)
-												setTimeout(function() {
+												setTimeout(function () {
 													resolveAtomic()
 												}, 3000)
 											})
@@ -181,9 +181,9 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 	private _initialized = false
 	private _readable = false
 
-	private gateway: QuantelGateway
+	private gateway!: QuantelGateway
 
-	private _monitor: NodeJS.Timer
+	private _monitor!: NodeJS.Timer
 
 	constructor(settings: QuantelHTTPStorage) {
 		super()
@@ -272,12 +272,12 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 						this.emit(StorageEventType.add, {
 							type: StorageEventType.add,
 							path: name,
-							file: new QuantelHTTPFile(this.gateway, this.transformerUrl, name, this._readable)
+							file: new QuantelHTTPFile(this.gateway, this.transformerUrl, name, this._readable),
 						})
 					} else if (this._monitoredUrls[name] === true && props.size === 0) {
 						this.emit(StorageEventType.delete, {
 							type: StorageEventType.delete,
-							path: name
+							path: name,
 						})
 					}
 				})
@@ -285,7 +285,7 @@ export class QuantelHTTPHandler extends EventEmitter implements StorageHandler {
 					if (this._monitoredUrls[name] === true) {
 						this.emit(StorageEventType.delete, {
 							type: StorageEventType.delete,
-							path: name
+							path: name,
 						})
 					}
 				})

@@ -581,15 +581,15 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@sofie-automation/code-standard-preset@0.1.1-nightly-feature-embedTools-20201105-115326-c385790.0":
-  version "0.1.1-nightly-feature-embedTools-20201105-115326-c385790.0"
-  resolved "https://registry.yarnpkg.com/@sofie-automation/code-standard-preset/-/code-standard-preset-0.1.1-nightly-feature-embedTools-20201105-115326-c385790.0.tgz#601ea65c29e80cf2403eb15a08e160e607af63c5"
-  integrity sha512-tJYxuSdcIlWgq3GEWf8EMUV9snOHUt1S9BfATqN9pEuiF31mEefV8T2GzH7UnMfQYkBOpdWXEC7LjeB/92Ck9Q==
+"@sofie-automation/code-standard-preset@0.1.1-nightly-tmp-localPreset-20201105-152744-1e762ba.0":
+  version "0.1.1-nightly-tmp-localPreset-20201105-152744-1e762ba.0"
+  resolved "https://registry.yarnpkg.com/@sofie-automation/code-standard-preset/-/code-standard-preset-0.1.1-nightly-tmp-localPreset-20201105-152744-1e762ba.0.tgz#363cd2aa54aa61e86f3cee644ec32e64c6f78a1e"
+  integrity sha512-cyQPlhf4QTYzD/s5m6PxQfL9DLZdWxlUX7XhU4uVCrO3mbSazdxf25YFkJs2cmZvGDSVV4b8RQ1L7TzBOa2oZA==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^4.1.0"
     "@typescript-eslint/parser" "^4.1.0"
     eslint "^7.8.1"
-    eslint-config-prettier "^6.11.0"
+    eslint-config-prettier "^6.15.0"
     eslint-plugin-node "^11.1.0"
     eslint-plugin-prettier "^3.1.4"
     husky "^4.3.0"
@@ -2713,7 +2713,7 @@ escodegen@^1.14.1:
   optionalDependencies:
     source-map "~0.6.1"
 
-eslint-config-prettier@^6.11.0, eslint-config-prettier@^6.15.0:
+eslint-config-prettier@^6.15.0:
   version "6.15.0"
   resolved "https://registry.yarnpkg.com/eslint-config-prettier/-/eslint-config-prettier-6.15.0.tgz#7f93f6cb7d45a92f1537a70ecc06366e1ac6fed9"
   integrity sha512-a1+kOYLR8wMGustcgAjdydMsQ2A/2ipRPwRKUmfYaSxc9ZPcrku080Ctl6zrZzZNs/U82MjSv+qKREkoq3bJaw==
