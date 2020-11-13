@@ -221,11 +221,17 @@ export class Watcher extends EventEmitter {
 			})
 			await Promise.all(
 				result.rows.map(async ({ doc }) => {
+					if (doc && doc.mediaId.startsWith('QUANTEL:')) {
+						this.logger.debug(
+							`Media watching: clean deleted: Not processing Quantel item "${doc.mediaId}".`
+						)
+						return
+					}
 					const { error } = await noTryAsync(async () => {
 						const mediaFolder = path.normalize(this.storageSettings.options.basePath)
 						const mediaPath = path.normalize(doc!.mediaPath)
 						this.logger.debug(
-							`Delete test: mediaPath = ${mediaPath} mediaFolder = ${mediaFolder} indexOf=${mediaPath.indexOf(
+							`Media watching: delete test: mediaPath = ${mediaPath} mediaFolder = ${mediaFolder} indexOf=${mediaPath.indexOf(
 								mediaFolder
 							)}`
 						)
@@ -242,13 +248,15 @@ export class Watcher extends EventEmitter {
 						)
 					})
 					if (error) {
-						this.logger.error(`Media scanning: failed `, error, doc)
+						this.logger.error(`Media watching: Media delete failed `, error, doc)
 					}
 				})
 			)
 
-			this.logger.debug(`About to delete media objects ${deleted.map(x => x._id)}`)
-			await this.db.bulkDocs(deleted)
+			if (deleted.length > 0) {
+				this.logger.debug(`About to delete media objects ${deleted.map(x => x._id)}`)
+				await this.db.bulkDocs(deleted)
+			}
 
 			if (result.rows.length < limit) {
 				break

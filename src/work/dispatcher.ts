@@ -599,15 +599,57 @@ export class Dispatcher {
 			throw docsError // TODO too extreme?
 		}
 
+		let stepCache: PouchDB.Core.AllDocsResponse<WorkStepDB> | undefined = undefined
 		for (let i = 0; i < docs.rows.length; i++) {
 			const item: WorkFlowDB | undefined = docs.rows[i].doc
 			if (item === undefined) continue
-			if (!item.finished && item.hash === hash) {
-				this.logger.warn(
-					`Dispatcher: ignoring new workFlow: "${wf._id}", because a matching workflow has been found: "${item._id}".`
-				)
-				finished()
-				return
+			if (item.hash === hash) {
+				if (!item.finished) {
+					this.logger.warn(
+						`Dispatcher: ignoring new workFlow: "${wf._id}", because a matching workflow has been found: "${item._id}".`
+					)
+					finished()
+					return
+				}
+				// Only for Quantel ... because CasparCG clip workflows might be re-initiated due to file delete
+				if (item.finished && item.success === true && item.name && item.name.startsWith('quantel:')) {
+					this.logger.warn(
+						`Dispatcher: ignoring new workFlow: "${wf._id}", because a previous Quantel workflow has completed successfully: "${item._id}".`
+					)
+					finished()
+					return
+				}
+				// TODO consider whether this is relevant for non-Quantel workflows as well
+				if (item.finished && item.success !== true && item.name && item.name.startsWith('quantel:')) {
+					// Allow the new workflow - try again on restarts - but delete the old one
+					this.logger.warn(
+						`Dispatcher: new Quantel workflow "${wf._id}" replaces failed workflow "${item._id}".`
+					)
+					const { error: delError } = await noTryAsync(() => this.workFlows.remove(item))
+					if (delError) {
+						this.logger.error('Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"', delError)
+					}
+					// Tidy up any related worksteps
+					if (!stepCache) {
+						const { result: stepDetails, error: stepError } = await noTryAsync(() => this.workSteps.allDocs())
+						if (stepError) {
+							this.logger.error(`Dispatcher: workstep replacement - failed to retrieve workstep identifiers`)
+							stepCache = undefined
+						} else {
+							stepCache = stepDetails
+						}
+					}
+					if (stepCache) {
+						for ( let row of stepCache.rows ) {
+							if (row.doc && row.doc._id.startsWith(item._id)) {
+								const { error: delStepError } = await noTryAsync(() => this.workSteps.remove(row.doc?._id ?? '', row.doc?._rev ?? ''))
+								if (delStepError) {
+									this.logger.error(`Dispatcher: workstep replacement - failed to delete workstep "${row.doc?._id}"`)
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 		// Did not find an outstanding workflow with the same hash
