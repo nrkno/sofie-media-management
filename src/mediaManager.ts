@@ -1,6 +1,6 @@
 import * as Winston from 'winston'
 import * as _ from 'underscore'
-import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
+import { PeripheralDeviceAPI as P } from '@sofie-automation/server-core-integration'
 import { extendMandadory } from './lib/lib'
 import { CoreHandler, CoreConfig } from './coreHandler'
 import { StorageSettings, DeviceSettings, MediaObject } from './api'

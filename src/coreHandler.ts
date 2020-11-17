@@ -4,7 +4,7 @@ import {
 	PeripheralDeviceAPI as P,
 	DDPConnectorOptions,
 	PeripheralDeviceAPI
-} from 'tv-automation-server-core-integration'
+} from '@sofie-automation/server-core-integration'
 import * as _ from 'underscore'
 import * as Winston from 'winston'
 import { DeviceConfig } from './mediaManager'

@@ -1,6 +1,6 @@
 import * as _ from 'underscore'
 import * as url from 'url'
-import { PeripheralDeviceAPI, Collection, Observer } from 'tv-automation-server-core-integration'
+import { PeripheralDeviceAPI, Collection, Observer } from '@sofie-automation/server-core-integration'
 import { Monitor } from './_monitor'
 import { MonitorDevice } from '../coreHandler'
 import { LoggerInstance } from 'winston'
@@ -155,7 +155,7 @@ export class MonitorQuantel extends Monitor {
 				this._status = {
 					statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
 					messages: ['Updating status after recent core connect ...']
-				} 
+				}
 				this._updateAndSendStatus()
 			})
 

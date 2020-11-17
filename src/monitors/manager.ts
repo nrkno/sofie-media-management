@@ -4,7 +4,7 @@ import * as _ from 'underscore'
 import { MonitorMediaWatcher } from './mediaWatcher'
 import { CoreMonitorHandler, CoreHandler } from '../coreHandler'
 import { MonitorQuantel, isQuantelMonitor } from './quantel'
-import { PeripheralDeviceAPI } from 'tv-automation-server-core-integration'
+import { PeripheralDeviceAPI } from '@sofie-automation/server-core-integration'
 import { Dispatcher } from '../work/dispatcher'
 import { MediaManagerApp } from '../app'
 

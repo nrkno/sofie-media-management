@@ -8,7 +8,7 @@ import {
 	ConfigManifestEntryType,
 	DeviceConfigManifest,
 	TableConfigManifestEntry
-} from 'tv-automation-server-core-integration'
+} from '@sofie-automation/server-core-integration'
 import { MediaFlowType } from './api'
 
 export function literal<T>(o: T) {

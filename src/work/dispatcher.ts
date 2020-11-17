@@ -5,7 +5,7 @@ import * as fs from 'fs-extra'
 import { noTryAsync, noTry } from 'no-try'
 import { LoggerInstance } from 'winston'
 
-import { PeripheralDeviceAPI as P } from 'tv-automation-server-core-integration'
+import { PeripheralDeviceAPI as P } from '@sofie-automation/server-core-integration'
 
 import {
 	extendMandadory,
@@ -627,24 +627,35 @@ export class Dispatcher {
 					)
 					const { error: delError } = await noTryAsync(() => this.workFlows.remove(item))
 					if (delError) {
-						this.logger.error('Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"', delError)
+						this.logger.error(
+							'Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"',
+							delError
+						)
 					}
 					// Tidy up any related worksteps
 					if (!stepCache) {
-						const { result: stepDetails, error: stepError } = await noTryAsync(() => this.workSteps.allDocs())
+						const { result: stepDetails, error: stepError } = await noTryAsync(() =>
+							this.workSteps.allDocs()
+						)
 						if (stepError) {
-							this.logger.error(`Dispatcher: workstep replacement - failed to retrieve workstep identifiers`)
+							this.logger.error(
+								`Dispatcher: workstep replacement - failed to retrieve workstep identifiers`
+							)
 							stepCache = undefined
 						} else {
 							stepCache = stepDetails
 						}
 					}
 					if (stepCache) {
-						for ( let row of stepCache.rows ) {
+						for (let row of stepCache.rows) {
 							if (row.doc && row.doc._id.startsWith(item._id)) {
-								const { error: delStepError } = await noTryAsync(() => this.workSteps.remove(row.doc?._id ?? '', row.doc?._rev ?? ''))
+								const { error: delStepError } = await noTryAsync(() =>
+									this.workSteps.remove(row.doc?._id ?? '', row.doc?._rev ?? '')
+								)
 								if (delStepError) {
-									this.logger.error(`Dispatcher: workstep replacement - failed to delete workstep "${row.doc?._id}"`)
+									this.logger.error(
+										`Dispatcher: workstep replacement - failed to delete workstep "${row.doc?._id}"`
+									)
 								}
 							}
 						}

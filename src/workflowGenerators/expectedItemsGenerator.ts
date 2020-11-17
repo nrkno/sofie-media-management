@@ -17,7 +17,7 @@ import {
 } from '../api'
 import { TrackedMediaItems, TrackedMediaItemDB, TrackedMediaItem } from '../mediaItemTracker'
 import { StorageObject, StorageEventType, File, StorageEvent } from '../storageHandlers/storageHandler'
-import { Collection, Observer } from 'tv-automation-server-core-integration'
+import { Collection, Observer } from '@sofie-automation/server-core-integration'
 import { randomId, literal, getCurrentTime, getWorkFlowName, retryNumber } from '../lib/lib'
 import { FileWorkStep, ScannerWorkStep } from '../work/workStep'
 import { QuantelStream, QuantelStreamHandlerSingleton } from '../storageHandlers/quantelStreamHandler'
