@@ -128,8 +128,8 @@ export class Watcher extends EventEmitter {
 
 			const doc: MediaObject = await this.db.get(mediaId).catch(() => ({ _id: mediaId } as MediaObject))
 
-			const mediaLogger = (level: string, message: string): void => {
-				this.logger[level](`Watcher: ${message}`, {
+			const mediaLogger = (message: string): void => {
+				this.logger.info(`Watcher: ${message}`, {
 					id: mediaId,
 					path: mediaPath,
 					size: mediaStat.size,
@@ -138,7 +138,7 @@ export class Watcher extends EventEmitter {
 			}
 
 			if (doc.mediaPath && doc.mediaPath !== mediaPath) {
-				mediaLogger('info', 'skipped - matching path')
+				mediaLogger('skipped - matching path')
 				delete this.filesToScanFail[mediaId]
 				delete this.filesToScan[mediaId]
 				this.scanning = false
@@ -147,7 +147,7 @@ export class Watcher extends EventEmitter {
 
 			// Database file and file on disk are likely the same ... no change
 			if (doc.mediaSize === mediaStat.size && doc.mediaTime === mediaStat.mtime.getTime()) {
-				mediaLogger('info', 'skipped - matching size and time')
+				mediaLogger('skipped - matching size and time')
 				this.scanning = false
 				delete this.filesToScanFail[mediaId]
 				delete this.filesToScan[mediaId]
@@ -169,7 +169,7 @@ export class Watcher extends EventEmitter {
 			delete this.filesToScanFail[mediaId]
 			delete this.filesToScan[mediaId]
 			this.scanning = false
-			mediaLogger('info', 'scanned')
+			mediaLogger('scanned')
 			this.retryScan()
 		})
 		if (error) {

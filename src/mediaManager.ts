@@ -18,7 +18,6 @@ import { MediaManagerApp } from './app'
 import { PreviewAndThumbnailVacuum } from './monitors/previewVacuum'
 import { buildStorageHandler } from './storageHandlers/storageHandlerFactory'
 import * as fs from 'fs-extra'
-import { threadId } from 'worker_threads'
 
 export type SetProcessState = (processName: string, comments: string[], status: P.StatusCode) => void
 
@@ -84,7 +83,9 @@ export class MediaManager {
 			await this.initCore()
 			this._logger.info('Core initialized')
 
-			if (!this.coreHandler) { throw new Error('MediaManger: init: Core handler should have been initialized here') }
+			if (!this.coreHandler) {
+				throw new Error('MediaManger: init: Core handler should have been initialized here')
+			}
 			const peripheralDevice = await this.coreHandler.core.getPeripheralDevice()
 
 			// Stop here if studioId not set
@@ -149,7 +150,9 @@ export class MediaManager {
 
 	async initMediaManager(settings: DeviceSettings): Promise<void> {
 		// console.log(this.coreHandler.deviceSettings)
-		if (!this.coreHandler) { throw new Error('MediaManager: initMediaManager: Core handler should have been initialized here') }
+		if (!this.coreHandler) {
+			throw new Error('MediaManager: initMediaManager: Core handler should have been initialized here')
+		}
 
 		this._logger.debug('Initializing Media Manager with the following settings:')
 		this._logger.debug(JSON.stringify(settings))
@@ -235,7 +238,9 @@ export class MediaManager {
 			if (!this.coreHandler) {
 				this.initCore()
 			}
-			if (!this.coreHandler) { throw new Error('MediaManager: coreHandler.onChanged: Core handler should have been initialized here') }
+			if (!this.coreHandler) {
+				throw new Error('MediaManager: coreHandler.onChanged: Core handler should have been initialized here')
+			}
 
 			this.coreHandler.core
 				.getPeripheralDevice()

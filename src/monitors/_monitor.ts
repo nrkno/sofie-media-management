@@ -10,9 +10,9 @@ import { literal } from '../lib/lib'
 
 export abstract class Monitor extends EventEmitter {
 	public readonly deviceType: string
-	protected coreHandler: CoreMonitorHandler
+	protected coreHandler!: CoreMonitorHandler // Always established in addMonitor
 
-	private changes: PouchDB.Core.Changes<MediaObject>
+	private changes!: PouchDB.Core.Changes<MediaObject> // Always kicked off in subclass init
 
 	protected lastSequenceNr = 0
 

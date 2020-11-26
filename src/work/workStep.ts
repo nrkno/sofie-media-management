@@ -18,12 +18,10 @@ export class WorkStepDB extends WorkStep {
 }
 
 export interface FileWorkStepInitial extends WorkStepInitial {
-	action:
-		| WorkStepAction.COPY
-		| WorkStepAction.DELETE
-		// | WorkStepAction.GENERATE_METADATA
-		// | WorkStepAction.GENERATE_PREVIEW
-		// | WorkStepAction.GENERATE_THUMBNAIL
+	action: WorkStepAction.COPY | WorkStepAction.DELETE
+	// | WorkStepAction.GENERATE_METADATA
+	// | WorkStepAction.GENERATE_PREVIEW
+	// | WorkStepAction.GENERATE_THUMBNAIL
 	file: File
 	target: StorageObject
 }
@@ -83,7 +81,7 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 		| WorkStepAction.GENERATE_PREVIEW
 		| WorkStepAction.GENERATE_THUMBNAIL
 		| WorkStepAction.SCAN
-	priority: number 
+	priority: number
 
 	// code annotations for class-transformer to automate serialization and deserialization
 	@Type(() => File, {

@@ -110,9 +110,11 @@ export class MonitorQuantel extends Monitor {
 
 			// Observe the data:
 			const observer = this.coreHandler.core.observe('expectedMediaItems')
-			observer.added = this.wrapError(this.onExpectedAdded as ((id: string, x?: Record<string, unknown>) => void))
+			observer.added = this.wrapError(this.onExpectedAdded as (id: string, x?: Record<string, unknown>) => void)
 			observer.changed = this.wrapError(this.onExpectedChanged)
-			observer.removed = this.wrapError(this.onExpectedRemoved as ((id: string, x?: Record<string, unknown>) => void))
+			observer.removed = this.wrapError(
+				this.onExpectedRemoved as (id: string, x?: Record<string, unknown>) => void
+			)
 
 			// Subscribe to the data:
 			if (this.expectedMediaItemsSubscription) {
@@ -173,7 +175,7 @@ export class MonitorQuantel extends Monitor {
 		this.observer.stop()
 	}
 
-	private wrapError <T extends unknown[], R = unknown> (fcn: (...args: T) => R) {
+	private wrapError<T extends unknown[], R = unknown>(fcn: (...args: T) => R) {
 		return (...args: T) => {
 			try {
 				return fcn(...args)

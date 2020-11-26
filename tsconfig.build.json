@@ -7,8 +7,8 @@
 		"paths": {
 			"*": ["./node_modules/*"],
 			"tv-automation-media-management": ["./src/index.ts"],
-			"types": ["node", "jest", "reflect-metadata"]
 		},
+		"types": ["node", "reflect-metadata", "node-fetch"],
 		"experimentalDecorators": true
 	}
 }

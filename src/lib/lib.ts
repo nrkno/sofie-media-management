@@ -165,7 +165,7 @@ enum syncFunctionFcnStatus {
 
 interface SyncFunctionFcn {
 	id: string
-	fcn: <T extends unknown[]> (finished: () => void, ...args: T) => void
+	fcn: <T extends unknown[]>(finished: () => void, ...args: T) => void
 	args: Array<unknown>
 	timeout: number
 	status: syncFunctionFcnStatus

@@ -79,7 +79,7 @@ export class Worker {
 	private _warmingUp = false
 	private _step: GeneralWorkStepDB | undefined
 	private abortHandler: (() => void) | undefined
-	private finishPromises: Array<(<T extends unknown, R = unknown> (x: T) => R)> = []
+	private finishPromises: Array<<T extends unknown, R = unknown>(x: T) => R> = []
 	private _lastBeginStep: Time | undefined
 	private ident: string
 	private quantelMonitorArrival: ((qm: MonitorQuantel | undefined) => void) | undefined = undefined

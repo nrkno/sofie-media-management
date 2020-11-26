@@ -1,8 +1,8 @@
 {
-	"extends": "@sofie-automation/code-standard-preset/ts/tsconfig.bin",
+	"extends": "./tsconfig.build.json",
 	"exclude": ["node_modules/**", "scratch/**"],
 	"compilerOptions": {
-		"types": ["node", "jest"],
+		"types": ["node", "jest", "node-fetch"],
 		"experimentalDecorators": true
 	}
 }
