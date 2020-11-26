@@ -105,7 +105,8 @@ export class MediaManagerApp {
 				ctx.type = 'application/xml'
 				ctx.body = await manifestTransform(smoothFestRes.body)
 				return
-			} else { // TODO - ideally this would stream - but that would hang on longer payloads
+			} else {
+				// TODO - ideally this would stream - but that would hang on longer payloads
 				const initReq = await got(`${this.transformer}${ctx.path}`, { responseType: 'buffer' })
 				ctx.type = initReq.headers['content-type'] || 'application/octet-stream'
 				ctx.body = initReq.body

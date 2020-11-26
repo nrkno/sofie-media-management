@@ -155,7 +155,7 @@ export class MonitorQuantel extends Monitor {
 				this._status = {
 					statusCode: PeripheralDeviceAPI.StatusCode.UNKNOWN,
 					messages: ['Updating status after recent core connect ...']
-				} 
+				}
 				this._updateAndSendStatus()
 			})
 
