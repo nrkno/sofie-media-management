@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0-release27.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.1...v1.3.0-release27.0) (2020-11-16)
+
+
+### Bug Fixes
+
+* don't repeat successful Quantel work on restart ([23a3b90](https://github.com/nrkno/tv-automation-media-management/commit/23a3b9055d359b86070add6ac2f83e69e14d94d1))
+* handle black frame detect durations with an 's' unit specifier ([4e9009a](https://github.com/nrkno/tv-automation-media-management/commit/4e9009ad20673dbab0d202534174dafd1f16199d))
+* missed merge conflict ([2258c1b](https://github.com/nrkno/tv-automation-media-management/commit/2258c1bc9a5b7e4691ffa9a244cae7256ca5a75c))
+* replace rather than duplicate failed work on restart ([9b482dc](https://github.com/nrkno/tv-automation-media-management/commit/9b482dcfc3532b54d22ee807157208ee06f9f23e))
+* resend sub-device status after core reconnect ([384b37e](https://github.com/nrkno/tv-automation-media-management/commit/384b37e8de97adcd8f35313eddc8440d74600581))
+
 ### [1.2.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.1-0...v1.2.1) (2020-09-28)
 
 

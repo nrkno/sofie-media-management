@@ -1,6 +1,5 @@
 import * as Koa from 'koa'
 import * as Router from 'koa-router'
-import * as send from 'koa-send'
 import * as cors from '@koa/cors'
 import * as range from 'koa-range'
 import * as fs from 'fs-extra'
@@ -43,16 +42,16 @@ export class MediaManagerApp {
 			let id = /* ctx.params.id.startsWith('QUANTEL:') ? ctx.params.id.slice(8) : */ ctx.params.id
 			let thumbPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
-				(this.config.previews && this.config.previews.folder) || 'thumbs',
+				(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
 				`${id.replace(/:/gi, '_')}.jpg`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
 			if (statError) {
-				this.logger.warning(`HTTP/S server: thumbnail requested that did not exist ${ctx.params.id}`, statError)
+				this.logger.warn(`HTTP/S server: thumbnail requested that did not exist ${ctx.params.id}`, statError)
 				return await next()
 			}
 			ctx.type = 'image/jpeg'
-			ctx.body = await send(ctx, thumbPath)
+			ctx.body = fs.createReadStream(thumbPath)
 			ctx.length = stats.size
 		})
 
@@ -106,8 +105,10 @@ export class MediaManagerApp {
 				ctx.body = await manifestTransform(smoothFestRes.body)
 				return
 			} else {
-				const response = got.stream(`${this.transformer}${ctx.path}`)
-				ctx.body = response
+				// TODO - ideally this would stream - but that would hang on longer payloads
+				const initReq = await got(`${this.transformer}${ctx.path}`, { responseType: 'buffer' })
+				ctx.type = initReq.headers['content-type'] || 'application/octet-stream'
+				ctx.body = initReq.body
 			}
 		})
 
