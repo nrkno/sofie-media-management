@@ -136,7 +136,7 @@
     "set-value": "^3.0.1",
     "tslib": "^1.9.2",
     "tv-automation-quantel-gateway-client": "^1.0.12",
-    "tv-automation-server-core-integration": "2.1.1-nightly-release27-20201116-132154-3cdc207.0",
+    "tv-automation-server-core-integration": "2.2.0",
     "underscore": "^1.11.0",
     "windows-network-drive": "^3.0.0",
     "winston": "^2.4.2",
