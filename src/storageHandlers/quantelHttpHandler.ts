@@ -118,8 +118,8 @@ export class QuantelHTTPFile implements File {
 							console.log(`Non 0-length clip found: ${clip.ClipID}. Requesting over HTTP`)
 							atomicPromise(
 								'quantelTransformer',
-								(): Promise<http.IncomingMessage> => {
-									return new Promise<http.IncomingMessage>((resolveAtomic, rejectAtomic) => {
+								(): Promise<void> => {
+									return new Promise<void>((resolveAtomic, rejectAtomic) => {
 										http.get(
 											`${this.transformerUrl}/quantel/homezone/clips/ports/${clip.ClipID}/essence.mxf`
 										)

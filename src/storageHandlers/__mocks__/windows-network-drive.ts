@@ -13,8 +13,8 @@ const windowsNetworkDrive = {
 	),
 	mount: jest.fn(
 		(_drivePath: string, driveLetter?: string, _username?: string, _password?: string): Promise<string> => {
-			return new Promise(resolve => {
-				resolve(driveLetter)
+			return new Promise<string>(resolve => {
+				resolve(driveLetter ?? '')
 			})
 		}
 	),
@@ -25,7 +25,7 @@ const windowsNetworkDrive = {
 	),
 	pathToWindowsPath: jest.fn(
 		(drivePath: string): Promise<string> => {
-			return new Promise(resolve => resolve(drivePath))
+			return new Promise<string>(resolve => resolve(drivePath))
 		}
 	),
 	isWinOs: jest.fn((): boolean => {
