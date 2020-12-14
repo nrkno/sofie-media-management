@@ -20,6 +20,6 @@ export abstract class BaseWorkFlowGenerator extends EventEmitter {
 		return super.on(type, listener)
 	}
 
-	abstract async init(): Promise<void>
-	abstract async destroy(): Promise<void>
+	abstract init(): Promise<void>
+	abstract destroy(): Promise<void>
 }

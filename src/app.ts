@@ -114,7 +114,7 @@ export class MediaManagerApp {
 
 		this.app.use(this.router.routes()).use(this.router.allowedMethods())
 
-		return new Promise(resolve => {
+		return new Promise<void>(resolve => {
 			if (this.config.httpPort) {
 				this.app.listen(this.config.httpPort, () => {
 					this.logger.info(`MediaMangerApp: Koa started on HTTP port ${this.config.httpPort}`)

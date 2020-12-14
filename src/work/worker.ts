@@ -378,7 +378,7 @@ export class Worker {
 
 			const { error: execError } = await noTryAsync(
 				() =>
-					new Promise((resolve, reject) => {
+					new Promise<void>((resolve, reject) => {
 						exec(args.join(' '), (err, stdout, stderr) => {
 							this.logger.debug(`Worker: thumbnail generate: output (stdout, stderr)`, stdout, stderr)
 							if (err) {
