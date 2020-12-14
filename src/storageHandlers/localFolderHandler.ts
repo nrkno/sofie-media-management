@@ -150,7 +150,7 @@ export class LocalFolderHandler extends EventEmitter implements StorageHandler {
 					return
 				}
 				reject()
-			})
+			}, 0)
 		})
 	}
 

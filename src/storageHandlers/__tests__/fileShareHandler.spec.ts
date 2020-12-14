@@ -10,7 +10,7 @@ jest.mock('chokidar')
 	if (event === 'ready') {
 		setTimeout(() => {
 			handler()
-		})
+		}, 0)
 	}
 	return chokidar
 })
