@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0-release28.2](https://github.com/nrkno/tv-automation-media-management/compare/v1.4.0-release28.1...v1.4.0-release28.2) (2020-12-14)
+
+
+### Bug Fixes
+
+* more typings issues ([8f73bfe](https://github.com/nrkno/tv-automation-media-management/commit/8f73bfeb0de2b6908642427b6713a06d5772b0a4))
+
 ## [1.4.0-release28.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.4.0-release28.0...v1.4.0-release28.1) (2020-12-14)
 
 
