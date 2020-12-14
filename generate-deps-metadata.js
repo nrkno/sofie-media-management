@@ -8,7 +8,7 @@ if (process.env.npm_package_version) {
 
 let dirNames = [
 	// TODO: add any relevant sub-libraries here, to report to Core
-	'tv-automation-server-core-integration',
+	'@sofie-automation/server-core-integration',
 	// 'timeline-state-resolver',
 ]
 try {
