@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.3.0-release27.0...v1.3.0) (2020-12-08)
+
+
+### Bug Fixes
+
+* prevent MPEG-DASH hangs by reading everything into RAM rather than streaming ([e366b15](https://github.com/nrkno/tv-automation-media-management/commit/e366b15a5cb6524f16334219d25fc233e0800f2a))
+* thumbnail serving ([940819a](https://github.com/nrkno/tv-automation-media-management/commit/940819ad794337619aef7cabf012e2548b774d75))
+
 ## [1.3.0-release27.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.2.1...v1.3.0-release27.0) (2020-11-16)
 
 
