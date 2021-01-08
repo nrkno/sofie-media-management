@@ -482,7 +482,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							e.file as File,
 							target,
 							tracked.comment,
-							!!e.file && this.isQuantel(e.file.name),
+							!!e.file && !this.isQuantel(e.file.name),
 							'Monitored file was added to source storage'
 						)
 					)
