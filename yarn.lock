@@ -577,10 +577,10 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@sofie-automation/server-core-integration@1.16.0-in-testing-R28.1":
-  version "1.16.0-in-testing-R28.1"
-  resolved "https://registry.yarnpkg.com/@sofie-automation/server-core-integration/-/server-core-integration-1.16.0-in-testing-R28.1.tgz#2926b2b46eb2814e34eb3e3aaeb3021277c77026"
-  integrity sha512-PmvJ8MRH63z6ipsmH6SNhWXSh+hvN0VdbwvYJ5OPAERkaw1Pwk4VzGgrB2wLTqHPrPpZ+EWq+j8eSvXJv1GO0Q==
+"@sofie-automation/server-core-integration@1.16.0":
+  version "1.16.0"
+  resolved "https://registry.yarnpkg.com/@sofie-automation/server-core-integration/-/server-core-integration-1.16.0.tgz#78434f90ff62299f0e1fb8c0f22519983cc89ec7"
+  integrity sha512-xrYjl6tPJdGKT4DJBcI6j0yKP+0rUnd9y9QxxkRvlWqARP/murrxSUwCP8gF37iN5bwwl9qzqs0RHInvGHpQFA==
   dependencies:
     data-store "3.1.0"
     ejson "^2.2.0"
@@ -7551,9 +7551,9 @@ uri-js@^4.2.2:
     punycode "^2.1.0"
 
 urijs@^1.19.2:
-  version "1.19.2"
-  resolved "https://registry.yarnpkg.com/urijs/-/urijs-1.19.2.tgz#f9be09f00c4c5134b7cb3cf475c1dd394526265a"
-  integrity sha512-s/UIq9ap4JPZ7H1EB5ULo/aOUbWqfDi7FKzMC2Nz+0Si8GiT1rIEaprt8hy3Vy2Ex2aJPpOQv4P4DuOZ+K1c6w==
+  version "1.19.5"
+  resolved "https://registry.yarnpkg.com/urijs/-/urijs-1.19.5.tgz#119683ab4b2fb0bd637e5ea6dd9117bcac68d3e4"
+  integrity sha512-48z9VGWwdCV5KfizHsE05DWS5fhK6gFlx5MjO7xu0Krc5FGPWzjlXEVV0nPMrdVuP7xmMHiPZ2HoYZwKOFTZOg==
 
 urix@^0.1.0:
   version "0.1.0"
