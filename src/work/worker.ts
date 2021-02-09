@@ -660,8 +660,12 @@ export class Worker {
 			return {}
 		}
 
-		if (!doc.mediainfo || !doc.mediainfo.format || !doc.mediainfo.format.duration) {
+		if (!doc.mediainfo || !doc.mediainfo.format) {
 			throw new Error('Worker: get metadata: running getMetadata requires the presence of basic file data first.')
+		}
+		if (!doc.mediainfo.format.duration) {
+			this.logger.info(`Worker: get metadata: not generating stream metadata: duration missing on "${doc.mediaId}"`)
+			return {}
 		}
 
 		let filterString = ''
