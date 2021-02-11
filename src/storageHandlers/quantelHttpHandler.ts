@@ -63,7 +63,7 @@ export class QuantelHTTPFile implements File {
 	private _read: boolean
 
 	@Transform(
-		(value: QuantelGateway): QuantelGatewayTombstone => {
+		({ value }): QuantelGatewayTombstone => {
 			return {
 				gatewayUrl: value.gatewayUrl,
 				ISAUrl: value.ISAUrl,
@@ -75,7 +75,7 @@ export class QuantelHTTPFile implements File {
 			toPlainOnly: true
 		}
 	)
-	@Transform((_value: QuantelGatewayTombstone) => QuantelGatewaySingleton, { toClassOnly: true })
+	@Transform( ({}) => QuantelGatewaySingleton, { toClassOnly: true })
 	private gateway: QuantelGateway
 
 	private transformerUrl: string

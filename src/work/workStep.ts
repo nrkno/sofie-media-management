@@ -50,8 +50,8 @@ export class FileWorkStep extends WorkStep implements FileWorkStepInitial {
 	})
 	file: File
 
-	@Transform((value: StorageObject) => value.id, { toPlainOnly: true })
-	@Transform((value: string) => value, { toClassOnly: true })
+	@Transform(({ value }) => value.id, { toPlainOnly: true })
+	@Transform(({ value }) => value, { toClassOnly: true })
 	target: StorageObject
 
 	constructor(init?: FileWorkStepInitialConstr) {
@@ -94,8 +94,8 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 	})
 	file: File
 
-	@Transform((value: StorageObject) => value.id, { toPlainOnly: true })
-	@Transform((value: string) => value, { toClassOnly: true })
+	@Transform(({ value }) => value.id, { toPlainOnly: true })
+	@Transform(({value }) => value, { toClassOnly: true })
 	target: StorageObject
 
 	constructor(init?: ScannerWorkStepInitialConstr) {
