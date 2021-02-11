@@ -31,6 +31,9 @@ export interface DeviceSettings {
 	/** Connection details for media access via HTTPS server */
 	httpsPort?: number
 
+	/** Relative priority of copying files and initializing media objects. */
+	copyPriority?: number
+
 	/** A list of Monitors, which will monitor media statuses */
 	monitors?: {
 		[monitorId: string]: MonitorSettings
@@ -54,6 +57,8 @@ export interface DeviceSettings {
 		height?: number
 		/** Sub-folder of `paths.resources` where thumbnails are stored. Defaults to `.../thumbnails` */
 		folder?: string // Not in use yet
+		/** Relative priority of jobs to generate thumbnails */
+		priority?: number
 	}
 
 	/** Configuration for various kinds of advanced metadata generation */
@@ -86,6 +91,9 @@ export interface DeviceSettings {
 
 		/** Merge black and freeze frame detection results. Default is `true` */
 		mergeBlacksAndFreezes?: boolean
+
+		/** Relative prioroty of jobs to create advanced metadata */
+		priority?: number
 	}
 
 	/** Configuration of _hover-scrub_ preview generation */
@@ -100,6 +108,9 @@ export interface DeviceSettings {
 		bitrate?: string
 		/** Sub-folder of `paths.resources` where thumbnails are stored. Defaults to `.../previews` */
 		folder?: string
+
+		/** Relative priority of jobs to generate previews */
+		priority?: number
 	}
 }
 

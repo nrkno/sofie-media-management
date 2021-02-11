@@ -234,6 +234,18 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			type: ConfigManifestEntryType.STRING
 		},
 		{
+			id: 'copyPriority',
+			name: 'Copy and initial check priority',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '2.0'
+		},
+		{
+			id: 'thumbnails.priority',
+			name: 'Thumbnail generation priority',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.5'
+		},
+		{
 			id: 'thumbnails.width',
 			name: 'Thumbnail width',
 			type: ConfigManifestEntryType.INT,
@@ -250,6 +262,12 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			name: 'Thumbnail sub-folder',
 			type: ConfigManifestEntryType.STRING,
 			placeholder: 'thumbs'
+		},
+		{
+			id: 'metadata.priority',
+			name: 'Metadata generation priority',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '1.0'
 		},
 		{
 			id: 'metadata.fieldOrder',
@@ -322,6 +340,12 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			id: 'previews.enable',
 			name: 'Enable preview generation',
 			type: ConfigManifestEntryType.BOOLEAN
+		},
+		{
+			id: 'previews.priority',
+			name: 'Preview generation priority',
+			type: ConfigManifestEntryType.NUMBER,
+			placeholder: '0.3'
 		},
 		{
 			id: 'previews.width',
