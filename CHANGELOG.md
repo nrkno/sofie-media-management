@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. See [standa
 
 ## [1.5.0-release30.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.4.0-release28.2...v1.5.0-release30.0) (2021-02-11)
 
+### Features
+
+* Set relative worker job priority via a config manifest setting([5265f93](https://github.com/nrkno/tv-automation-media-management/commit/5265f93d88dc9e1bf2cdfca2ce9781ee61ca6e72))
+
+
 ## [1.4.0-release28.2](https://github.com/nrkno/tv-automation-media-management/compare/v1.4.0-release28.1...v1.4.0-release28.2) (2020-12-14)
 
 
