@@ -486,7 +486,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 							e.file as File,
 							target,
 							tracked.comment,
-							!!e.file && this.isQuantel(e.file.name),
+							!!e.file && !this.isQuantel(e.file.name),
 							'Monitored file was added to source storage'
 						)
 					)
@@ -814,7 +814,7 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 * Checks if the item exists on the storage and issues workflows
 	 * @param tmi
 	 */
-	protected checkAndEmitCopyWorkflow(tmi: TrackedMediaItem, reason: string, withRetry?: boolean) {
+	protected checkAndEmitCopyWorkflow(tmi: TrackedMediaItem, reason: string, withRetry?: boolean, lastSourceFileSize?: number) {
 		if (!tmi.sourceStorageId)
 			throw new Error(
 				`${this.ident} checkAndEmitCopyWorkflow: Tracked Media Item "${tmi._id}" has no source storage!`
@@ -859,68 +859,82 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 				if (file && storage) {
 					file.getProperties()
 						.then(sFileProps => {
-							this._allStorages
-								.filter(i => tmi.targetStorageIds.indexOf(i.id) >= 0)
-								.forEach(i => {
-									// check if the file exists on the target storage
-									i.handler.getFile(tmi.name).then(
-										rFile => {
-											// the file exists on target storage
-											rFile.getProperties().then(
-												rFileProps => {
-													if (rFileProps.size !== sFileProps.size) {
-														// File size doesn't match
+							if (lastSourceFileSize !== undefined) {
+								if (lastSourceFileSize === sFileProps.size) {
+									this._allStorages
+										.filter(i => tmi.targetStorageIds.indexOf(i.id) >= 0)
+										.forEach(i => {
+											// check if the file exists on the target storage
+											i.handler.getFile(tmi.name).then(
+												rFile => {
+													// the file exists on target storage
+													rFile.getProperties().then(
+														rFileProps => {
+															if (rFileProps.size !== sFileProps.size) {
+																// File size doesn't match
+																this.emitCopyWorkflow(
+																	file,
+																	i,
+																	tmi.comment,
+																	true,
+																	reason,
+																	`File size doesn't match on target storage`
+																)
+															}
+														},
+														e => {
+															// Properties could not be fetched
+															this.logger.error(
+																`${this.ident} checkAndEmitCopyWorkflow: ` +
+																	`File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked. Attempting to write over.`,
+																e
+															)
+															this.emitCopyWorkflow(
+																file,
+																i,
+																tmi.comment,
+																true,
+																reason,
+																`Could not fetch target file properties`
+															)
+														}
+													)
+												},
+												_err => {
+													// the file not found
+													if (withRetry) {
+														setTimeout(() => {
+															this.logger.debug(
+																`${this.ident} checkAndEmitCopyWorkflow: ` +
+																	`Retrying a check for a "${tmi.name}" file that wasn't found on target storage "${i.id}"`
+															)
+															this.checkAndEmitCopyWorkflow(tmi, reason, false, sFileProps.size)
+														}, 60 * 1000)
+													} else {
 														this.emitCopyWorkflow(
 															file,
 															i,
 															tmi.comment,
 															true,
 															reason,
-															`File size doesn't match on target storage`
+															`File not found on target storage`
 														)
 													}
-												},
-												e => {
-													// Properties could not be fetched
-													this.logger.error(
-														`${this.ident} checkAndEmitCopyWorkflow: ` +
-															`File "${tmi.name}" exists on storage "${i.id}", but it's properties could not be checked. Attempting to write over.`,
-														e
-													)
-													this.emitCopyWorkflow(
-														file,
-														i,
-														tmi.comment,
-														true,
-														reason,
-														`Could not fetch target file properties`
-													)
 												}
 											)
-										},
-										_err => {
-											// the file not found
-											if (withRetry) {
-												setTimeout(() => {
-													this.logger.debug(
-														`${this.ident} checkAndEmitCopyWorkflow: ` +
-															`Retrying a check for a "${tmi.name}" file that wasn't found on target storage "${i.id}"`
-													)
-													this.checkAndEmitCopyWorkflow(tmi, reason)
-												}, 60 * 1000)
-											} else {
-												this.emitCopyWorkflow(
-													file,
-													i,
-													tmi.comment,
-													true,
-													reason,
-													`File not found on target storage`
-												)
-											}
-										}
+										})
+								} else {
+									// file is growing on source storage, do nothing and wait for an add/change event
+									this.logger.debug(
+										`${this.ident} checkAndEmitCopyWorkflow: File "${tmi.name}" is growing on source storage "${tmi.sourceStorageId}".`
 									)
-								})
+								}
+							} else {
+								// wait 3s to see it the file isn't growing on source storage
+								setTimeout(() => {
+									this.checkAndEmitCopyWorkflow(tmi, reason, withRetry, sFileProps.size)
+								}, 3000)
+							}
 						})
 						.catch(e => {
 							this.logger.error(
