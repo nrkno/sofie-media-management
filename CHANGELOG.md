@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.5.0-release30.2](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0-release30.1...v1.5.0-release30.2) (2021-02-11)
+
+
+### Bug Fixes
+
+* copy a file when added on a non-quantel storage ([3925c0d](https://github.com/nrkno/tv-automation-media-management/commit/3925c0da458c23d22f64fb9394ec0d6115235a98))
+* emit copy workflow only only when file isn't growing ([7f239de](https://github.com/nrkno/tv-automation-media-management/commit/7f239de87cf7e0b3d5023e0a363a7ed04c24ca9b))
+
 ## [1.5.0-release30.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.4.0-release28.2...v1.5.0-release30.0) (2021-02-11)
 
 ### Features
