@@ -95,7 +95,7 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 	file: File
 
 	@Transform(({ value }) => value.id, { toPlainOnly: true })
-	@Transform(({value }) => value, { toClassOnly: true })
+	@Transform(({ value }) => value, { toClassOnly: true })
 	target: StorageObject
 
 	constructor(init?: ScannerWorkStepInitialConstr) {

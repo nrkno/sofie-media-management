@@ -814,7 +814,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 	 * Checks if the item exists on the storage and issues workflows
 	 * @param tmi
 	 */
-	protected checkAndEmitCopyWorkflow(tmi: TrackedMediaItem, reason: string, withRetry?: boolean, lastSourceFileSize?: number) {
+	protected checkAndEmitCopyWorkflow(
+		tmi: TrackedMediaItem,
+		reason: string,
+		withRetry?: boolean,
+		lastSourceFileSize?: number
+	) {
 		if (!tmi.sourceStorageId)
 			throw new Error(
 				`${this.ident} checkAndEmitCopyWorkflow: Tracked Media Item "${tmi._id}" has no source storage!`
@@ -908,7 +913,12 @@ export class ExpectedItemsGenerator extends BaseWorkFlowGenerator {
 																`${this.ident} checkAndEmitCopyWorkflow: ` +
 																	`Retrying a check for a "${tmi.name}" file that wasn't found on target storage "${i.id}"`
 															)
-															this.checkAndEmitCopyWorkflow(tmi, reason, false, sFileProps.size)
+															this.checkAndEmitCopyWorkflow(
+																tmi,
+																reason,
+																false,
+																sFileProps.size
+															)
 														}, 60 * 1000)
 													} else {
 														this.emitCopyWorkflow(

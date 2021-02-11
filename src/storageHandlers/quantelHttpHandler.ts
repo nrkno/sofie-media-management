@@ -75,7 +75,7 @@ export class QuantelHTTPFile implements File {
 			toPlainOnly: true
 		}
 	)
-	@Transform( ({}) => QuantelGatewaySingleton, { toClassOnly: true })
+	@Transform(({}) => QuantelGatewaySingleton, { toClassOnly: true })
 	private gateway: QuantelGateway
 
 	private transformerUrl: string
