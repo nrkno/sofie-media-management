@@ -152,7 +152,6 @@ export class Dispatcher {
 			e => {
 				this.logger.error(`Dispatcher: failed to synchronize workFlows with core`, e)
 				process.exit(1)
-				throw e
 			}
 		)
 		await noTryAsync(
@@ -160,7 +159,6 @@ export class Dispatcher {
 			e => {
 				this.logger.error(`Dispatcher: failed to synchronize workSteps with core`, e)
 				process.exit(1)
-				throw e
 			}
 		)
 		// Maintain one-to-many relationship for the WorkFlows and WorkSteps
@@ -326,7 +324,7 @@ export class Dispatcher {
 				if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
 					this.coreHandler.setProcessState(
 						PROCESS_NAME,
-						[`No WorkFlow has finished in the last 15 minutes`],
+						[`Media Manager seems to be stuck. Please contact support.`],
 						P.StatusCode.BAD
 					)
 					return
@@ -334,7 +332,9 @@ export class Dispatcher {
 				if (oldWorkFlows.length > 0) {
 					this.coreHandler.setProcessState(
 						PROCESS_NAME,
-						[`Some WorkFlows have been waiting more than 3hrs to be completed`],
+						[
+							`Media Manager has one or more workflows that are more than 3 hours old. Please contact support.`
+						],
 						P.StatusCode.BAD
 					)
 					this.watchdogRunning = false
@@ -343,7 +343,9 @@ export class Dispatcher {
 				if (unfinishedWorkFlows.length > this.warningWFQueueLength) {
 					this.coreHandler.setProcessState(
 						PROCESS_NAME,
-						[`WorkFlow queue is now ${unfinishedWorkFlows.length} items long`],
+						[
+							`The Media Manager's queue is now ${unfinishedWorkFlows.length} items long. Please contact support.`
+						],
 						P.StatusCode.WARNING_MAJOR
 					)
 					this.watchdogRunning = false
