@@ -1,7 +1,7 @@
 {
   "name": "tv-automation-media-management",
   "private": true,
-  "version": "1.7.0-release32.0",
+  "version": "1.8.0-release33",
   "description": "Connect to Core, synchronize media",
   "main": "dist/index.js",
   "license": "MIT",
