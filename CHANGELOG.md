@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.8.0-release33.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.7.0-release32.0...v1.8.0-release33.0) (2021-04-23)
+
+
+### Bug Fixes
+
+* failing workstep because of race with watcher ([1e8f91b](https://github.com/nrkno/tv-automation-media-management/commit/1e8f91bc89ebe864313cef87b9e7fc40425afbb1))
+* skip getMetadata when duration is missing ([9085187](https://github.com/nrkno/tv-automation-media-management/commit/908518747e53fefa86a4928be161c1d97156dde0))
+
 ## [1.7.0-release32.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0...v1.7.0-release32.0) (2021-03-23)
 
 
