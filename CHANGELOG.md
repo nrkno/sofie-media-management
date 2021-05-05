@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.7.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.6.0...v1.7.0) (2021-05-05)
+
+## [1.7.0-release32.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0...v1.7.0-release32.0) (2021-03-23)
+
+
+### Bug Fixes
+
+* improve user messages for stuck or overly large or long running workflow ([74c6138](https://github.com/nrkno/tv-automation-media-management/commit/74c6138837592c04fe7d2253a013f8ce98a3cc28))
+
 ## [1.7.0-release32.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0...v1.7.0-release32.0) (2021-03-23)
 
 
