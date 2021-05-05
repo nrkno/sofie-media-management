@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file. See [standa
 
 * improve user messages for stuck or overly large or long running workflow ([74c6138](https://github.com/nrkno/tv-automation-media-management/commit/74c6138837592c04fe7d2253a013f8ce98a3cc28))
 
+## [1.6.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0...v1.6.0) (2021-05-05)
+
 ## [1.6.0-release31.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0-release30.2...v1.6.0-release31.0) (2021-03-02)
 
 ## [1.5.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.5.0-release30.2...v1.5.0) (2021-03-19)
