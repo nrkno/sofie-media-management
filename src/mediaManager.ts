@@ -193,7 +193,8 @@ export class MediaManager {
 				this._availableStorage,
 				this._trackedMedia,
 				settings.mediaFlows || [],
-				this._logger
+				this._logger,
+				settings.cronJobTime
 			),
 			new ExpectedItemsGenerator(
 				this._availableStorage,

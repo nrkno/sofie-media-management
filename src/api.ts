@@ -167,6 +167,8 @@ export interface MediaFlow {
 	sourceId: string
 	/** Id of a Storage */
 	destinationId?: string
+	/** If an item removed from destination should be copied again when still available on source */
+	copyRemoved?: boolean
 	/** Workflow generator type */
 	mediaFlowType: MediaFlowType
 }

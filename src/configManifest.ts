@@ -112,6 +112,11 @@ MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.WATCH_FOLDER] = [
 		id: 'destinationId',
 		name: 'Target Storage',
 		type: ConfigManifestEntryType.STRING // dropdown
+	},
+	{
+		id: 'copyRemoved',
+		name: 'Copy again files removed on Target',
+		type: ConfigManifestEntryType.BOOLEAN
 	}
 ]
 MEDIA_MANAGER_MEDIAFLOW_CONFIG[MediaFlowType.LOCAL_INGEST] = [...MEDIA_MANAGER_MEDIAFLOW_COMMON]
