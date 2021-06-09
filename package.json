@@ -1,7 +1,7 @@
 {
   "name": "tv-automation-media-management",
   "private": true,
-  "version": "1.10.0-release35",
+  "version": "1.10.0-release35.0",
   "description": "Connect to Core, synchronize media",
   "main": "dist/index.js",
   "license": "MIT",
@@ -120,7 +120,7 @@
   ],
   "dependencies": {
     "@koa/cors": "^3.0.0",
-    "@sofie-automation/server-core-integration": "^1.34.0-in-testing.0",
+    "@sofie-automation/server-core-integration": "^1.35.0-in-testing.0",
     "chokidar": "^3.4.3",
     "class-transformer": "^0.4.0",
     "fs-extra": "^8.1.0",
@@ -136,7 +136,7 @@
     "reflect-metadata": "^0.1.12",
     "set-value": "^3.0.1",
     "tslib": "^2.0.3",
-    "tv-automation-quantel-gateway-client": "^1.0.12",
+    "tv-automation-quantel-gateway-client": "^2.0.2",
     "underscore": "^1.12.1",
     "urijs": "^1.19.4",
     "windows-network-drive": "^3.0.0",
@@ -146,6 +146,6 @@
   "resolutions": {
     "node-license-validator/**/minimist": "^1.2.3",
     "pouchdb-**/node-fetch": "^2.6.1",
-    "koa-router**/urijs": "^1.19.4"
+    "normalize-url": "^6.0.1"
   }
 }
