@@ -574,14 +574,14 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@sofie-automation/server-core-integration@^1.34.0-in-testing.0":
-  version "1.34.0-nightly-test-mserk5-20210507-123656-f937ba8.0"
-  resolved "https://registry.yarnpkg.com/@sofie-automation/server-core-integration/-/server-core-integration-1.34.0-nightly-test-mserk5-20210507-123656-f937ba8.0.tgz#7e8cf63085ad2265d24d657f89596f2350d2b3fa"
-  integrity sha512-1VWmOlAHcXJ5K3MX/s1UFK1rPWzka/WcFHI0RF5imcu3ypN1bRvbYjRfmY2PCBvGbO7AJ8q5cbRs2Fd84fDZEw==
+"@sofie-automation/server-core-integration@^1.35.0-in-testing.0":
+  version "1.35.0-in-testing.0"
+  resolved "https://registry.yarnpkg.com/@sofie-automation/server-core-integration/-/server-core-integration-1.35.0-in-testing.0.tgz#6aa6e6ffdbb661314723782d8ff6b911282e0a91"
+  integrity sha512-BQoTT/vEBg4MOpPiQcA0/XHOD1H4Qo1GWVOov+t+iVe30nLwnYtkQuhx2GjVnMop57LDc4aUY7oaADfX/GlNJg==
   dependencies:
     data-store "3.1.0"
     ejson "^2.2.0"
-    faye-websocket "^0.11.3"
+    faye-websocket "^0.11.4"
     got "^11.8.2"
     tslib "^2.0.3"
     underscore "^1.12.1"
@@ -2832,10 +2832,10 @@ fastq@^1.6.0:
   dependencies:
     reusify "^1.0.4"
 
-faye-websocket@^0.11.3:
-  version "0.11.3"
-  resolved "https://registry.yarnpkg.com/faye-websocket/-/faye-websocket-0.11.3.tgz#5c0e9a8968e8912c286639fde977a8b209f2508e"
-  integrity sha512-D2y4bovYpzziGgbHYtGCMjlJM36vAl/y+xUyn1C+FVx8szd1E+86KwVw6XvYSzOP8iMpm1X0I4xJD+QtUb36OA==
+faye-websocket@^0.11.4:
+  version "0.11.4"
+  resolved "https://registry.yarnpkg.com/faye-websocket/-/faye-websocket-0.11.4.tgz#7f0d9275cfdd86a1c963dc8b65fcc451edcbb1da"
+  integrity sha512-CzbClwlXAuiRQAlUyfqPgvPoNKTckTPGfwZV4ZdAhVcP2lh9KUxJg2b5GkE7XbjKQ3YJnQ9z6D9ntLAlB+tP8g==
   dependencies:
     websocket-driver ">=0.5.1"
 
@@ -7354,13 +7354,12 @@ tunnel-agent@^0.6.0:
   dependencies:
     safe-buffer "^5.0.1"
 
-tv-automation-quantel-gateway-client@^1.0.12:
-  version "1.0.12"
-  resolved "https://registry.yarnpkg.com/tv-automation-quantel-gateway-client/-/tv-automation-quantel-gateway-client-1.0.12.tgz#2856a2d8459a9fe21c2eb12f54ecea471db3e930"
-  integrity sha512-yab4tXDifQAZhLRl+t03zSnSlu/N3Zh9zGHs5c3b1OuRSHTEFZqHIt6jnXVsxzHfLSTo2NYV5T5f8o4GmMVhIQ==
+tv-automation-quantel-gateway-client@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/tv-automation-quantel-gateway-client/-/tv-automation-quantel-gateway-client-2.0.2.tgz#5d5db5525e1d3af8e575edeccd223cac672184f9"
+  integrity sha512-SzW5FalDbF5uhMeLSGxrIuFuxcjqO9SPjcWZ0h4fmZ6FZTxX3R6IA0pTq5RNDvSLUI0A8b6q0EKilLELlSeoew==
   dependencies:
     got "^11.5.2"
-    underscore "^1.9.1"
 
 tweetnacl@^0.14.3, tweetnacl@~0.14.0:
   version "0.14.5"
@@ -7442,7 +7441,7 @@ unbzip2-stream@^1.0.9:
     buffer "^5.2.1"
     through "^2.3.8"
 
-underscore@^1.12.1, underscore@^1.9.1:
+underscore@^1.12.1:
   version "1.13.1"
   resolved "https://registry.yarnpkg.com/underscore/-/underscore-1.13.1.tgz#0c1c6bd2df54b6b69f2314066d65b6cde6fcf9d1"
   integrity sha512-hzSoAVtJF+3ZtiFX0VgfFPHEDRm7Y/QPjGyNo4TVdnDTdft3tr8hEkD25a1jC+TjTuE7tkHGKkhwCgs9dgBB2g==
@@ -7763,7 +7762,7 @@ write-stream@~0.4.3:
   dependencies:
     readable-stream "~0.0.2"
 
-ws@^7.2.3:
+ws@^7.4.4:
   version "7.4.6"
   resolved "https://registry.yarnpkg.com/ws/-/ws-7.4.6.tgz#5654ca8ecdeee47c33a9a4bf6d28e2be2980377c"
   integrity sha512-YmhHDO4MzaDLB+M9ym/mDA5z0naX8j7SIlT8f8z+I0VtzsRbekxEutHSme7NPS2qE8StCYQNUnfWdXta/Yu85A==

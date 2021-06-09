@@ -138,11 +138,15 @@ export class MonitorQuantel extends Monitor {
 			if (!this.settings.ISAUrl) throw new Error(`${this.ident} init: parameter not set: ISAUrl`)
 			if (!this.settings.serverId) throw new Error(`${this.ident} init: parameter not set: serverId`)
 
+			const isaURLs = [this.settings.ISAUrl]
+			if (this.settings.ISABackupUrl) {
+				isaURLs.push(this.settings.ISABackupUrl)
+			}
+
 			// Setup quantel connection:
 			this.waitingForInit = this.quantel.init(
 				this.settings.gatewayUrl,
-				this.settings.ISAUrl,
-				this.settings.ISABackupUrl,
+				isaURLs,
 				this.settings.zoneId,
 				this.settings.serverId
 			)
@@ -285,7 +289,10 @@ export class MonitorQuantel extends Monitor {
 		setTimeout(() => {
 			if (!this.isDestroyed) {
 				this.doWatch().catch(e => {
-					this.logger.error(`${this.ident} triggerWatch: Error in Quantel doWatch - retarting watcher in 10s`, e)
+					this.logger.error(
+						`${this.ident} triggerWatch: Error in Quantel doWatch - retarting watcher in 10s`,
+						e
+					)
 				})
 			}
 			setTimeout(this.triggerWatch, 10000)

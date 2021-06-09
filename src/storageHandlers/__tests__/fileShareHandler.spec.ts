@@ -14,6 +14,7 @@ jest.mock('chokidar')
 	}
 	return chokidar
 })
+;(chokidar as any).close = jest.fn().mockResolvedValue(undefined)
 ;(networkDrive as any).mount = jest.fn().mockResolvedValue(true)
 ;(networkDrive as any).find = function() {
 	return Promise.resolve([])
@@ -54,7 +55,7 @@ describe('FileShareHandler', () => {
 		expect(networkDrive.mount).toHaveBeenCalled()
 	})
 
-	afterAll(() => {
-		fsh0.destroy()
+	afterAll(async () => {
+		await fsh0.destroy()
 	})
 })
