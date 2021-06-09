@@ -660,8 +660,12 @@ export class Worker {
 			return {}
 		}
 
-		if (!doc.mediainfo || !doc.mediainfo.format || !doc.mediainfo.format.duration) {
+		if (!doc.mediainfo || !doc.mediainfo.format) {
 			throw new Error('Worker: get metadata: running getMetadata requires the presence of basic file data first.')
+		}
+		if (!doc.mediainfo.format.duration) {
+			this.logger.info(`Worker: get metadata: not generating stream metadata: duration missing on "${doc.mediaId}"`)
+			return {}
 		}
 
 		let filterString = ''
@@ -1132,17 +1136,16 @@ export class Worker {
 			this.logger.debug(`Worker: metadata generate: new info size is ${mediaSize}`)
 		}
 
-		// Read document again ... might have been updated while we were busy working
-		if (docExists) {
-			let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
-			if (getError2) {
-				return this.failStep(
-					`after work, failed to retrieve media object with ID "${fileId}"`,
-					step.action,
-					getError2
-				)
-			}
+		// Read document again ... might have been created or updated while we were busy working
+		let { result: doc2, error: getError2 } = await noTryAsync(() => this.mediaDB.get<MediaObject>(fileId))
+		if (!getError2) {
 			doc = doc2
+		} else if (docExists) {
+			return this.failStep(
+				`after work, failed to retrieve media object with ID "${fileId}"`,
+				step.action,
+				getError2
+			)
 		}
 		doc.mediainfo = Object.assign(doc.mediainfo || {}, newInfo)
 		this.logger.debug(`Worker: media clip is`, doc)

@@ -630,7 +630,7 @@ export class Dispatcher {
 					const { error: delError } = await noTryAsync(() => this.workFlows.remove(item))
 					if (delError) {
 						this.logger.error(
-							'Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"',
+							`Dispatcher: workflow replacement - failed to delete existing workflow: "${item._id}"`,
 							delError
 						)
 					}
