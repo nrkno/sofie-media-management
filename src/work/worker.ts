@@ -664,7 +664,9 @@ export class Worker {
 			throw new Error('Worker: get metadata: running getMetadata requires the presence of basic file data first.')
 		}
 		if (!doc.mediainfo.format.duration) {
-			this.logger.info(`Worker: get metadata: not generating stream metadata: duration missing on "${doc.mediaId}"`)
+			this.logger.info(
+				`Worker: get metadata: not generating stream metadata: duration missing on "${doc.mediaId}"`
+			)
 			return {}
 		}
 

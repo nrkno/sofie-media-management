@@ -285,10 +285,13 @@ export class MonitorQuantel extends Monitor {
 		setTimeout(() => {
 			if (!this.isDestroyed) {
 				this.doWatch().catch(e => {
-					this.logger.error(`${this.ident} triggerWatch: Error in Quantel doWatch - retarting watcher in 10s`, e)
+					this.logger.error(
+						`${this.ident} triggerWatch: Error in Quantel doWatch - retarting watcher in 10s`,
+						e
+					)
+					setTimeout(this.triggerWatch.bind(this), 10000)
 				})
 			}
-			setTimeout(this.triggerWatch, 10000)
 		}, BREATHING_ROOM)
 	}
 
