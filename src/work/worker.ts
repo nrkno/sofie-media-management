@@ -765,12 +765,16 @@ export class Worker {
 
 			let i = 0
 			while ((res = freezeDetectDuration.exec(stringData)) !== null) {
-				freezes[i++].duration = parseFloat(res[2])
+				if (freezes[i]) { 
+					freezes[i++].duration = parseFloat(res[2])
+				}
 			}
 
 			i = 0
 			while ((res = freezeDetectEnd.exec(stringData)) !== null) {
-				freezes[i++].end = parseFloat(res[2])
+				if (freezes[i]) {
+					freezes[i++].end = parseFloat(res[2])
+				}
 			}
 		})
 
