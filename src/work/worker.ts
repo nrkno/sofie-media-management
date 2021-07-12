@@ -644,7 +644,6 @@ export class Worker {
 	}
 
 	private async getMetadata(doc: MediaObject): Promise<Metadata> {
-		
 		// No longer static because /g flag has states between each run
 		const sceneRegex = /Parsed_showinfo_(.*)pts_time:([\d.]+)\s+/g
 		const blackDetectRegex = /(black_start:)(\d+(.\d+)?)( black_end:)(\d+(.\d+)?)( black_duration:)(\d+(.\d+))?/g
@@ -765,7 +764,7 @@ export class Worker {
 
 			let i = 0
 			while ((res = freezeDetectDuration.exec(stringData)) !== null) {
-				if (freezes[i]) { 
+				if (freezes[i]) {
 					freezes[i++].duration = parseFloat(res[2])
 				}
 			}
