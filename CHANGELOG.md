@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.11.0-release36.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.10.0...v1.11.0-release36.0) (2021-07-12)
+
+
+### Bug Fixes
+
+* make sure two+ files with freeze frames don't cause a crash ([7cf021d](https://github.com/nrkno/tv-automation-media-management/commit/7cf021d53c3a046d6cdc8c3ec5362f6091d94d1f))
+
 ## [1.10.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.9.0...v1.10.0) (2021-07-07)
 
 ## [1.10.0-release35.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.9.0-release34.1...v1.10.0-release35.1) (2021-06-10)
