@@ -326,7 +326,7 @@ export class MonitorQuantel extends Monitor {
 
 				if (url) {
 					const { result: clipSummaries, error: searchError } = await noTryAsync(() =>
-						this.quantel.searchClip(this.parseUrlToQuery(url))
+						this.quantel.searchClip(this.parseUrlToQuery(monitoredFile.url)) // Re-resolve URL as clone-by-title may update this
 					)
 					if (searchError) {
 						this.logger.error(
@@ -444,6 +444,11 @@ export class MonitorQuantel extends Monitor {
 										result
 									)
 									copyCreated = true
+									// Edge case where a cloned clip searched for by Title has a different title as a clone, although the same ClipGUID
+									if (this.parseUrlToQuery(url).Title) {
+										const updatedURL = `quantel:${clipSummaries[0].ClipGUID.toUpperCase()}`
+										this.monitoredFiles[url] = { ...this.monitoredFiles[url], url: updatedURL }
+									}
 									break
 								}
 								if (!copyCreated) {
