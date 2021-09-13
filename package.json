@@ -120,7 +120,7 @@
   ],
   "dependencies": {
     "@koa/cors": "^3.0.0",
-    "@sofie-automation/server-core-integration": "^1.36.0-in-testing.1",
+    "@sofie-automation/server-core-integration": "^1.37.0-in-testing.0",
     "chokidar": "^3.4.3",
     "class-transformer": "^0.4.0",
     "fs-extra": "^8.1.0",
