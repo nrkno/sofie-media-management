@@ -134,7 +134,7 @@
     "pouchdb-find": "^7.0.0",
     "pouchdb-node": "^7.0.0",
     "reflect-metadata": "^0.1.12",
-    "set-value": "^3.0.1",
+    "set-value": "^4.0.1",
     "tslib": "^2.0.3",
     "tv-automation-quantel-gateway-client": "^2.0.2",
     "underscore": "^1.12.1",
