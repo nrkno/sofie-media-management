@@ -43,7 +43,7 @@ export class MediaManagerApp {
 			let thumbPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
 				(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
-				`${id.replace(/:/gi, '_')}.jpg`
+				`${id.replace(/[:\?]/gi, '_')}.jpg`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(thumbPath))
 			if (statError) {
@@ -62,7 +62,7 @@ export class MediaManagerApp {
 			let previewPath = path.join(
 				(this.config.paths && this.config.paths.resources) || '',
 				(this.config.previews && this.config.previews.folder) || 'previews',
-				`${id.replace(/:/gi, '_')}.webm`
+				`${id.replace(/[:\?]/gi, '_')}.webm`
 			)
 			let { result: stats, error: statError } = await noTryAsync(() => fs.stat(previewPath))
 			if (statError) {

@@ -323,7 +323,7 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
-			`${doc._id.replace(/:/gi, '_')}.jpg`
+			`${doc._id.replace(/[:\?]/gi, '_')}.jpg`
 		)
 		const tmpPath = destPath.slice(0, -4) + '.new.jpg'
 		await fs.mkdirp(path.dirname(tmpPath))
@@ -448,7 +448,7 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.previews && this.config.previews.folder) || 'previews',
-			`${doc._id.replace(/:/gi, '_')}.webm`
+			`${doc._id.replace(/[:\?]/gi, '_')}.webm`
 		)
 		const tmpPath = destPath + '.new'
 
