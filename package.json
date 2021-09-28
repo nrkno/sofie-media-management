@@ -122,6 +122,7 @@
     "pouchdb-node": "^7.0.0",
     "reflect-metadata": "^0.1.12",
     "tslib": "^2.3.1",
+    "set-value": "^4.0.1",
     "tv-automation-quantel-gateway-client": "^2.0.2",
     "underscore": "^1.12.1",
     "windows-network-drive": "^3.0.0",
