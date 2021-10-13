@@ -1279,13 +1279,13 @@ export class Worker {
 }
 
 function toString(val: any | undefined): string | undefined {
-	if (!val) return
+	if (val === undefined) return
 
 	return String(val)
 }
 
 function toNumber(val: any | undefined): number | undefined {
-	if (!val) return
+	if (val === undefined) return
 
 	return Number(val)
 }
