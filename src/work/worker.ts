@@ -22,6 +22,7 @@ import * as fs from 'fs-extra'
 import * as http from 'http'
 import { MonitorQuantel } from '../monitors/quantel'
 import quantelMetadataTransform from './quantelFormats'
+import { MediaStream, MediaStreamCodec } from '../api/mediaObject'
 
 export interface WorkResult {
 	status: WorkStepStatus
@@ -323,7 +324,7 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.thumbnails && this.config.thumbnails.folder) || 'thumbs',
-			`${doc._id.replace(/:/gi, '_')}.jpg`
+			`${doc._id.replace(/[:\?]/gi, '_')}.jpg`
 		)
 		const tmpPath = destPath.slice(0, -4) + '.new.jpg'
 		await fs.mkdirp(path.dirname(tmpPath))
@@ -448,7 +449,7 @@ export class Worker {
 		const destPath = path.join(
 			(this.config.paths && this.config.paths.resources) || '',
 			(this.config.previews && this.config.previews.folder) || 'previews',
-			`${doc._id.replace(/:/gi, '_')}.webm`
+			`${doc._id.replace(/[:\?]/gi, '_')}.webm`
 		)
 		const tmpPath = destPath + '.new'
 
@@ -792,9 +793,7 @@ export class Worker {
 				if (
 					freezes[freezes.length - 1] &&
 					!freezes[freezes.length - 1].end &&
-					doc.mediainfo &&
-					doc.mediainfo.format &&
-					typeof doc.mediainfo.format.duration === 'number'
+					doc.mediainfo?.format?.duration
 				) {
 					freezes[freezes.length - 1].end = doc.mediainfo.format.duration
 					freezes[freezes.length - 1].duration =
@@ -1090,49 +1089,51 @@ export class Worker {
 			// freezes: [],
 			// blacks: [],
 
-			streams: probeData.streams.map((s: any) => ({
-				codec: {
-					long_name: s.codec_long_name,
-					type: s.codec_type,
-					time_base: s.codec_time_base,
-					tag_string: s.codec_tag_string,
-					is_avc: s.is_avc
-				},
+			streams: probeData.streams.map((s: any) =>
+				literal<MediaStream>({
+					codec: literal<MediaStreamCodec>({
+						long_name: toString(s.codec_long_name),
+						type: s.codec_type,
+						time_base: toString(s.codec_time_base),
+						tag_string: toString(s.codec_tag_string),
+						is_avc: toString(s.is_avc)
+					}),
 
-				// Video
-				width: s.width,
-				height: s.height,
-				sample_aspect_ratio: s.sample_aspect_ratio,
-				display_aspect_ratio: s.display_aspect_ratio,
-				pix_fmt: s.pix_fmt,
-				bits_per_raw_sample: s.bits_per_raw_sample,
+					// Video
+					width: toNumber(s.width),
+					height: toNumber(s.height),
+					sample_aspect_ratio: toString(s.sample_aspect_ratio),
+					display_aspect_ratio: toString(s.display_aspect_ratio),
+					pix_fmt: toString(s.pix_fmt),
+					bits_per_raw_sample: toString(s.bits_per_raw_sample),
 
-				// Audio
-				sample_fmt: s.sample_fmt,
-				sample_rate: s.sample_rate,
-				channels: s.channels,
-				channel_layout: s.channel_layout,
-				bits_per_sample: s.bits_per_sample,
+					// Audio
+					sample_fmt: toString(s.sample_fmt),
+					sample_rate: toString(s.sample_rate),
+					channels: toNumber(s.channels),
+					channel_layout: toString(s.channel_layout),
+					bits_per_sample: toNumber(s.bits_per_sample),
 
-				// Common
-				time_base: s.time_base,
-				start_time: s.start_time,
-				duration_ts: s.duration_ts,
-				duration: s.duration,
+					// Common
+					time_base: toString(s.time_base),
+					start_time: toString(s.start_time),
+					duration_ts: toNumber(s.duration_ts),
+					duration: toString(s.duration),
 
-				bit_rate: s.bit_rate,
-				max_bit_rate: s.max_bit_rate,
-				nb_frames: s.nb_frames
-			})),
+					bit_rate: toString(s.bit_rate),
+					max_bit_rate: toString(s.max_bit_rate),
+					nb_frames: toString(s.nb_frames)
+				})
+			),
 			format: {
-				name: probeData.format.format_name,
-				long_name: probeData.format.format_long_name,
+				name: toString(probeData.format.format_name),
+				long_name: toString(probeData.format.format_long_name),
 				// size: probeData.format.time, carried at a higher level
 
 				start_time: probeData.format.start_time,
-				duration: probeData.format.duration,
-				bit_rate: probeData.format.bit_rate,
-				max_bit_rate: probeData.format.max_bit_rate
+				duration: toNumber(probeData.format.duration),
+				bit_rate: toNumber(probeData.format.bit_rate),
+				max_bit_rate: toNumber(probeData.format.max_bit_rate)
 			}
 		})
 
@@ -1275,4 +1276,15 @@ export class Worker {
 			status: WorkStepStatus.DONE
 		})
 	}
+}
+
+function toString(val: any | undefined): string | undefined {
+	if (val === undefined) return undefined
+	return String(val)
+}
+
+function toNumber(val: any | undefined): number | undefined {
+	const num = Number(val)
+	if (isNaN(num)) return undefined
+	return num
 }
