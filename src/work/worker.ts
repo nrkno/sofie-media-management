@@ -1279,13 +1279,12 @@ export class Worker {
 }
 
 function toString(val: any | undefined): string | undefined {
-	if (val === undefined) return
-
+	if (val === undefined) return undefined
 	return String(val)
 }
 
 function toNumber(val: any | undefined): number | undefined {
-	if (val === undefined) return
-
-	return Number(val)
+	const num = Number(val)
+	if (isNaN(num)) return undefined
+	return num
 }
