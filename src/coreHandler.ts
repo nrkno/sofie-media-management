@@ -183,7 +183,10 @@ export class CoreHandler {
 
 			configManifest: MEDIA_MANAGER_CONFIG_MANIFEST
 		}
-		options.versions = this._getVersions()
+
+		// Only the process needs versions defined
+		if (options.deviceSubType === P.SUBTYPE_PROCESS) options.versions = this._getVersions()
+
 		return options
 	}
 	onConnected(fcn: () => any) {
