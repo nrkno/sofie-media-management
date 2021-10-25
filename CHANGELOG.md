@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.12.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.3...v1.12.0) (2021-10-25)
+
+
+### Features
+
+* config setting to disable watchdog ([45566db](https://github.com/nrkno/tv-automation-media-management/commit/45566dbdde1b3ea1fd5a205ee333e4003bc29423))
+
 ## [1.12.0-release37.3](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.2...v1.12.0-release37.3) (2021-10-22)
 
 
