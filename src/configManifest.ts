@@ -222,19 +222,19 @@ export const MEDIA_MANAGER_CONFIG_MANIFEST: DeviceConfigManifest = {
 			id: 'warningTaskWorkingTime',
 			name: 'Maximum time allowed for a job to take (more will trigger a warning)',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '900000',
+			placeholder: '900000'
 		},
 		{
 			id: 'warningWFQueueLength',
 			name: 'Maximum amount of unfinished jobs in queue (more will trigger a warning)',
 			type: ConfigManifestEntryType.INT,
-			placeholder: '10',
+			placeholder: '10'
 		},
 		{
 			id: 'disableStuckWarning',
 			name: 'Disable stuck warnings',
 			type: ConfigManifestEntryType.BOOLEAN,
-			defaultVal: false,
+			defaultVal: false
 		},
 		{
 			id: 'httpPort',

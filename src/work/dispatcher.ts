@@ -905,7 +905,7 @@ export class Dispatcher {
 
 					this.logger.debug(
 						`Dispatcher: setting WorkStep "${job._id}" result to "${result.status}"` +
-						(result.messages ? ', message: ' + result.messages.join(', ') : '')
+							(result.messages ? ', message: ' + result.messages.join(', ') : '')
 					)
 					return workStep
 				}),
@@ -972,7 +972,8 @@ export class Dispatcher {
 						)
 					} else {
 						this.logger.info(
-							`Dispatcher: workFlow ${wf._id} is now finished ${isSuccessful ? 'successfully' : 'unsuccessfully'
+							`Dispatcher: workFlow ${wf._id} is now finished ${
+								isSuccessful ? 'successfully' : 'unsuccessfully'
 							}`
 						)
 					}

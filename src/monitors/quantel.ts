@@ -325,8 +325,8 @@ export class MonitorQuantel extends Monitor {
 				let mediaObject: MediaObject | null = null
 
 				if (url) {
-					const { result: clipSummaries, error: searchError } = await noTryAsync(() =>
-						this.quantel.searchClip(this.parseUrlToQuery(monitoredFile.url)) // Re-resolve URL as clone-by-title may update this
+					const { result: clipSummaries, error: searchError } = await noTryAsync(
+						() => this.quantel.searchClip(this.parseUrlToQuery(monitoredFile.url)) // Re-resolve URL as clone-by-title may update this
 					)
 					if (searchError) {
 						this.logger.error(
