@@ -60,6 +60,7 @@ export class Dispatcher {
 
 	private warningWFQueueLength: number
 	private warningTaskWorkingTime: number
+	private disableStuckWarning: boolean
 
 	private quantelMonitor: MonitorQuantel | undefined
 
@@ -83,6 +84,7 @@ export class Dispatcher {
 		this.cronJobTime = config.cronJobTime || CRON_JOB_INTERVAL
 		this.warningTaskWorkingTime = config.warningTaskWorkingTime || WARNING_TASK_WORKING_TIME
 		this.warningWFQueueLength = config.warningWFQueueLength || WARNING_WF_QUEUE_LENGTH
+		this.disableStuckWarning = config.disableStuckWarning || false
 	}
 
 	private async initDB(): Promise<void> {
@@ -321,24 +323,26 @@ export class Dispatcher {
 				const oldUnfinishedWorkFlows = unfinishedWorkFlows.filter(
 					i => i.doc && i.doc.created <= getCurrentTime() - 15 * 60 * 1000
 				)
-				if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
-					this.coreHandler.setProcessState(
-						PROCESS_NAME,
-						[`Media Manager seems to be stuck. Please contact support.`],
-						P.StatusCode.BAD
-					)
-					return
-				}
-				if (oldWorkFlows.length > 0) {
-					this.coreHandler.setProcessState(
-						PROCESS_NAME,
-						[
-							`Media Manager has one or more workflows that are more than 3 hours old. Please contact support.`
-						],
-						P.StatusCode.BAD
-					)
-					this.watchdogRunning = false
-					return
+				if (!this.disableStuckWarning) {
+					if (oldUnfinishedWorkFlows.length > 0 && recentlyFinished.length === 0) {
+						this.coreHandler.setProcessState(
+							PROCESS_NAME,
+							[`Media Manager seems to be stuck. Please contact support.`],
+							P.StatusCode.BAD
+						)
+						return
+					}
+					if (oldWorkFlows.length > 0) {
+						this.coreHandler.setProcessState(
+							PROCESS_NAME,
+							[
+								`Media Manager has one or more workflows that are more than 3 hours old. Please contact support.`
+							],
+							P.StatusCode.BAD
+						)
+						this.watchdogRunning = false
+						return
+					}
 				}
 				if (unfinishedWorkFlows.length > this.warningWFQueueLength) {
 					this.coreHandler.setProcessState(
@@ -901,7 +905,7 @@ export class Dispatcher {
 
 					this.logger.debug(
 						`Dispatcher: setting WorkStep "${job._id}" result to "${result.status}"` +
-							(result.messages ? ', message: ' + result.messages.join(', ') : '')
+						(result.messages ? ', message: ' + result.messages.join(', ') : '')
 					)
 					return workStep
 				}),
@@ -968,8 +972,7 @@ export class Dispatcher {
 						)
 					} else {
 						this.logger.info(
-							`Dispatcher: workFlow ${wf._id} is now finished ${
-								isSuccessful ? 'successfully' : 'unsuccessfully'
+							`Dispatcher: workFlow ${wf._id} is now finished ${isSuccessful ? 'successfully' : 'unsuccessfully'
 							}`
 						)
 					}

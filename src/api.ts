@@ -25,6 +25,8 @@ export interface DeviceSettings {
 	warningWFQueueLength?: number
 	/** When to warn that a worker is working too long */
 	warningTaskWorkingTime?: number
+	/** Show a warning from the watchdog if no unfinished jobs in Media Manager */
+	disableStuckWarning?: boolean
 
 	/** Connection details for media access via HTTP server */
 	httpPort?: number
