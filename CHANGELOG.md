@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.12.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0...v1.12.1) (2021-12-09)
+
+
+### Bug Fixes
+
+* update server-core-integration ([0ea0869](https://github.com/nrkno/tv-automation-media-management/commit/0ea086930b786c5196077b9551d31c0c4b048734))
+
 ## [1.12.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.3...v1.12.0) (2021-12-09)
 
 ## [1.12.0-release37.3](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.2...v1.12.0-release37.3) (2021-10-22)
