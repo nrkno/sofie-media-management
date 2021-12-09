@@ -8,12 +8,12 @@ if (process.env.npm_package_version) {
 
 let dirNames = [
 	// TODO: add any relevant sub-libraries here, to report to Core
-	'@sofie-automation/server-core-integration',
+	// '@sofie-automation/server-core-integration',
 	// 'timeline-state-resolver',
 ]
 try {
 	let nodeModulesDirectories = fs.readdirSync('node_modules')
-	nodeModulesDirectories.forEach((dir) => {
+	nodeModulesDirectories.forEach(dir => {
 		try {
 			if (dirNames.indexOf(dir) !== -1) {
 				let file = 'node_modules/' + dir + '/package.json'

@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.12.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0...v1.12.1) (2021-12-09)
+
+
+### Bug Fixes
+
+* update server-core-integration ([0ea0869](https://github.com/nrkno/tv-automation-media-management/commit/0ea086930b786c5196077b9551d31c0c4b048734))
+
+## [1.12.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.3...v1.12.0) (2021-12-09)
+
+## [1.12.0-release37.3](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.2...v1.12.0-release37.3) (2021-10-22)
+
+
+### Bug Fixes
+
+* update server-core-integration, and only report versions for the parent process ([022d42e](https://github.com/nrkno/tv-automation-media-management/commit/022d42e8d687d114b85216dbcd76f2a13f499943))
+
+## [1.12.0-release37.2](https://github.com/nrkno/tv-automation-media-management/compare/v1.9.0...v1.12.0-release37.2) (2021-10-18)
+
+
+### Bug Fixes
+
+* change title to GUID on successful clone to avoid next search fail ([7acbe61](https://github.com/nrkno/tv-automation-media-management/commit/7acbe617f18510153fd966f047c06db1a4ea0143))
+* Check for undefined, not falsy value ([5351cc7](https://github.com/nrkno/tv-automation-media-management/commit/5351cc727f6f20be9dae1258e0501dd941963d9b))
+* downgrade dependency ([482624c](https://github.com/nrkno/tv-automation-media-management/commit/482624c38610f668d0337f62a3d185f010c18766))
+* Force metadata values to be their described types ([8eaf1e6](https://github.com/nrkno/tv-automation-media-management/commit/8eaf1e68399b9897440ca28dad782d746087ec3f))
+* make sure two+ files with freeze frames don't cause a crash ([7cf021d](https://github.com/nrkno/tv-automation-media-management/commit/7cf021d53c3a046d6cdc8c3ec5362f6091d94d1f))
+* path names cannot contain question marks ([d182a3c](https://github.com/nrkno/tv-automation-media-management/commit/d182a3c58db468fe7b053ba2a5ba78fc8bfaf075))
+
+## [1.10.0-release35.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.9.0-release34.1...v1.10.0-release35.1) (2021-06-10)
+
+## [1.10.0-release35.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.9.0-release34.0...v1.10.0-release35.0) (2021-06-09)
+
 ## [1.12.0-release37.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.0-release37.0...v1.12.0-release37.1) (2021-09-13)
 
 
