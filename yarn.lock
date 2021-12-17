@@ -592,10 +592,10 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@sofie-automation/server-core-integration@1.38.0-nightly-release38-20211208-162831-102085a.0":
-  version "1.38.0-nightly-release38-20211208-162831-102085a.0"
-  resolved "https://registry.yarnpkg.com/@sofie-automation/server-core-integration/-/server-core-integration-1.38.0-nightly-release38-20211208-162831-102085a.0.tgz#8f5d733414485078db26a352da738b1f0cad65cf"
-  integrity sha512-8fG1ponVo4ucFJ5KsXX1a7XrX9RZv2VaFdHW2OpG0OnKL+WjJmyubu+XomG7ll8op3RFlIfFSRle2pdNlYaVvg==
+"@sofie-automation/server-core-integration@1.38.0-nightly-release38-20211217-125528-1e8438d.0":
+  version "1.38.0-nightly-release38-20211217-125528-1e8438d.0"
+  resolved "https://registry.yarnpkg.com/@sofie-automation/server-core-integration/-/server-core-integration-1.38.0-nightly-release38-20211217-125528-1e8438d.0.tgz#b93cfae3be66c5f4347065e8b960bb58d2c4e8e5"
+  integrity sha512-ldBsxGkPtZe2SUZD54/Y2Kdyk3vFemN29aoAo0jQpiUlthOSkB/lNpKuRrEnH4SrDJNkwTPj93DWMipfAcSmxw==
   dependencies:
     data-store "^4.0.3"
     ejson "^2.2.0"
