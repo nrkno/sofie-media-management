@@ -7,27 +7,27 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nrkno/tv-automation-media-management"
+    "url": "git+https://github.com/nrkno/sofie-media-management"
   },
   "bugs": {
-    "url": "https://github.com/nrkno/tv-automation-media-management/issues"
+    "url": "https://github.com/nrkno/sofie-media-management/issues"
   },
-  "homepage": "https://github.com/nrkno/tv-automation-media-management",
+  "homepage": "https://github.com/nrkno/sofie-media-management",
   "contributors": [
     {
       "name": "Jan Starzak",
       "email": "jan@superfly.tv",
-      "url": "http://superfly.tv"
+      "url": "https://superfly.tv"
     },
     {
       "name": "Johan Nyman",
       "email": "johan@superfly.tv",
-      "url": "http://superfly.tv"
+      "url": "https://superfly.tv"
     },
     {
       "name": "Richard Cartwright",
       "email": "spark@superfly.tv",
-      "url": "http://superfly.tv"
+      "url": "https://superfly.tv"
     }
   ],
   "scripts": {
