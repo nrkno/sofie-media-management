@@ -1,4 +1,4 @@
-import { Type, Transform, plainToClass, classToPlain } from 'class-transformer'
+import { Type, Transform, plainToInstance, instanceToPlain } from 'class-transformer'
 import { WorkStep, WorkStepAction, WorkStepStatus, WorkStepInitial, StorageType } from '../api'
 import { File, StorageObject } from '../storageHandlers/storageHandler'
 import { LocalFolderFile } from '../storageHandlers/localFolderHandler'
@@ -104,7 +104,7 @@ export class ScannerWorkStep extends WorkStep implements ScannerWorkStepInitial 
 }
 
 export function workStepToPlain(obj: WorkStep): object {
-	return classToPlain(obj)
+	return instanceToPlain(obj)
 }
 
 export function plainToWorkStep(obj: object, availableStorage: StorageObject[]): WorkStepDB {
@@ -117,7 +117,7 @@ export function plainToWorkStep(obj: object, availableStorage: StorageObject[]):
 		case WorkStepAction.GENERATE_PREVIEW:
 		case WorkStepAction.SCAN:
 			try {
-				const cls = plainToClass(FileWorkStep, obj)
+				const cls = plainToInstance(FileWorkStep, obj)
 				const storageId = (cls.target as any) as string
 
 				const storage =

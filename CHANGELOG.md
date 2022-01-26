@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.13.1](https://github.com/nrkno/tv-automation-media-management/compare/v1.13.0...v1.13.1) (2022-01-26)
+
+
+### Bug Fixes
+
+* rename methods ([7156709](https://github.com/nrkno/tv-automation-media-management/commit/715670902a2bab42f66200b9b5f5fb50af4615b1))
+
 ## [1.13.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.13.0-release38.0...v1.13.0) (2022-01-26)
 
 ## [1.13.0-release38.0](https://github.com/nrkno/tv-automation-media-management/compare/v1.12.1...v1.13.0-release38.0) (2021-12-17)
