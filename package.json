@@ -125,7 +125,7 @@
     "tslib": "^2.3.1",
     "tv-automation-quantel-gateway-client": "^2.0.2",
     "underscore": "^1.12.1",
-    "urijs": "^1.19.7",
+    "urijs": "^1.19.9",
     "windows-network-drive": "^3.0.0",
     "winston": "^2.4.2",
     "xml2js": "^0.4.19"
