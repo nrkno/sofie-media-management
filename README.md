@@ -1,3 +1,6 @@
+Please note that this repository has been archived as this component has been replaced with [Package Manager](https://github.com/nrkno/sofie-package-manager).  
+As of Sofie 1.50.0, Media Manager will no longer operate without changes. The remaining APIs needed for Media Manager are expected to be removed in 1.52.0, or a release soon after.
+
 # Sofie: The Modern TV News Studio Automation System (Media Management)
 An application for managing media, used by [Sofie Server Core](https://github.com/nrkno/tv-automation-server-core).
 
